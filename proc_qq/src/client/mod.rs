@@ -1,9 +1,8 @@
-use std::error::Error;
 use std::path::Path;
 use std::sync::Arc;
 use std::time::Duration;
 
-use anyhow::Context;
+use anyhow::{Context, Result};
 use bytes::Bytes;
 use rq_engine::command::wtlogin::{
     LoginDeviceLocked, LoginNeedCaptcha, LoginResponse, LoginSuccess, LoginUnknownStatus,
@@ -19,6 +18,7 @@ pub use entities::*;
 
 mod entities;
 
+/// 客户端, 对RS-QQ的封装
 pub struct Client {
     pub rq_client: Arc<rs_qq::Client>,
     pub authentication: Authentication,
@@ -26,23 +26,68 @@ pub struct Client {
 }
 
 impl Client {
-    pub fn start(self) -> JoinHandle<Result<(), Box<dyn Error + Sync + Send>>> {
+    /// 启动客户端
+    pub fn start(self) -> JoinHandle<Result<()>> {
         tokio::spawn(run_client(self))
     }
 }
 
-pub async fn run_client(client: Client) -> Result<(), Box<dyn Error + Sync + Send>> {
-    let stream = TcpStream::connect(client.rq_client.get_address())
-        .await
-        .expect("failed to connect");
-    let rq_client = client.rq_client.clone();
-    let handle = tokio::spawn(async move { rq_client.start(stream).await });
-    tokio::task::yield_now().await;
-    let token_login = if let Some(session_file) = &client.priority_session {
-        if Path::new(session_file).exists() {
-            let session_data = tokio::fs::read(session_file)
+/// 启动客户端
+pub async fn run_client(client: Client) -> Result<()> {
+    loop {
+        // 连接到服务器, 并启动客户端, 并获取到handle
+        let stream = match TcpStream::connect(client.rq_client.get_address())
+            .await
+            .with_context(|| "连接到服务器失败")
+        {
+            Ok(stream) => stream,
+            Err(err) => {
+                tracing::info!("{:?}", err);
+                tracing::info!("五秒钟之后重试");
+                sleep(Duration::from_secs(5)).await;
+                continue;
+            }
+        };
+        let rq_client = client.rq_client.clone();
+        let handle = tokio::spawn(async move { rq_client.start(stream).await });
+        tokio::task::yield_now().await;
+        // 使用session恢复登录
+        if !token_login(&client).await {
+            // 不成功的话使用验证登录
+            // 验证登录不成功认为是致命错误
+            login_authentication(&client).await?;
+        }
+        // rs-qq 文档中说明, 登录完成后必须注册设备
+        after_login(&client.rq_client.clone()).await;
+        // 如果需要的话保存session, 如果出错认为是致命错误
+        if let Some(session_file) = &client.priority_session {
+            tokio::fs::write(session_file, client.rq_client.gen_token().await)
                 .await
-                .with_context(|| format!("fs io error : {}", session_file))?;
+                .with_context(|| "写入session出错")?;
+        }
+        // 等待结束
+        match handle.await {
+            Ok(_) => {}
+            Err(err) => tracing::info!("{:?}", err),
+        };
+        tracing::info!("连接已断开, 五秒钟之后重试");
+        sleep(Duration::from_secs(5)).await;
+    }
+}
+
+async fn token_login(client: &Client) -> bool {
+    if let Some(session_file) = &client.priority_session {
+        if Path::new(session_file).exists() {
+            let session_data = match tokio::fs::read(session_file)
+                .await
+                .with_context(|| format!("fs io error : {}", session_file))
+            {
+                Ok(data) => data,
+                Err(err) => {
+                    tracing::info!("{:?}", err);
+                    return false;
+                }
+            };
             client
                 .rq_client
                 .token_login(Bytes::from(session_data))
@@ -53,41 +98,30 @@ pub async fn run_client(client: Client) -> Result<(), Box<dyn Error + Sync + Sen
         }
     } else {
         false
-    };
-    if !token_login {
-        login_authentication(&client).await
     }
-    after_login(&client.rq_client.clone()).await;
-    if let Some(session_file) = &client.priority_session {
-        tokio::fs::write(session_file, client.rq_client.gen_token().await)
-            .await
-            .unwrap();
-    }
-    handle.await?;
-    Ok(())
 }
 
-async fn login_authentication(client: &Client) {
+async fn login_authentication(client: &Client) -> Result<()> {
     let rq_client = client.rq_client.clone();
     match &client.authentication {
         Authentication::QRCode => qr_login(rq_client).await,
         Authentication::UinPassword(uin, password) => {
             let first = rq_client.password_login(uin.clone(), password).await;
-            loop_login(rq_client, first).await;
+            loop_login(rq_client, first).await
         }
         Authentication::UinPasswordMd5(uin, password) => {
             let first = rq_client.password_md5_login(uin.clone(), password).await;
-            loop_login(rq_client, first).await;
+            loop_login(rq_client, first).await
         }
-    };
+    }
 }
 
-async fn qr_login(rq_client: Arc<rs_qq::Client>) {
+async fn qr_login(rq_client: Arc<rs_qq::Client>) -> Result<()> {
     let mut image_sig = Bytes::new();
     let mut resp = rq_client
         .fetch_qrcode()
         .await
-        .expect("failed to fetch qrcode");
+        .with_context(|| "failed to fetch qrcode")?;
     loop {
         match resp {
             QRCodeState::ImageFetch(QRCodeImageFetch {
@@ -96,8 +130,9 @@ async fn qr_login(rq_client: Arc<rs_qq::Client>) {
             }) => {
                 tokio::fs::write("qrcode.png", &image_data)
                     .await
-                    .expect("failed to write file");
+                    .with_context(|| "failed to write file")?;
                 image_sig = sig.clone();
+                // 桌面环境直接打开, 服务器使用文字渲染
                 tracing::info!("二维码: qrcode.png");
             }
             QRCodeState::WaitingForScan => {
@@ -108,20 +143,11 @@ async fn qr_login(rq_client: Arc<rs_qq::Client>) {
             }
             QRCodeState::Timeout => {
                 tracing::info!("二维码已超时，重新获取");
-                if let QRCodeState::ImageFetch(QRCodeImageFetch {
-                    ref image_data,
-                    ref sig,
-                }) = rq_client
+                resp = rq_client
                     .fetch_qrcode()
                     .await
-                    .expect("failed to fetch qrcode")
-                {
-                    tokio::fs::write("qrcode.png", &image_data)
-                        .await
-                        .expect("failed to write file");
-                    image_sig = sig.clone();
-                    tracing::info!("二维码: qrcode.png");
-                }
+                    .with_context(|| "failed to fetch qrcode")?;
+                continue;
             }
             QRCodeState::Confirmed(QRCodeConfirmed {
                 ref tmp_pwd,
@@ -133,8 +159,7 @@ async fn qr_login(rq_client: Arc<rs_qq::Client>) {
                 let first = rq_client
                     .qrcode_login(tmp_pwd, tmp_no_pic_sig, tgt_qr)
                     .await;
-                loop_login(rq_client, first).await;
-                return;
+                return loop_login(rq_client, first).await;
             }
             QRCodeState::Canceled => {
                 panic!("二维码已取消")
@@ -148,7 +173,7 @@ async fn qr_login(rq_client: Arc<rs_qq::Client>) {
     }
 }
 
-async fn loop_login(client: Arc<rs_qq::Client>, first: RQResult<LoginResponse>) {
+async fn loop_login(client: Arc<rs_qq::Client>, first: RQResult<LoginResponse>) -> Result<()> {
     let mut resp = first.unwrap();
     loop {
         match resp {
@@ -156,7 +181,7 @@ async fn loop_login(client: Arc<rs_qq::Client>, first: RQResult<LoginResponse>) 
                 ref account_info, ..
             }) => {
                 tracing::info!("login success: {:?}", account_info);
-                return;
+                return Ok(());
             }
             LoginResponse::DeviceLocked(LoginDeviceLocked {
                 ref sms_phone,
@@ -184,23 +209,15 @@ async fn loop_login(client: Arc<rs_qq::Client>, first: RQResult<LoginResponse>) 
                     .unwrap()
                     .replace("ssl.captcha.qq.com", "txhelper.glitch.me");
                 tracing::info!("helper_url: {:?}", helper_url);
-                let mut txt = reqwest::ClientBuilder::new().build().unwrap().get(&helper_url).header(
-                    "user-agent", "Mozilla/5.0 (Linux; Android 6.0; Nexus 5 Build/MRA58N) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/98.0.4758.80 Mobile Safari/537.36",
-                ).send().await
-                    .unwrap()
-                    .text()
+                let mut txt = http_get(&helper_url)
                     .await
-                    .unwrap();
-                tracing::info!("helper: {}", txt);
+                    .with_context(|| "http请求失败")?;
+                tracing::info!("helper: 滑动后请等待: {}", txt);
                 loop {
                     sleep(Duration::from_secs(5)).await;
-                    let rsp = reqwest::ClientBuilder::new().build().unwrap().get(&helper_url).header(
-                        "user-agent", "Mozilla/5.0 (Linux; Android 6.0; Nexus 5 Build/MRA58N) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/98.0.4758.80 Mobile Safari/537.36",
-                    ).send().await
-                        .unwrap()
-                        .text()
+                    let rsp = http_get(&helper_url)
                         .await
-                        .unwrap();
+                        .with_context(|| "http请求失败")?;
                     if !rsp.eq(&txt) {
                         txt = rsp;
                         break;
@@ -232,4 +249,12 @@ async fn loop_login(client: Arc<rs_qq::Client>, first: RQResult<LoginResponse>) 
             }
         }
     }
+}
+
+async fn http_get(url: &str) -> Result<String> {
+    Ok(reqwest::ClientBuilder::new().build().unwrap().get(url).header(
+        "user-agent", "Mozilla/5.0 (Linux; Android 6.0; Nexus 5 Build/MRA58N) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/98.0.4758.80 Mobile Safari/537.36",
+    ).send().await?
+        .text()
+        .await?)
 }
