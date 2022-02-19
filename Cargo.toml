@@ -1,6 +1,6 @@
 [workspace]
 members = [
     "proc_qq",
-    "proc_qq_macros",
+    "proc_qq_codegen",
     "proc_qq_tests",
 ]

@@ -5,8 +5,9 @@ edition = "2021"
 
 [dependencies]
 async-trait = "0.1"
+futures="0"
 reqwest = "0"
-proc_qq_macros = { path = "../proc_qq_macros" }
+proc_qq_codegen = { path = "../proc_qq_codegen" }
 bytes = "1"
 tokio = { version = "1", features = ["full"] }
 tracing = "0"

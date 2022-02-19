@@ -4,10 +4,9 @@ use std::sync::Arc;
 use anyhow::Context;
 use rq_engine::protocol::device::Device;
 use rq_engine::protocol::version::{Version, ANDROID_PHONE};
-use rs_qq::handler::Handler;
 
 use crate::DeviceSource::{JsonFile, JsonString};
-use crate::{Authentication, Client, DeviceSource};
+use crate::{Authentication, Client, ClientHandler, DeviceSource, Module};
 
 #[derive(Debug)]
 pub struct ClientBuilder {
@@ -27,10 +26,7 @@ impl ClientBuilder {
         }
     }
 
-    pub async fn build<H>(&self, h: H) -> Result<Client, anyhow::Error>
-    where
-        H: Handler + 'static + Sync + Send,
-    {
+    pub async fn build(&self, h: Vec<Module>) -> Result<Client, anyhow::Error> {
         Ok(Client {
             rq_client: Arc::new(rs_qq::Client::new(
                 match &self.device_source {
@@ -54,7 +50,7 @@ impl ClientBuilder {
                     JsonString(json_string) => parse_device_json(json_string)?,
                 },
                 self.version,
-                h,
+                ClientHandler { modules: h },
             )),
             authentication: self
                 .authentication

@@ -1,0 +1,14 @@
+[package]
+name = "proc_qq_codegen"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+quote = "1"
+syn = { version = "1.0.72", features = ["full", "visit", "visit-mut", "extra-traits"] }
+proc-macro2 = "1.0.27"
+proc-macro-error = { version = "1", default-features = false }
+devise = "0.3.1"
+
+[lib]
+proc-macro = true

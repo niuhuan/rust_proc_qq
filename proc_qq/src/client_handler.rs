@@ -1,7 +1,10 @@
 use async_trait::async_trait;
+use rs_qq::client::event::GroupMessageEvent;
 use rs_qq::handler::{Handler, QEvent};
 
-pub struct ClientHandler {}
+pub struct ClientHandler {
+    pub(crate) modules: Vec<Module>,
+}
 
 impl ClientHandler {}
 
@@ -53,4 +56,18 @@ impl Handler for ClientHandler {
             _ => tracing::info!(target = "rs_qq", "{:?}", e),
         }
     }
+}
+
+pub struct Module {
+    pub id: String,
+    pub handles: Vec<ModelEventHandle>,
+}
+
+pub enum ModelEventHandle {
+    GroupMessageEventHandle(Box<dyn ModuleGroupMessageEventHandle>),
+}
+
+#[async_trait]
+pub trait ModuleGroupMessageEventHandle: Sync + Send {
+    async fn handle(&self, event: &GroupMessageEvent);
 }

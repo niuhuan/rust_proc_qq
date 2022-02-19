@@ -3,7 +3,7 @@ pub use client::*;
 pub use client_builder::*;
 pub use client_handler::*;
 pub use entities::*;
-pub use proc_qq_macros::*;
+pub use proc_qq_codegen::*;
 
 mod client;
 mod client_builder;

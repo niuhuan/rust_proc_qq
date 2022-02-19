@@ -1,9 +1,14 @@
 use tracing::Level;
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 
-use proc_qq::re_export::rs_qq::handler::DefaultHandler;
 use proc_qq::Authentication::{QRCode, UinPassword};
 use proc_qq::ClientBuilder;
+
+// use proc_qq::event;
+// use proc_qq::re_export::rs_qq::client::event::GroupMessageEvent;
+
+// #[event]
+// async fn a(event: &GroupMessageEvent) {}
 
 #[tokio::test]
 async fn test_qr_login() {
@@ -11,7 +16,7 @@ async fn test_qr_login() {
     ClientBuilder::new()
         .priority_session("session.token")
         .authentication(QRCode)
-        .build(DefaultHandler {})
+        .build(vec![])
         .await
         .unwrap()
         .start()
@@ -26,7 +31,7 @@ async fn test_password_login() {
     ClientBuilder::new()
         .priority_session("session.token")
         .authentication(UinPassword(123456, "password".to_owned()))
-        .build(DefaultHandler {})
+        .build(vec![])
         .await
         .unwrap()
         .start()
