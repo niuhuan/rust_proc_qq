@@ -1,0 +1,10 @@
+
+.idea/
+
+target/
+Cargo.lock
+
+device.json
+qrcode.png
+session.token
+

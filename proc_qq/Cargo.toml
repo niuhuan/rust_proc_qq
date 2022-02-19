@@ -1,0 +1,19 @@
+[package]
+name = "proc_qq"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+reqwest = "0"
+proc_qq_macros = { path = "../proc_qq_macros" }
+bytes = "1"
+tokio = { version = "1", features = ["full"] }
+tracing = "0"
+rs-qq = { git = "https://github.com/lz1998/rs-qq.git", branch = "master" }
+rq-engine = { git = "https://github.com/lz1998/rs-qq.git", branch = "master" }
+anyhow = "1"
+serde = "1"
+serde_json = "1"
+serde_derive = "1"
+
+[lib]

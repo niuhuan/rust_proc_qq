@@ -1,0 +1,13 @@
+[package]
+name = "proc_qq_tests"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+proc_qq = { path = "../proc_qq" }
+anyhow = "1"
+tokio = { version = "1", features = ["full"] }
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["fmt"] }
+
+[lib]
