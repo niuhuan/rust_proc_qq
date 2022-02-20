@@ -1,14 +1,16 @@
 RUST_PROC_QQ
 ============
 
-基于 [RS-QQ](https://github.com/lz1998/rs-qq) + 过程宏 的QQ机器人框架/模版
+- 一个开箱即用, 使用简单的, Rust语言的QQ机器人框架. (基于[RS-QQ](https://github.com/lz1998/rs-qq))
+- 参考了Spring(java)和Rocket(rust)的思想, 如果您使用此类框架将很好上手
 
 ## 框架目的
 
 - 简单化 : 让程序员写更少的代码
     - 自动管理客户端生命周期以及TCP重连
     - 封装登录流程, 自动获取ticket, 验证滑动条
-- 模块化 : 让调理更清晰, 实现插件之间的分离
+- 模块化 : 让调理更清晰
+  - 模块化, 实现插件之间的分离, 更好的启用禁用
 
 ## 如何使用 / demo
 
@@ -25,7 +27,7 @@ proc_qq = { git = "https://github.com/niuhuan/rust_proc_qq.git", branch = "maste
 hello_module.rs
 
 ```rust
-use proc_qq::{event, Module};
+use proc_qq::{event, module, Module};
 use proc_qq::re_export::rs_qq::client::event::{GroupMessageEvent, PrivateMessageEvent};
 use proc_qq::re_export::rs_qq::msg::elem::Text;
 use proc_qq::re_export::rs_qq::msg::MessageChain;
@@ -81,10 +83,8 @@ async fn private_hello(event: &PrivateMessageEvent) -> anyhow::Result<bool> {
 
 /// 返回一个模块 (向过程宏改进中)
 pub(crate) fn module() -> Module {
-    Module {
-        id: "hello".to_owned(),
-        handles: vec![group_hello {}.into(), private_hello {}.into()],
-    }
+  // id, name, [plugins ...]
+  module!("hello", "你好", group_hello, private_hello)
 }
 ```
 
@@ -168,3 +168,8 @@ use rs_qq::client::event::{
 };
 ```
 
+### 其他
+
+[使用此框架的模版](proc_qq_template)
+
+[例子](proc_qq_examples)

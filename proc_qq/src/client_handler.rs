@@ -132,7 +132,19 @@ impl Handler for ClientHandler {
 
 pub struct Module {
     pub id: String,
+    pub name: String,
     pub handles: Vec<ModuleEventHandler>,
+}
+
+#[macro_export]
+macro_rules! module {
+    ($id:expr,$name:expr $(, $x:tt)* $(,)?) => (
+        ::proc_qq::Module {
+            id: $id.to_owned(),
+            name: $name.to_owned(),
+            handles: vec![$($x {}.into(),)*],
+        }
+    );
 }
 
 pub struct ModuleEventHandler {

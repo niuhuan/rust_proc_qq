@@ -1,13 +1,10 @@
 use proc_qq::re_export::rs_qq::client::event::{GroupMessageEvent, PrivateMessageEvent};
 use proc_qq::re_export::rs_qq::msg::elem::Text;
 use proc_qq::re_export::rs_qq::msg::MessageChain;
-use proc_qq::{event, Module};
+use proc_qq::{event, module, Module};
 
 pub(crate) fn module() -> Module {
-    Module {
-        id: "hello".to_owned(),
-        handles: vec![group_hello {}.into(), private_hello {}.into()],
-    }
+    module!("hello", "你好", group_hello, private_hello)
 }
 
 #[event]
