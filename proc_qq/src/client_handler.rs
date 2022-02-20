@@ -30,7 +30,8 @@ macro_rules! map_handlers {
                                 result = MapResult::Process(&m.id, &h.name);
                             }
                         }
-                        Err(_) => {
+                        Err(err) => {
+                            tracing::error!(target = "proc_qq", " handle error : {:?}", err);
                             result = MapResult::Exception(&m.id, &h.name);
                         }
                     },
