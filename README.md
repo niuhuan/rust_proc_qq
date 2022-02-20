@@ -157,3 +157,14 @@ fn init_tracing_subscriber() {
 ### 效果
 
 ![demo](images/demo_01.jpg)
+
+### 支持的事件
+
+```rust
+use rs_qq::client::event::{
+    DeleteFriendEvent, FriendMessageRecallEvent, FriendPokeEvent, FriendRequestEvent,
+    GroupLeaveEvent, GroupMessageEvent, GroupMessageRecallEvent, GroupMuteEvent,
+    GroupNameUpdateEvent, GroupRequestEvent, NewFriendEvent, PrivateMessageEvent, TempMessageEvent,
+};
+```
+

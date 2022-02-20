@@ -57,10 +57,54 @@ pub fn event(_: TokenStream, input: TokenStream) -> TokenStream {
             quote! {::proc_qq::PrivateMessageEventProcess},
             quote! {::proc_qq::ModuleEventProcess::PrivateMessage},
         ),
+        "& TempMessageEvent" => (
+            quote! {::proc_qq::TempMessageEventProcess},
+            quote! {::proc_qq::ModuleEventProcess::TempMessage},
+        ),
+        "& GroupRequestEvent" => (
+            quote! {::proc_qq::GroupRequestEventProcess},
+            quote! {::proc_qq::ModuleEventProcess::GroupRequest},
+        ),
+        "& FriendRequestEvent" => (
+            quote! {::proc_qq::FriendRequestEventProcess},
+            quote! {::proc_qq::ModuleEventProcess::FriendRequest},
+        ),
+        "& NewFriendEvent" => (
+            quote! {::proc_qq::NewFriendEventProcess},
+            quote! {::proc_qq::ModuleEventProcess::NewFriendEvent},
+        ),
+        "& FriendPokeEvent" => (
+            quote! {::proc_qq::FriendPokeEventProcess},
+            quote! {::proc_qq::ModuleEventProcess::FriendPoke},
+        ),
+        "& DeleteFriendEvent" => (
+            quote! {::proc_qq::DeleteFriendEventProcess},
+            quote! {::proc_qq::ModuleEventProcess::DeleteFriend},
+        ),
+        "& GroupMuteEvent" => (
+            quote! {::proc_qq::GroupMuteEventProcess},
+            quote! {::proc_qq::ModuleEventProcess::GroupMute},
+        ),
+        "& GroupLeaveEvent" => (
+            quote! {::proc_qq::GroupLeaveEventProcess},
+            quote! {::proc_qq::ModuleEventProcess::GroupLeave},
+        ),
+        "& GroupNameUpdateEvent" => (
+            quote! {::proc_qq::GroupNameUpdateEventProcess},
+            quote! {::proc_qq::ModuleEventProcess::GroupNameUpdate},
+        ),
+        "& GroupMessageRecallEvent" => (
+            quote! {::proc_qq::GroupMessageRecallEventProcess},
+            quote! {::proc_qq::ModuleEventProcess::GroupMessageRecall},
+        ),
+        "& FriendMessageRecallEvent" => (
+            quote! {::proc_qq::FriendMessageRecallEventProcess},
+            quote! {::proc_qq::ModuleEventProcess::FriendMessageRecall},
+        ),
         t => abort!(
             param.span(),
             format!(
-                "unknown type {}, param type must be &GroupMessageEvent / &PrivateMessageEven",
+                "unknown type {}, param type must be &GroupMessageEvent / &PrivateMessageEvent / &TempMessageEvent / &GroupRequestEvent",
                 t
             ),
         ),
