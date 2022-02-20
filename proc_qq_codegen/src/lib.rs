@@ -1,10 +1,9 @@
 use proc_macro::TokenStream;
 
+use proc_macro_error::{abort, proc_macro_error};
 use quote::quote;
 use syn::spanned::Spanned;
 use syn::{parse_macro_input, FnArg};
-
-use proc_macro_error::{abort, proc_macro_error};
 
 macro_rules! emit {
     ($tokens:expr) => {{
@@ -46,18 +45,50 @@ pub fn event(_: TokenStream, input: TokenStream) -> TokenStream {
         FnArg::Typed(pt) => pt,
     };
 
-    //let param_pat = param.pat.as_ref();
     let param_ty = param.ty.as_ref();
-    //let param_pat = quote! {#param_pat};
     let param_ty = quote! {#param_ty};
-    if !vec!["& GroupMessageEvent"].contains(&param_ty.to_string().as_ref()) {
-        abort!(param.span(), "param type must be &GroupMessageEvent");
-    }
+
+    let tokens = match param_ty.to_string().as_str() {
+        "& GroupMessageEvent" => (
+            quote! {::proc_qq::GroupMessageEventProcess},
+            quote! {::proc_qq::ModuleEventProcess::GroupMessage},
+        ),
+        "& PrivateMessageEvent" => (
+            quote! {::proc_qq::PrivateMessageEventProcess},
+            quote! {::proc_qq::ModuleEventProcess::PrivateMessage},
+        ),
+        t => abort!(
+            param.span(),
+            format!(
+                "unknown type {}, param type must be &GroupMessageEvent / &PrivateMessageEven",
+                t
+            ),
+        ),
+    };
+    let trait_name = tokens.0;
+    let enum_name = tokens.1;
+
+    let ident = &method.sig.ident;
+    let ident_str = format!("\"{}\"", ident);
 
     let finish = quote! {
+        #[allow(non_camel_case_types)]
+        pub struct #ident {}
+        #[::proc_qq::re_export::async_trait::async_trait]
+        impl #trait_name for #ident {
+            async fn handle(&self, event: #param_ty) -> ::proc_qq::re_export::anyhow::Result<bool> {
+                Ok(#ident(event).await?)
+            }
+        }
+        impl Into<::proc_qq::ModuleEventHandler> for #ident {
+            fn into(self) -> ::proc_qq::ModuleEventHandler {
+                ::proc_qq::ModuleEventHandler{
+                    name: #ident_str.into(),
+                    process: #enum_name(Box::new(self)),
+                }
+            }
+        }
         #method
-
     };
-    //abort!(&method.sig.span(), format!("{}", param_ty));
     emit!(finish)
 }

@@ -1,5 +1,5 @@
 [package]
-name = "proc_qq_tests"
+name = "proc_qq_examples"
 version = "0.1.0"
 edition = "2021"
 
