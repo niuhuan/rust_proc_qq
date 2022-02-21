@@ -47,74 +47,108 @@ pub fn event(_: TokenStream, input: TokenStream) -> TokenStream {
         "& GroupMessageEvent" => (
             quote! {::proc_qq::GroupMessageEventProcess},
             quote! {::proc_qq::ModuleEventProcess::GroupMessage},
+            false,
         ),
         "& PrivateMessageEvent" => (
             quote! {::proc_qq::PrivateMessageEventProcess},
             quote! {::proc_qq::ModuleEventProcess::PrivateMessage},
+            false,
         ),
         "& TempMessageEvent" => (
             quote! {::proc_qq::TempMessageEventProcess},
             quote! {::proc_qq::ModuleEventProcess::TempMessage},
+            false,
         ),
         "& GroupRequestEvent" => (
             quote! {::proc_qq::GroupRequestEventProcess},
             quote! {::proc_qq::ModuleEventProcess::GroupRequest},
+            false,
         ),
         "& FriendRequestEvent" => (
             quote! {::proc_qq::FriendRequestEventProcess},
             quote! {::proc_qq::ModuleEventProcess::FriendRequest},
+            false,
         ),
         "& NewFriendEvent" => (
             quote! {::proc_qq::NewFriendEventProcess},
             quote! {::proc_qq::ModuleEventProcess::NewFriendEvent},
+            false,
         ),
         "& FriendPokeEvent" => (
             quote! {::proc_qq::FriendPokeEventProcess},
             quote! {::proc_qq::ModuleEventProcess::FriendPoke},
+            false,
         ),
         "& DeleteFriendEvent" => (
             quote! {::proc_qq::DeleteFriendEventProcess},
             quote! {::proc_qq::ModuleEventProcess::DeleteFriend},
+            false,
         ),
         "& GroupMuteEvent" => (
             quote! {::proc_qq::GroupMuteEventProcess},
             quote! {::proc_qq::ModuleEventProcess::GroupMute},
+            false,
         ),
         "& GroupLeaveEvent" => (
             quote! {::proc_qq::GroupLeaveEventProcess},
             quote! {::proc_qq::ModuleEventProcess::GroupLeave},
+            false,
         ),
         "& GroupNameUpdateEvent" => (
             quote! {::proc_qq::GroupNameUpdateEventProcess},
             quote! {::proc_qq::ModuleEventProcess::GroupNameUpdate},
+            false,
         ),
         "& GroupMessageRecallEvent" => (
             quote! {::proc_qq::GroupMessageRecallEventProcess},
             quote! {::proc_qq::ModuleEventProcess::GroupMessageRecall},
+            false,
         ),
         "& FriendMessageRecallEvent" => (
             quote! {::proc_qq::FriendMessageRecallEventProcess},
             quote! {::proc_qq::ModuleEventProcess::FriendMessageRecall},
+            false,
+        ),
+        "& MessageEvent" => (
+            quote! {::proc_qq::MessageEventProcess},
+            quote! {::proc_qq::ModuleEventProcess::Message},
+            true,
         ),
         t => abort!(
             param.span(),
             format!("未知的参数类型 {}, 请在文档中查看兼容的事件以及参数类型 https://github.com/niuhuan/rust_proc_qq", t),
         ),
     };
-    // gen token stream
     let trait_name = tokens.0;
     let enum_name = tokens.1;
+    let build_in = tokens.2;
+    // gen token stream
     let ident = &method.sig.ident;
-    let ident_str = format!("\"{}\"", ident);
-    let finish = quote! {
+    let ident_str = format!("{}", ident);
+    let build_struct = quote! {
         #[allow(non_camel_case_types)]
         pub struct #ident {}
-        #[::proc_qq::re_export::async_trait::async_trait]
-        impl #trait_name for #ident {
-            async fn handle(&self, event: #param_ty) -> ::proc_qq::re_export::anyhow::Result<bool> {
-                Ok(#ident(event).await?)
+    };
+    let build_trait = if build_in {
+        let block = &method.block;
+        quote! {
+            #[::proc_qq::re_export::async_trait::async_trait]
+            impl #trait_name for #ident {
+                async fn handle(&self, event: #param_ty) -> ::proc_qq::re_export::anyhow::Result<bool> #block
             }
         }
+    } else {
+        quote! {
+            #method
+            #[::proc_qq::re_export::async_trait::async_trait]
+            impl #trait_name for #ident {
+                async fn handle(&self, event: #param_ty) -> ::proc_qq::re_export::anyhow::Result<bool> {
+                    Ok(#ident(event).await?)
+                }
+            }
+        }
+    };
+    let build_into = quote! {
         impl Into<::proc_qq::ModuleEventHandler> for #ident {
             fn into(self) -> ::proc_qq::ModuleEventHandler {
                 ::proc_qq::ModuleEventHandler{
@@ -123,7 +157,10 @@ pub fn event(_: TokenStream, input: TokenStream) -> TokenStream {
                 }
             }
         }
-        #method
     };
-    emit!(finish)
+    emit!(quote! {
+        #build_struct
+        #build_trait
+        #build_into
+    })
 }

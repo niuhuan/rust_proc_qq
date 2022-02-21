@@ -2,6 +2,8 @@ use rq_engine::msg::MessageChain;
 use rq_engine::structs::{GroupMessage, PrivateMessage, TempMessage};
 use rs_qq::client::event::{GroupMessageEvent, PrivateMessageEvent, TempMessageEvent};
 
+use crate::MessageEvent;
+
 pub enum MessageSource {
     // Group(group_code,uin)
     Group(i64, i64),
@@ -85,5 +87,23 @@ impl MessageTrait for TempMessageEvent {
 
     fn message_content(&self) -> String {
         self.message.message_content()
+    }
+}
+
+impl MessageTrait for MessageEvent<'_> {
+    fn message_source(&self) -> MessageSource {
+        match self {
+            MessageEvent::GroupMessage(event) => event.message_source(),
+            MessageEvent::PrivateMessage(event) => event.message_source(),
+            MessageEvent::TempMessage(event) => event.message_source(),
+        }
+    }
+
+    fn message_content(&self) -> String {
+        match self {
+            MessageEvent::GroupMessage(event) => event.message_content(),
+            MessageEvent::PrivateMessage(event) => event.message_content(),
+            MessageEvent::TempMessage(event) => event.message_content(),
+        }
     }
 }

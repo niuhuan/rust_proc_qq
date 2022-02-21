@@ -1,3 +1,5 @@
+#![feature(in_band_lifetimes)]
+
 /// 此模块用于重新导出引入, 以便macros使用
 pub use client::*;
 pub use client_builder::*;

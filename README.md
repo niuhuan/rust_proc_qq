@@ -27,30 +27,27 @@ proc_qq = { git = "https://github.com/niuhuan/rust_proc_qq.git", branch = "maste
 hello_module.rs
 
 ```rust
-use proc_qq::{event, module, Module};
-use proc_qq::re_export::rs_qq::client::event::{GroupMessageEvent, PrivateMessageEvent};
+use proc_qq::re_export::rs_qq::client::event::GroupMessageEvent;
 use proc_qq::re_export::rs_qq::msg::elem::Text;
 use proc_qq::re_export::rs_qq::msg::MessageChain;
+use proc_qq::{event, module, ClientTrait, MessageEvent, MessageTrait, Module};
 
 /// 监听群消息
 /// 使用event宏进行声明监听消息
-/// 参数为rs-qq支持的任何一个类型的消息事件, 必须是引用
+/// 参数为rs-qq支持的任何一个类型的消息事件, 必须是引用.
 /// 返回值为 anyhow::Result<bool>, Ok(true)为拦截事件, 不再向下一个监听器传递
 #[event]
-async fn group_hello(event: &GroupMessageEvent) -> anyhow::Result<bool> {
-    let content = event.message.elements.to_string();
+async fn print(event: &MessageEvent) -> anyhow::Result<bool> {
     if content.eq("你好") {
-        let chain = MessageChain::new(Text::new("世界".to_string()));
         event
-            .client
-            .send_group_message(event.message.group_code, chain)
+            .client()
+            .send_message_to_source(event, MessageChain::new(Text::new("世界".to_owned())))
             .await?;
         Ok(true)
     } else if content.eq("RC") {
-        let chain = MessageChain::new(Text::new("NB".to_string()));
         event
-            .client
-            .send_group_message(event.message.group_code, chain)
+            .client()
+            .send_message_to_source(event, MessageChain::new(Text::new("NB".to_owned())))
             .await?;
         Ok(true)
     } else {
@@ -58,33 +55,15 @@ async fn group_hello(event: &GroupMessageEvent) -> anyhow::Result<bool> {
     }
 }
 
-/// 监听
 #[event]
-async fn private_hello(event: &PrivateMessageEvent) -> anyhow::Result<bool> {
-    let content = event.message.elements.to_string();
-    if content.eq("你好") {
-        let chain = MessageChain::new(Text::new("世界".to_string()));
-        event
-            .client
-            .send_private_message(event.message.from_uin, chain)
-            .await?;
-        Ok(true)
-    } else if content.eq("RC") {
-        let chain = MessageChain::new(Text::new("NB".to_string()));
-        event
-            .client
-            .send_private_message(event.message.from_uin, chain)
-            .await?;
-        Ok(true)
-    } else {
-        Ok(false)
-    }
+async fn group_hello(_: &GroupMessageEvent) -> anyhow::Result<bool> {
+    Ok(false)
 }
 
 /// 返回一个模块 (向过程宏改进中)
 pub(crate) fn module() -> Module {
     // id, name, [plugins ...]
-    module!("hello", "你好", group_hello, private_hello)
+    module!("hello", "你好", print, group_hello)
 }
 ```
 
@@ -112,22 +91,6 @@ async fn test_qr_login() {
         // .device(JsonFile("device.json")) // 设备默认值 
         .authentication(QRCode)                 // 若不成功则使用二维码登录
         .build(vec![hello_module::module()])    // 您可以注册多个模块
-        .await
-        .unwrap()
-        .start()
-        .await
-        .unwrap()
-        .unwrap();
-}
-
-/// 启动并使用为密码登录
-#[tokio::test]
-async fn test_password_login() {
-    init_tracing_subscriber();
-    ClientBuilder::new()
-        .priority_session("session.token")
-        .authentication(UinPassword(123456, "password".to_owned()))
-        .build(vec![])
         .await
         .unwrap()
         .start()
@@ -168,7 +131,9 @@ use rs_qq::client::event::{
     GroupLeaveEvent, GroupMessageEvent, GroupMessageRecallEvent, GroupMuteEvent,
     GroupNameUpdateEvent, GroupRequestEvent, NewFriendEvent, PrivateMessageEvent, TempMessageEvent,
 };
+use proc_qq::{MessageEvent, };
 ```
+
 同时支持多种消息的事件封装中...
 
 ### 拓展
@@ -189,7 +154,7 @@ private_message_event.message_content();
 use prco_qq::MessageTrait;
 use prco_qq::ClientTrait;
 
-let group_message_event: GroupMessageEvent = _;
+let group_message_event: & GroupMessageEvent = _;
 let client: Arc<Client> = _;
 
 client.send_message_to_source(group_message_event, my_message);

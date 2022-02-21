@@ -1,3 +1,5 @@
+#![feature(in_band_lifetimes)]
+
 use tracing::Level;
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 

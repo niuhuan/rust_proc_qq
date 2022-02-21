@@ -1,52 +1,33 @@
-use proc_qq::re_export::rs_qq::client::event::{GroupMessageEvent, PrivateMessageEvent};
+use proc_qq::re_export::rs_qq::client::event::GroupMessageEvent;
 use proc_qq::re_export::rs_qq::msg::elem::Text;
 use proc_qq::re_export::rs_qq::msg::MessageChain;
-use proc_qq::{event, module, Module};
+use proc_qq::{event, module, ClientTrait, MessageEvent, MessageTrait, Module};
+
+#[event]
+async fn print(event: &MessageEvent) -> anyhow::Result<bool> {
+    let content = event.message_content();
+    if content.eq("你好") {
+        event
+            .client()
+            .send_message_to_source(event, MessageChain::new(Text::new("世界".to_owned())))
+            .await?;
+        Ok(true)
+    } else if content.eq("RC") {
+        event
+            .client()
+            .send_message_to_source(event, MessageChain::new(Text::new("NB".to_owned())))
+            .await?;
+        Ok(true)
+    } else {
+        Ok(false)
+    }
+}
+
+#[event]
+async fn group_hello(_: &GroupMessageEvent) -> anyhow::Result<bool> {
+    Ok(false)
+}
 
 pub(crate) fn module() -> Module {
-    module!("hello", "你好", group_hello, private_hello)
-}
-
-#[event]
-async fn group_hello(event: &GroupMessageEvent) -> anyhow::Result<bool> {
-    let content = event.message.elements.to_string();
-    if content.eq("你好") {
-        let chain = MessageChain::new(Text::new("世界".to_string()));
-        event
-            .client
-            .send_group_message(event.message.group_code, chain)
-            .await?;
-        Ok(true)
-    } else if content.eq("RC") {
-        let chain = MessageChain::new(Text::new("NB".to_string()));
-        event
-            .client
-            .send_group_message(event.message.group_code, chain)
-            .await?;
-        Ok(true)
-    } else {
-        Ok(false)
-    }
-}
-
-#[event]
-async fn private_hello(event: &PrivateMessageEvent) -> anyhow::Result<bool> {
-    let content = event.message.elements.to_string();
-    if content.eq("你好") {
-        let chain = MessageChain::new(Text::new("世界".to_string()));
-        event
-            .client
-            .send_private_message(event.message.from_uin, chain)
-            .await?;
-        Ok(true)
-    } else if content.eq("RC") {
-        let chain = MessageChain::new(Text::new("NB".to_string()));
-        event
-            .client
-            .send_private_message(event.message.from_uin, chain)
-            .await?;
-        Ok(true)
-    } else {
-        Ok(false)
-    }
+    module!("hello", "你好", print, group_hello)
 }

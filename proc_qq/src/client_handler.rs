@@ -1,3 +1,5 @@
+use std::sync::Arc;
+
 use async_trait::async_trait;
 use rs_qq::client::event::{
     DeleteFriendEvent, FriendMessageRecallEvent, FriendPokeEvent, FriendRequestEvent,
@@ -19,11 +21,12 @@ enum MapResult<'a> {
 }
 
 macro_rules! map_handlers {
-    ($self:expr,$event:expr,$process:path) => {{
+    ($self:expr $(,$event:expr, $process:path)* $(,)?) => {{
         let mut result = MapResult::None;
         for m in &$self.modules {
             for h in &m.handles {
                 match &h.process {
+                    $(
                     $process(e) => match e.handle(&$event).await {
                         Ok(b) => {
                             if b {
@@ -31,10 +34,11 @@ macro_rules! map_handlers {
                             }
                         }
                         Err(err) => {
-                            tracing::error!(target = "proc_qq", " handle error : {:?}", err);
+                            tracing::error!(target = "proc_qq", " 出现错误 : {:?}", err);
                             result = MapResult::Exception(&m.id, &h.name);
                         }
                     },
+                    )*
                     _ => (),
                 }
                 if let MapResult::None = result {
@@ -63,7 +67,14 @@ impl Handler for ClientHandler {
                     event.message.from_uin,
                     event.message.elements.to_string()
                 );
-                let _ = map_handlers!(&self, &event, ModuleEventProcess::GroupMessage);
+                let me = MessageEvent::GroupMessage(&event);
+                let _ = map_handlers!(
+                    &self,
+                    &event,
+                    ModuleEventProcess::GroupMessage,
+                    &me,
+                    ModuleEventProcess::Message,
+                );
             }
             QEvent::PrivateMessage(event) => {
                 tracing::debug!(
@@ -72,7 +83,14 @@ impl Handler for ClientHandler {
                     event.message.from_uin,
                     event.message.elements.to_string()
                 );
-                let _ = map_handlers!(&self, &event, ModuleEventProcess::PrivateMessage);
+                let me = MessageEvent::PrivateMessage(&event);
+                let _ = map_handlers!(
+                    &self,
+                    &event,
+                    ModuleEventProcess::PrivateMessage,
+                    &me,
+                    ModuleEventProcess::Message,
+                );
             }
             QEvent::TempMessage(event) => {
                 tracing::debug!(
@@ -81,7 +99,14 @@ impl Handler for ClientHandler {
                     event.message.from_uin,
                     event.message.elements.to_string()
                 );
-                let _ = map_handlers!(&self, &event, ModuleEventProcess::TempMessage);
+                let me = MessageEvent::TempMessage(&event);
+                let _ = map_handlers!(
+                    &self,
+                    &event,
+                    ModuleEventProcess::TempMessage,
+                    &me,
+                    ModuleEventProcess::Message,
+                );
             }
             QEvent::GroupRequest(event) => {
                 tracing::debug!(
@@ -170,6 +195,8 @@ pub enum ModuleEventProcess {
 
     GroupMessageRecall(Box<dyn GroupMessageRecallEventProcess>),
     FriendMessageRecall(Box<dyn FriendMessageRecallEventProcess>),
+
+    Message(Box<dyn MessageEventProcess>),
 }
 
 macro_rules! process_trait {
@@ -198,3 +225,21 @@ process_trait!(GroupNameUpdateEventProcess, GroupNameUpdateEvent);
 
 process_trait!(GroupMessageRecallEventProcess, GroupMessageRecallEvent);
 process_trait!(FriendMessageRecallEventProcess, FriendMessageRecallEvent);
+
+pub enum MessageEvent<'a> {
+    GroupMessage(&'a GroupMessageEvent),
+    PrivateMessage(&'a PrivateMessageEvent),
+    TempMessage(&'a TempMessageEvent),
+}
+
+impl MessageEvent<'_> {
+    pub fn client(&self) -> Arc<rs_qq::Client> {
+        match self {
+            MessageEvent::GroupMessage(e) => e.client.clone(),
+            MessageEvent::PrivateMessage(e) => e.client.clone(),
+            MessageEvent::TempMessage(e) => e.client.clone(),
+        }
+    }
+}
+
+process_trait!(MessageEventProcess, MessageEvent);
