@@ -4,9 +4,11 @@ pub use client_builder::*;
 pub use client_handler::*;
 pub use entities::*;
 pub use proc_qq_codegen::*;
+pub use traits::*;
 
 mod client;
 mod client_builder;
 mod client_handler;
 mod entities;
 pub mod re_export;
+mod traits;

@@ -10,7 +10,7 @@ RUST_PROC_QQ
     - 自动管理客户端生命周期以及TCP重连
     - 封装登录流程, 自动获取ticket, 验证滑动条
 - 模块化 : 让调理更清晰
-  - 模块化, 实现插件之间的分离, 更好的启用禁用
+    - 模块化, 实现插件之间的分离, 更好的启用禁用
 
 ## 如何使用 / demo
 
@@ -83,8 +83,8 @@ async fn private_hello(event: &PrivateMessageEvent) -> anyhow::Result<bool> {
 
 /// 返回一个模块 (向过程宏改进中)
 pub(crate) fn module() -> Module {
-  // id, name, [plugins ...]
-  module!("hello", "你好", group_hello, private_hello)
+    // id, name, [plugins ...]
+    module!("hello", "你好", group_hello, private_hello)
 }
 ```
 
@@ -109,7 +109,7 @@ async fn test_qr_login() {
     // 使用builder创建
     ClientBuilder::new()
         .priority_session("session.token")      // 默认使用session.token登录
-            // .device(JsonFile("device.json")) // 设备默认值 
+        // .device(JsonFile("device.json")) // 设备默认值 
         .authentication(QRCode)                 // 若不成功则使用二维码登录
         .build(vec![hello_module::module()])    // 您可以注册多个模块
         .await
@@ -158,6 +158,8 @@ fn init_tracing_subscriber() {
 
 ![demo](images/demo_01.jpg)
 
+## 功能
+
 ### 支持的事件
 
 ```rust
@@ -167,8 +169,33 @@ use rs_qq::client::event::{
     GroupNameUpdateEvent, GroupRequestEvent, NewFriendEvent, PrivateMessageEvent, TempMessageEvent,
 };
 ```
+同时支持多种消息的事件封装中...
 
-### 其他
+### 拓展
+
+#### 直接获取消息的正文内容
+
+```rust
+use prco_qq::MessageTrait;
+
+let private_message_event: PrivateMessageEvent = _;
+
+private_message_event.message_content();
+```
+
+#### 直接回复消息到消息源
+
+```rust
+use prco_qq::MessageTrait;
+use prco_qq::ClientTrait;
+
+let group_message_event: GroupMessageEvent = _;
+let client: Arc<Client> = _;
+
+client.send_message_to_source(group_message_event, my_message);
+```
+
+## 其他
 
 [使用此框架的模版](proc_qq_template)
 
