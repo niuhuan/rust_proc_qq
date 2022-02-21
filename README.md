@@ -30,7 +30,7 @@ hello_module.rs
 use proc_qq::re_export::rs_qq::client::event::GroupMessageEvent;
 use proc_qq::re_export::rs_qq::msg::elem::Text;
 use proc_qq::re_export::rs_qq::msg::MessageChain;
-use proc_qq::{event, module, ClientTrait, MessageEvent, MessageTrait, Module};
+use proc_qq::{event, module, ClientTrait, MessageEvent, MessageContentTrait, Module};
 
 /// 监听群消息
 /// 使用event宏进行声明监听消息
@@ -40,14 +40,12 @@ use proc_qq::{event, module, ClientTrait, MessageEvent, MessageTrait, Module};
 async fn print(event: &MessageEvent) -> anyhow::Result<bool> {
     if content.eq("你好") {
         event
-            .client()
-            .send_message_to_source(event, MessageChain::new(Text::new("世界".to_owned())))
+            .send_message_to_source(MessageChain::new(Text::new("世界".to_owned())))
             .await?;
         Ok(true)
     } else if content.eq("RC") {
         event
-            .client()
-            .send_message_to_source(event, MessageChain::new(Text::new("NB".to_owned())))
+            .send_message_to_source(MessageChain::new(Text::new("NB".to_owned())))
             .await?;
         Ok(true)
     } else {
@@ -110,6 +108,7 @@ fn init_tracing_subscriber() {
             tracing_subscriber::filter::Targets::new()
                 .with_target("rs_qq", Level::DEBUG)
                 .with_target("proc_qq", Level::DEBUG)
+                // 这里改成自己的crate名称
                 .with_target("proc_qq_examples", Level::DEBUG),
         )
         .init();
@@ -141,23 +140,19 @@ use proc_qq::{MessageEvent, };
 #### 直接获取消息的正文内容
 
 ```rust
-use prco_qq::MessageTrait;
-
-let private_message_event: PrivateMessageEvent = _;
-
-private_message_event.message_content();
+use prco_qq::MessageContentTrait;
+MessageEvent::message_content;
 ```
 
 #### 直接回复消息到消息源
 
 ```rust
-use prco_qq::MessageTrait;
+use prco_qq::MessageSendToSourceTrait;
+MessageEvent::send_message_to_source;
+// or
+use prco_qq::MessageSourceTrait;
 use prco_qq::ClientTrait;
-
-let group_message_event: & GroupMessageEvent = _;
-let client: Arc<Client> = _;
-
-client.send_message_to_source(group_message_event, my_message);
+Client::send_message_to_source;
 ```
 
 ## 其他
