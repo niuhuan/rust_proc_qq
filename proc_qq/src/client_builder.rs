@@ -35,15 +35,13 @@ impl ClientBuilder {
                             parse_device_json(
                                 &tokio::fs::read_to_string(file_name)
                                     .await
-                                    .with_context(|| {
-                                        format!("failed to read file : {}", file_name)
-                                    })?,
+                                    .with_context(|| format!("读取文件失败 : {}", file_name))?,
                             )?
                         } else {
                             let device = Device::random();
                             tokio::fs::write(file_name, serde_json::to_string(&device).unwrap())
                                 .await
-                                .with_context(|| format!("failed to write file : {}", file_name))?;
+                                .with_context(|| format!("写入文件失败 : {}", file_name))?;
                             device
                         }
                     }
@@ -55,7 +53,7 @@ impl ClientBuilder {
             authentication: self
                 .authentication
                 .clone()
-                .with_context(|| "must be set authentication")?,
+                .with_context(|| "您必须设置验证方式 (调用authentication)")?,
             priority_session: self.priority_session.clone(),
         })
     }
@@ -82,5 +80,5 @@ impl ClientBuilder {
 }
 
 fn parse_device_json(json: &str) -> Result<Device, anyhow::Error> {
-    Ok(serde_json::from_str(json).with_context(|| format!("failed to deserialize device json"))?)
+    Ok(serde_json::from_str(json).with_context(|| format!("DeviceJson解析失败"))?)
 }

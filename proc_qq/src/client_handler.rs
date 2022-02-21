@@ -56,7 +56,7 @@ impl Handler for ClientHandler {
     async fn handle(&self, e: QEvent) {
         match e {
             QEvent::GroupMessage(event) => {
-                tracing::info!(
+                tracing::debug!(
                     target = "proc_qq",
                     "(GROUP={}, UIN={}) MESSAGE : {}",
                     event.message.group_code,
@@ -66,7 +66,7 @@ impl Handler for ClientHandler {
                 let _ = map_handlers!(&self, &event, ModuleEventProcess::GroupMessage);
             }
             QEvent::PrivateMessage(event) => {
-                tracing::info!(
+                tracing::debug!(
                     target = "proc_qq",
                     "(UIN={}) MESSAGE : {}",
                     event.message.from_uin,
@@ -75,7 +75,7 @@ impl Handler for ClientHandler {
                 let _ = map_handlers!(&self, &event, ModuleEventProcess::PrivateMessage);
             }
             QEvent::TempMessage(event) => {
-                tracing::info!(
+                tracing::debug!(
                     target = "proc_qq",
                     "(UIN={}) MESSAGE : {}",
                     event.message.from_uin,
@@ -84,7 +84,7 @@ impl Handler for ClientHandler {
                 let _ = map_handlers!(&self, &event, ModuleEventProcess::TempMessage);
             }
             QEvent::GroupRequest(event) => {
-                tracing::info!(
+                tracing::debug!(
                     target = "proc_qq",
                     "REQUEST (GROUP={}, UIN={}): {}",
                     event.request.group_code,
@@ -94,7 +94,7 @@ impl Handler for ClientHandler {
                 let _ = map_handlers!(&self, &event, ModuleEventProcess::GroupRequest);
             }
             QEvent::FriendRequest(event) => {
-                tracing::info!(
+                tracing::debug!(
                     target = "proc_qq",
                     "REQUEST (UIN={}): {}",
                     event.request.req_uin,
@@ -126,7 +126,7 @@ impl Handler for ClientHandler {
             QEvent::FriendMessageRecall(event) => {
                 let _ = map_handlers!(&self, &event, ModuleEventProcess::FriendMessageRecall);
             }
-            _ => tracing::info!(target = "proc_qq", "{:?}", e),
+            _ => tracing::debug!(target = "proc_qq", "{:?}", e),
         }
     }
 }

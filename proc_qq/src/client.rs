@@ -16,7 +16,6 @@ use tokio::time::sleep;
 
 use crate::Authentication;
 
-/// 客户端, 对RS-QQ的封装
 pub struct Client {
     pub rq_client: Arc<rs_qq::Client>,
     pub authentication: Authentication,
@@ -24,16 +23,14 @@ pub struct Client {
 }
 
 impl Client {
-    /// 启动客户端
     pub fn start(self) -> JoinHandle<Result<()>> {
         tokio::spawn(run_client(self))
     }
 }
 
-/// 启动客户端
 pub async fn run_client(client: Client) -> Result<()> {
     loop {
-        // 连接到服务器, 并启动客户端, 并获取到handle
+        // connect to server
         let stream = match TcpStream::connect(client.rq_client.get_address())
             .await
             .with_context(|| "连接到服务器失败")
@@ -49,21 +46,21 @@ pub async fn run_client(client: Client) -> Result<()> {
         let rq_client = client.rq_client.clone();
         let handle = tokio::spawn(async move { rq_client.start(stream).await });
         tokio::task::yield_now().await;
-        // 使用session恢复登录
+        // token login if allow and file exists
         if !token_login(&client).await {
-            // 不成功的话使用验证登录
-            // 验证登录不成功认为是致命错误
+            // authentication if token login failed or not set
+            // The error of login failure is fatal
             login_authentication(&client).await?;
         }
-        // rs-qq 文档中说明, 登录完成后必须注册设备
+        // Reference rs-qq docs, this function must be called after login is completed, maybe it's to register the device.
         after_login(&client.rq_client.clone()).await;
-        // 如果需要的话保存session, 如果出错认为是致命错误
+        // save session, IO errors are fatal.
         if let Some(session_file) = &client.priority_session {
             tokio::fs::write(session_file, client.rq_client.gen_token().await)
                 .await
                 .with_context(|| "写入session出错")?;
         }
-        // 等待结束
+        // hold handle
         match handle.await {
             Ok(_) => {}
             Err(err) => tracing::info!("{:?}", err),
@@ -78,7 +75,7 @@ async fn token_login(client: &Client) -> bool {
         if Path::new(session_file).exists() {
             let session_data = match tokio::fs::read(session_file)
                 .await
-                .with_context(|| format!("fs io error : {}", session_file))
+                .with_context(|| format!("文件读取失败 : {}", session_file))
             {
                 Ok(data) => data,
                 Err(err) => {
@@ -119,7 +116,7 @@ async fn qr_login(rq_client: Arc<rs_qq::Client>) -> Result<()> {
     let mut resp = rq_client
         .fetch_qrcode()
         .await
-        .with_context(|| "failed to fetch qrcode")?;
+        .with_context(|| "二维码加载失败")?;
     loop {
         match resp {
             QRCodeState::ImageFetch(QRCodeImageFetch {
@@ -130,21 +127,21 @@ async fn qr_login(rq_client: Arc<rs_qq::Client>) -> Result<()> {
                     .await
                     .with_context(|| "failed to write file")?;
                 image_sig = sig.clone();
-                // 桌面环境直接打开, 服务器使用文字渲染
+                // todo 桌面环境直接打开, 服务器使用文字渲染
                 tracing::info!("二维码: qrcode.png");
             }
             QRCodeState::WaitingForScan => {
-                tracing::info!("二维码待扫描")
+                // tracing::info!("二维码待扫描")
             }
             QRCodeState::WaitingForConfirm => {
-                tracing::info!("二维码待确认")
+                // tracing::info!("二维码待确认")
             }
             QRCodeState::Timeout => {
                 tracing::info!("二维码已超时，重新获取");
                 resp = rq_client
                     .fetch_qrcode()
                     .await
-                    .with_context(|| "failed to fetch qrcode")?;
+                    .with_context(|| "二维码加载失败")?;
                 continue;
             }
             QRCodeState::Confirmed(QRCodeConfirmed {
@@ -160,14 +157,14 @@ async fn qr_login(rq_client: Arc<rs_qq::Client>) -> Result<()> {
                 return loop_login(rq_client, first).await;
             }
             QRCodeState::Canceled => {
-                panic!("二维码已取消")
+                return Err(anyhow::Error::msg("二维码已取消"));
             }
         }
         sleep(Duration::from_secs(5)).await;
         resp = rq_client
             .query_qrcode_result(&image_sig)
             .await
-            .expect("failed to query qrcode result");
+            .with_context(|| "二维码状态加载失败")?;
     }
 }
 
@@ -178,7 +175,7 @@ async fn loop_login(client: Arc<rs_qq::Client>, first: RQResult<LoginResponse>) 
             LoginResponse::Success(LoginSuccess {
                 ref account_info, ..
             }) => {
-                tracing::info!("login success: {:?}", account_info);
+                tracing::info!("登录成功: {:?}", account_info);
                 return Ok(());
             }
             LoginResponse::DeviceLocked(LoginDeviceLocked {
@@ -187,9 +184,9 @@ async fn loop_login(client: Arc<rs_qq::Client>, first: RQResult<LoginResponse>) 
                 ref message,
                 ..
             }) => {
-                tracing::info!("device locked: {:?}", message);
-                tracing::info!("sms_phone: {:?}", sms_phone);
-                tracing::info!("verify_url: {:?}", verify_url);
+                tracing::info!("设备锁 : {:?}", message);
+                tracing::info!("密保手机 : {:?}", sms_phone);
+                tracing::info!("验证地址 : {:?}", verify_url);
                 tracing::info!("手机打开url，处理完成后重启程序");
                 std::process::exit(0);
                 //也可以走短信验证
@@ -201,16 +198,16 @@ async fn loop_login(client: Arc<rs_qq::Client>, first: RQResult<LoginResponse>) 
                 image_captcha: ref _image_captcha,
                 ..
             }) => {
-                tracing::info!("verify_url: {:?}", verify_url);
+                tracing::info!("滑动条 (原URL) : {:?}", verify_url);
                 let helper_url = verify_url
                     .clone()
                     .unwrap()
                     .replace("ssl.captcha.qq.com", "txhelper.glitch.me");
-                tracing::info!("helper_url: {:?}", helper_url);
+                tracing::info!("滑动条 (改URL) : {:?}", helper_url);
                 let mut txt = http_get(&helper_url)
                     .await
                     .with_context(|| "http请求失败")?;
-                tracing::info!("helper: 滑动后请等待: {}", txt);
+                tracing::info!("您需要使用该仓库 提供的APP进行滑动 , 滑动后请等待, https://github.com/mzdluo123/TxCaptchaHelper : {}", txt);
                 loop {
                     sleep(Duration::from_secs(5)).await;
                     let rsp = http_get(&helper_url)
@@ -221,29 +218,29 @@ async fn loop_login(client: Arc<rs_qq::Client>, first: RQResult<LoginResponse>) 
                         break;
                     }
                 }
-                tracing::info!("helper: {}", txt);
-                resp = client
-                    .submit_ticket(&txt)
-                    .await
-                    .expect("failed to submit ticket");
+                tracing::info!("获取到ticket : {}", txt);
+                resp = client.submit_ticket(&txt).await.expect("发送ticket失败");
             }
             LoginResponse::DeviceLockLogin { .. } => {
                 resp = client
                     .device_lock_login()
                     .await
-                    .expect("failed to login with device lock");
+                    .with_context(|| "设备锁登录失败")?;
             }
             LoginResponse::AccountFrozen => {
-                panic!("account frozen");
+                return Err(anyhow::Error::msg("账户被冻结"));
             }
             LoginResponse::TooManySMSRequest => {
-                panic!("too many sms request");
+                return Err(anyhow::Error::msg("短信请求过于频繁"));
             }
             LoginResponse::UnknownStatus(LoginUnknownStatus {
                 ref status,
                 ref tlv_map,
             }) => {
-                panic!("unknown login status: {:?}, {:?}", status, tlv_map);
+                return Err(anyhow::Error::msg(format!(
+                    "不能解析的登录响应: {:?}, {:?}",
+                    status, tlv_map
+                )));
             }
         }
     }

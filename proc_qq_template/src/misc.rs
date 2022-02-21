@@ -11,10 +11,6 @@ pub(crate) fn module() -> Module {
 #[event]
 async fn group_mute(event: &GroupMuteEvent) -> anyhow::Result<bool> {
     event.group_mute.target_uin;
-    tracing::info!(
-        target = "proc_qq_template",
-        "禁言 : {}",
-        event.group_mute.target_uin
-    );
+    tracing::info!("禁言 : {}", event.group_mute.target_uin);
     Ok(false)
 }
