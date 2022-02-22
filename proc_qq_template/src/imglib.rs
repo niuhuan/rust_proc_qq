@@ -24,12 +24,13 @@ async fn group_message(event: &GroupMessageEvent) -> anyhow::Result<bool> {
             .await?;
         Ok(true)
     } else if content.eq("动漫壁纸") {
-        let img = get_img().await?;
+        let img = get_img().await?.to_vec();
         let img = event
             .client
-            .upload_group_image(event.message.group_code, img.to_vec(), "bz.jpg".to_string())
+            .upload_group_image(event.message.group_code, img, "bz.jpeg".into())
             .await?;
-        let chain = MessageChain::new(img);
+        let mut chain = MessageChain::default();
+        chain.push(img);
         event
             .client
             .send_group_message(event.message.group_code, chain)

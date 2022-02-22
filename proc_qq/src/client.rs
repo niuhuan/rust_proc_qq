@@ -236,10 +236,12 @@ async fn loop_login(client: Arc<rs_qq::Client>, first: RQResult<LoginResponse>) 
             LoginResponse::UnknownStatus(LoginUnknownStatus {
                 ref status,
                 ref tlv_map,
+                message,
+                ..
             }) => {
                 return Err(anyhow::Error::msg(format!(
-                    "不能解析的登录响应: {:?}, {:?}",
-                    status, tlv_map
+                    "不能解析的登录响应: {:?}, {:?}, {:?}",
+                    status, tlv_map, message,
                 )));
             }
         }
