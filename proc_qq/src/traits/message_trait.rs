@@ -1,4 +1,5 @@
 use async_trait::async_trait;
+use rq_engine::msg::elem::Text;
 use rq_engine::msg::MessageChain;
 use rq_engine::structs::{GroupMessage, MessageReceipt, PrivateMessage, TempMessage};
 use rq_engine::RQResult;
@@ -25,7 +26,18 @@ pub trait MessageContentTrait: Send + Sync {
 
 #[async_trait]
 pub trait MessageSendToSourceTrait: Send + Sync {
-    async fn send_message_to_source(&self, message: MessageChain) -> RQResult<MessageReceipt>;
+    async fn send_message_to_source<S: Into<MessageChain> + Send + Sync>(
+        &self,
+        message: S,
+    ) -> RQResult<MessageReceipt>;
+}
+
+pub trait TextEleParseTrait {
+    fn parse_text(self) -> Text;
+}
+
+pub trait MessageChainParseTrait {
+    fn parse_message_chain(self) -> MessageChain;
 }
 
 impl MessageContentTrait for MessageChain {
@@ -60,7 +72,10 @@ impl MessageContentTrait for GroupMessageEvent {
 
 #[async_trait]
 impl MessageSendToSourceTrait for GroupMessageEvent {
-    async fn send_message_to_source(&self, message: MessageChain) -> RQResult<MessageReceipt> {
+    async fn send_message_to_source<S: Into<MessageChain> + Send + Sync>(
+        &self,
+        message: S,
+    ) -> RQResult<MessageReceipt> {
         self.client.send_message_to_source(self, message).await
     }
 }
@@ -91,7 +106,10 @@ impl MessageContentTrait for PrivateMessageEvent {
 
 #[async_trait]
 impl MessageSendToSourceTrait for PrivateMessageEvent {
-    async fn send_message_to_source(&self, message: MessageChain) -> RQResult<MessageReceipt> {
+    async fn send_message_to_source<S: Into<MessageChain> + Send + Sync>(
+        &self,
+        message: S,
+    ) -> RQResult<MessageReceipt> {
         self.client.send_message_to_source(self, message).await
     }
 }
@@ -122,7 +140,10 @@ impl MessageContentTrait for TempMessageEvent {
 
 #[async_trait]
 impl MessageSendToSourceTrait for TempMessageEvent {
-    async fn send_message_to_source(&self, message: MessageChain) -> RQResult<MessageReceipt> {
+    async fn send_message_to_source<S: Into<MessageChain> + Send + Sync>(
+        &self,
+        message: S,
+    ) -> RQResult<MessageReceipt> {
         self.client.send_message_to_source(self, message).await
     }
 }
@@ -149,11 +170,38 @@ impl MessageContentTrait for MessageEvent<'_> {
 
 #[async_trait]
 impl MessageSendToSourceTrait for MessageEvent<'_> {
-    async fn send_message_to_source(&self, message: MessageChain) -> RQResult<MessageReceipt> {
+    async fn send_message_to_source<S: Into<MessageChain> + Send + Sync>(
+        &self,
+        message: S,
+    ) -> RQResult<MessageReceipt> {
         match self {
             MessageEvent::GroupMessage(event) => event.send_message_to_source(message).await,
             MessageEvent::PrivateMessage(event) => event.send_message_to_source(message).await,
             MessageEvent::TempMessage(event) => event.send_message_to_source(message).await,
         }
+    }
+}
+
+impl TextEleParseTrait for String {
+    fn parse_text(self) -> Text {
+        Text::new(self)
+    }
+}
+
+impl TextEleParseTrait for &str {
+    fn parse_text(self) -> Text {
+        Text::new(self.to_owned())
+    }
+}
+
+impl MessageChainParseTrait for String {
+    fn parse_message_chain(self) -> MessageChain {
+        MessageChain::new(self.parse_text())
+    }
+}
+
+impl MessageChainParseTrait for &str {
+    fn parse_message_chain(self) -> MessageChain {
+        MessageChain::new(self.parse_text())
     }
 }

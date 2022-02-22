@@ -7,20 +7,21 @@ use crate::{MessageSource, MessageSourceTrait};
 
 #[async_trait]
 pub trait ClientTrait: Send + Sync {
-    async fn send_message_to_source(
+    async fn send_message_to_source<S: Into<MessageChain> + Send + Sync>(
         &self,
         source: &impl MessageSourceTrait,
-        message: MessageChain,
+        message: S,
     ) -> RQResult<MessageReceipt>;
 }
 
 #[async_trait]
 impl ClientTrait for rs_qq::Client {
-    async fn send_message_to_source(
+    async fn send_message_to_source<S: Into<MessageChain> + Send + Sync>(
         &self,
         source: &impl MessageSourceTrait,
-        message: MessageChain,
+        message: S,
     ) -> RQResult<MessageReceipt> {
+        let message = message.into();
         match source.message_source() {
             MessageSource::Group(group_code, _) => {
                 self.send_group_message(group_code, message).await
@@ -42,11 +43,13 @@ impl ClientTrait for rs_qq::Client {
 
 #[async_trait]
 impl ClientTrait for crate::Client {
-    async fn send_message_to_source(
+    async fn send_message_to_source<S: Into<MessageChain> + Send + Sync>(
         &self,
         source: &impl MessageSourceTrait,
-        message: MessageChain,
+        message: S,
     ) -> RQResult<MessageReceipt> {
-        self.rq_client.send_message_to_source(source, message).await
+        self.rq_client
+            .send_message_to_source(source, message.into())
+            .await
     }
 }

@@ -1,8 +1,8 @@
 RUST_PROC_QQ
 ============
 
-- 一个开箱即用, 使用简单的, Rust语言的QQ机器人框架. (基于[RS-QQ](https://github.com/lz1998/rs-qq))
-- 参考了Spring(java)和Rocket(rust)的思想, 如果您使用此类框架将很好上手
+- Rust语言的QQ机器人框架. (基于[RS-QQ](https://github.com/lz1998/rs-qq))
+- 开箱即用, 操作简单, 代码极简
 
 ## 框架目的
 
@@ -28,9 +28,10 @@ hello_module.rs
 
 ```rust
 use proc_qq::re_export::rs_qq::client::event::GroupMessageEvent;
-use proc_qq::re_export::rs_qq::msg::elem::Text;
-use proc_qq::re_export::rs_qq::msg::MessageChain;
-use proc_qq::{event, module, ClientTrait, MessageEvent, MessageContentTrait, Module};
+use proc_qq::{
+    event, module, MessageChainParseTrait, MessageContentTrait, MessageEvent, MessageSendToSourceTrait,
+    Module,
+};
 
 /// 监听群消息
 /// 使用event宏进行声明监听消息
@@ -38,14 +39,15 @@ use proc_qq::{event, module, ClientTrait, MessageEvent, MessageContentTrait, Mod
 /// 返回值为 anyhow::Result<bool>, Ok(true)为拦截事件, 不再向下一个监听器传递
 #[event]
 async fn print(event: &MessageEvent) -> anyhow::Result<bool> {
+    let content = event.message_content();
     if content.eq("你好") {
         event
-            .send_message_to_source(MessageChain::new(Text::new("世界".to_owned())))
+            .send_message_to_source("世界".parse_message_chain())
             .await?;
         Ok(true)
     } else if content.eq("RC") {
         event
-            .send_message_to_source(MessageChain::new(Text::new("NB".to_owned())))
+            .send_message_to_source("NB".parse_message_chain())
             .await?;
         Ok(true)
     } else {
@@ -133,7 +135,7 @@ use rs_qq::client::event::{
 use proc_qq::{MessageEvent, };
 ```
 
-同时支持多种消息的事件封装中...
+支持更多种事件封装中...
 
 ### 拓展
 
@@ -153,6 +155,13 @@ MessageEvent::send_message_to_source;
 use prco_qq::MessageSourceTrait;
 use prco_qq::ClientTrait;
 Client::send_message_to_source;
+```
+
+#### 直接将文字当作MessageChain使用
+
+```rust
+TextChainParseTrait;
+MessageChainParseTrait;
 ```
 
 ## 其他
