@@ -60,12 +60,12 @@ impl Handler for ClientHandler {
     async fn handle(&self, e: QEvent) {
         match e {
             QEvent::Login(event) => {
-                tracing::debug!(
-                    target = "proc_qq",
-                    "LOGIN : (UIN={})",
-                    event,
+                tracing::debug!(target = "proc_qq", "LOGIN : (UIN={})", event,);
+                let _ = map_handlers!(
+                    &self,
+                    &LoginEvent { uin: event },
+                    ModuleEventProcess::LoginEvent
                 );
-                let _ = map_handlers!(&self, &LoginEvent{uin:event}, ModuleEventProcess::LoginEvent);
             }
             QEvent::GroupMessage(event) => {
                 tracing::debug!(
@@ -254,6 +254,24 @@ impl MessageEvent<'_> {
             MessageEvent::GroupMessage(e) => e.client.clone(),
             MessageEvent::PrivateMessage(e) => e.client.clone(),
             MessageEvent::TempMessage(e) => e.client.clone(),
+        }
+    }
+    pub fn is_group_message(&self) -> bool {
+        match self {
+            MessageEvent::GroupMessage(_) => true,
+            _ => false,
+        }
+    }
+    pub fn is_private_message(&self) -> bool {
+        match self {
+            MessageEvent::PrivateMessage(_) => true,
+            _ => false,
+        }
+    }
+    pub fn is_temp_message(&self) -> bool {
+        match self {
+            MessageEvent::TempMessage(_) => true,
+            _ => false,
         }
     }
 }

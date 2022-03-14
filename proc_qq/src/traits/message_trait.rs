@@ -1,8 +1,9 @@
 use async_trait::async_trait;
 use rq_engine::msg::elem::{FlashImage, FriendImage, GroupImage, Text};
 use rq_engine::msg::MessageChain;
+use rq_engine::pb::msg::elem::Elem;
 use rq_engine::structs::{GroupMessage, MessageReceipt, PrivateMessage, TempMessage};
-use rq_engine::RQResult;
+use rq_engine::{RQError, RQResult};
 use rs_qq::client::event::{GroupMessageEvent, PrivateMessageEvent, TempMessageEvent};
 
 use crate::{ClientTrait, MessageEvent};
@@ -14,6 +15,20 @@ pub enum MessageSource {
     Private(i64),
     // Temp(group_code,uin)
     Temp(Option<i64>, i64),
+}
+
+pub enum UploadImage {
+    FriendImage(FriendImage),
+    GroupImage(GroupImage),
+}
+
+impl Into<Vec<Elem>> for UploadImage {
+    fn into(self) -> Vec<Elem> {
+        match self {
+            UploadImage::FriendImage(i) => i.into(),
+            UploadImage::GroupImage(i) => i.into(),
+        }
+    }
 }
 
 pub trait MessageSourceTrait: Send + Sync {
@@ -30,6 +45,11 @@ pub trait MessageSendToSourceTrait: Send + Sync {
         &self,
         message: S,
     ) -> RQResult<MessageReceipt>;
+
+    async fn upload_image_to_source<S: Into<Vec<u8>> + Send + Sync>(
+        &self,
+        data: S,
+    ) -> RQResult<UploadImage>;
 }
 
 pub trait TextEleParseTrait {
@@ -78,6 +98,17 @@ impl MessageSendToSourceTrait for GroupMessageEvent {
     ) -> RQResult<MessageReceipt> {
         self.client.send_message_to_source(self, message).await
     }
+
+    async fn upload_image_to_source<S: Into<Vec<u8>> + Send + Sync>(
+        &self,
+        data: S,
+    ) -> RQResult<UploadImage> {
+        Ok(UploadImage::GroupImage(
+            self.client
+                .upload_group_image(self.message.group_code, data.into())
+                .await?,
+        ))
+    }
 }
 
 impl MessageSourceTrait for PrivateMessage {
@@ -111,6 +142,17 @@ impl MessageSendToSourceTrait for PrivateMessageEvent {
         message: S,
     ) -> RQResult<MessageReceipt> {
         self.client.send_message_to_source(self, message).await
+    }
+
+    async fn upload_image_to_source<S: Into<Vec<u8>> + Send + Sync>(
+        &self,
+        data: S,
+    ) -> RQResult<UploadImage> {
+        Ok(UploadImage::FriendImage(
+            self.client
+                .upload_private_image(self.message.from_uin, data.into())
+                .await?,
+        ))
     }
 }
 
@@ -146,6 +188,15 @@ impl MessageSendToSourceTrait for TempMessageEvent {
     ) -> RQResult<MessageReceipt> {
         self.client.send_message_to_source(self, message).await
     }
+
+    async fn upload_image_to_source<S: Into<Vec<u8>> + Send + Sync>(
+        &self,
+        _: S,
+    ) -> RQResult<UploadImage> {
+        RQResult::Err(RQError::Other(
+            "tmp message not supported upload image".to_owned(),
+        ))
+    }
 }
 
 impl MessageSourceTrait for MessageEvent<'_> {
@@ -178,6 +229,17 @@ impl MessageSendToSourceTrait for MessageEvent<'_> {
             MessageEvent::GroupMessage(event) => event.send_message_to_source(message).await,
             MessageEvent::PrivateMessage(event) => event.send_message_to_source(message).await,
             MessageEvent::TempMessage(event) => event.send_message_to_source(message).await,
+        }
+    }
+
+    async fn upload_image_to_source<S: Into<Vec<u8>> + Send + Sync>(
+        &self,
+        data: S,
+    ) -> RQResult<UploadImage> {
+        match self {
+            MessageEvent::GroupMessage(event) => event.upload_image_to_source(data).await,
+            MessageEvent::PrivateMessage(event) => event.upload_image_to_source(data).await,
+            MessageEvent::TempMessage(event) => event.upload_image_to_source(data).await,
         }
     }
 }
@@ -230,3 +292,11 @@ impl MessageChainParseTrait for FlashImage {
     }
 }
 
+impl MessageChainParseTrait for UploadImage {
+    fn parse_message_chain(self) -> MessageChain {
+        match self {
+            UploadImage::FriendImage(i) => i.parse_message_chain(),
+            UploadImage::GroupImage(i) => i.parse_message_chain(),
+        }
+    }
+}

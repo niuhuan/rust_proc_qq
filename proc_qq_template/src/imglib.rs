@@ -1,8 +1,11 @@
-use proc_qq::re_export::rs_qq::client::event::{GroupMessageEvent, PrivateMessageEvent};
+use proc_qq::re_export::rs_qq::client::event::PrivateMessageEvent;
 use proc_qq::re_export::rs_qq::msg::elem::Text;
 use proc_qq::re_export::rs_qq::msg::MessageChain;
 use proc_qq::re_export::{bytes, reqwest};
-use proc_qq::{event, MessageChainParseTrait, module, Module};
+use proc_qq::{
+    event, module, MessageChainParseTrait, MessageContentTrait, MessageEvent,
+    MessageSendToSourceTrait, Module,
+};
 
 static ID: &'static str = "imglib";
 static NAME: &'static str = "图库";
@@ -14,24 +17,25 @@ pub(crate) fn module() -> Module {
 }
 
 #[event]
-async fn group_message(event: &GroupMessageEvent) -> anyhow::Result<bool> {
-    let content = event.message.elements.to_string();
+async fn group_message(event: &MessageEvent) -> anyhow::Result<bool> {
+    let content = event.message_content();
     if content.eq(NAME) {
-        let chain = MessageChain::new(Text::new(MENU.to_owned()));
         event
-            .client
-            .send_group_message(event.message.group_code, chain)
+            .send_message_to_source(
+                if event.is_temp_message() {
+                    "临时会话不能使用此功能奥"
+                } else {
+                    MENU
+                }
+                .parse_message_chain(),
+            )
             .await?;
         Ok(true)
     } else if content.eq("动漫壁纸") {
         let img = get_img().await?.to_vec();
-        let img = event
-            .client
-            .upload_group_image(event.message.group_code, img)
-            .await?;
+        let img = event.upload_image_to_source(img).await?;
         event
-            .client
-            .send_group_message(event.message.group_code, img.parse_message_chain())
+            .send_message_to_source(img.parse_message_chain())
             .await?;
         Ok(true)
     } else {

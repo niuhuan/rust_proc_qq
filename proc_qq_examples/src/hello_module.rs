@@ -1,5 +1,8 @@
 use proc_qq::re_export::rs_qq::client::event::GroupMessageEvent;
-use proc_qq::{event, module, MessageChainParseTrait, MessageContentTrait, MessageEvent, MessageSendToSourceTrait, Module, LoginEvent};
+use proc_qq::{
+    event, module, LoginEvent, MessageChainParseTrait, MessageContentTrait, MessageEvent,
+    MessageSendToSourceTrait, Module,
+};
 
 #[event]
 async fn login(event: &LoginEvent) -> anyhow::Result<bool> {
