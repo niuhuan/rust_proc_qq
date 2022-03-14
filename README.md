@@ -157,11 +157,14 @@ use prco_qq::ClientTrait;
 Client::send_message_to_source;
 ```
 
-#### 直接将文字当作MessageChain使用
+#### 直接将文字/图片当作MessageChain使用
 
 ```rust
-TextChainParseTrait;
 MessageChainParseTrait;
+
+client
+.send_group_message(group_code, "".parse_message_chain())
+.await?;
 ```
 
 ## 其他

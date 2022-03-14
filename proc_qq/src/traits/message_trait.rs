@@ -1,5 +1,5 @@
 use async_trait::async_trait;
-use rq_engine::msg::elem::Text;
+use rq_engine::msg::elem::{FlashImage, FriendImage, GroupImage, Text};
 use rq_engine::msg::MessageChain;
 use rq_engine::structs::{GroupMessage, MessageReceipt, PrivateMessage, TempMessage};
 use rq_engine::RQResult;
@@ -205,3 +205,28 @@ impl MessageChainParseTrait for &str {
         MessageChain::new(self.parse_text())
     }
 }
+
+impl MessageChainParseTrait for FriendImage {
+    fn parse_message_chain(self) -> MessageChain {
+        let mut chain = MessageChain::default();
+        chain.push(self);
+        chain
+    }
+}
+
+impl MessageChainParseTrait for GroupImage {
+    fn parse_message_chain(self) -> MessageChain {
+        let mut chain = MessageChain::default();
+        chain.push(self);
+        chain
+    }
+}
+
+impl MessageChainParseTrait for FlashImage {
+    fn parse_message_chain(self) -> MessageChain {
+        let mut chain = MessageChain::default();
+        chain.push(self);
+        chain
+    }
+}
+

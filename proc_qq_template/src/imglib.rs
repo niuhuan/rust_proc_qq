@@ -2,7 +2,7 @@ use proc_qq::re_export::rs_qq::client::event::{GroupMessageEvent, PrivateMessage
 use proc_qq::re_export::rs_qq::msg::elem::Text;
 use proc_qq::re_export::rs_qq::msg::MessageChain;
 use proc_qq::re_export::{bytes, reqwest};
-use proc_qq::{event, module, Module};
+use proc_qq::{event, MessageChainParseTrait, module, Module};
 
 static ID: &'static str = "imglib";
 static NAME: &'static str = "图库";
@@ -27,13 +27,11 @@ async fn group_message(event: &GroupMessageEvent) -> anyhow::Result<bool> {
         let img = get_img().await?.to_vec();
         let img = event
             .client
-            .upload_group_image(event.message.group_code, img, "bz.jpeg".into())
+            .upload_group_image(event.message.group_code, img)
             .await?;
-        let mut chain = MessageChain::default();
-        chain.push(img);
         event
             .client
-            .send_group_message(event.message.group_code, chain)
+            .send_group_message(event.message.group_code, img.parse_message_chain())
             .await?;
         Ok(true)
     } else {
