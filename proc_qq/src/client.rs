@@ -3,12 +3,13 @@ use std::sync::Arc;
 use std::time::Duration;
 
 use anyhow::{Context, Result};
-use bytes::Bytes;
+use bytes::{Buf, BufMut, Bytes, BytesMut};
 use rq_engine::command::wtlogin::{
     LoginDeviceLocked, LoginNeedCaptcha, LoginResponse, LoginSuccess, LoginUnknownStatus,
     QRCodeConfirmed, QRCodeImageFetch, QRCodeState,
 };
-use rq_engine::RQResult;
+use rq_engine::{RQResult, Token};
+use rq_engine::binary::{BinaryReader, BinaryWriter};
 use rs_qq::ext::common::after_login;
 use tokio::net::TcpStream;
 use tokio::task::JoinHandle;
@@ -56,7 +57,7 @@ pub async fn run_client(client: Client) -> Result<()> {
         after_login(&client.rq_client.clone()).await;
         // save session, IO errors are fatal.
         if let Some(session_file) = &client.priority_session {
-            tokio::fs::write(session_file, client.rq_client.gen_token().await)
+            tokio::fs::write(session_file, token_to_bytes(&client.rq_client.gen_token().await))
                 .await
                 .with_context(|| "写入session出错")?;
         }
@@ -85,7 +86,7 @@ async fn token_login(client: &Client) -> bool {
             };
             client
                 .rq_client
-                .token_login(Bytes::from(session_data))
+                .token_login(bytes_to_token(session_data))
                 .await
                 .is_ok()
         } else {
@@ -120,9 +121,9 @@ async fn qr_login(rq_client: Arc<rs_qq::Client>) -> Result<()> {
     loop {
         match resp {
             QRCodeState::ImageFetch(QRCodeImageFetch {
-                ref image_data,
-                ref sig,
-            }) => {
+                                        ref image_data,
+                                        ref sig,
+                                    }) => {
                 tokio::fs::write("qrcode.png", &image_data)
                     .await
                     .with_context(|| "failed to write file")?;
@@ -145,11 +146,11 @@ async fn qr_login(rq_client: Arc<rs_qq::Client>) -> Result<()> {
                 continue;
             }
             QRCodeState::Confirmed(QRCodeConfirmed {
-                ref tmp_pwd,
-                ref tmp_no_pic_sig,
-                ref tgt_qr,
-                ..
-            }) => {
+                                       ref tmp_pwd,
+                                       ref tmp_no_pic_sig,
+                                       ref tgt_qr,
+                                       ..
+                                   }) => {
                 tracing::info!("二维码已确认");
                 let first = rq_client
                     .qrcode_login(tmp_pwd, tmp_no_pic_sig, tgt_qr)
@@ -173,17 +174,17 @@ async fn loop_login(client: Arc<rs_qq::Client>, first: RQResult<LoginResponse>) 
     loop {
         match resp {
             LoginResponse::Success(LoginSuccess {
-                ref account_info, ..
-            }) => {
+                                       ref account_info, ..
+                                   }) => {
                 tracing::info!("登录成功: {:?}", account_info);
                 return Ok(());
             }
             LoginResponse::DeviceLocked(LoginDeviceLocked {
-                ref sms_phone,
-                ref verify_url,
-                ref message,
-                ..
-            }) => {
+                                            ref sms_phone,
+                                            ref verify_url,
+                                            ref message,
+                                            ..
+                                        }) => {
                 tracing::info!("设备锁 : {:?}", message);
                 tracing::info!("密保手机 : {:?}", sms_phone);
                 tracing::info!("验证地址 : {:?}", verify_url);
@@ -193,11 +194,11 @@ async fn loop_login(client: Arc<rs_qq::Client>, first: RQResult<LoginResponse>) 
                 // resp = client.request_sms().await.expect("failed to request sms");
             }
             LoginResponse::NeedCaptcha(LoginNeedCaptcha {
-                ref verify_url,
-                // 图片应该没了
-                image_captcha: ref _image_captcha,
-                ..
-            }) => {
+                                           ref verify_url,
+                                           // 图片应该没了
+                                           image_captcha: ref _image_captcha,
+                                           ..
+                                       }) => {
                 tracing::info!("滑动条 (原URL) : {:?}", verify_url);
                 let helper_url = verify_url
                     .clone()
@@ -234,11 +235,11 @@ async fn loop_login(client: Arc<rs_qq::Client>, first: RQResult<LoginResponse>) 
                 return Err(anyhow::Error::msg("短信请求过于频繁"));
             }
             LoginResponse::UnknownStatus(LoginUnknownStatus {
-                ref status,
-                ref tlv_map,
-                message,
-                ..
-            }) => {
+                                             ref status,
+                                             ref tlv_map,
+                                             message,
+                                             ..
+                                         }) => {
                 return Err(anyhow::Error::msg(format!(
                     "不能解析的登录响应: {:?}, {:?}, {:?}",
                     status, tlv_map, message,
@@ -254,4 +255,36 @@ async fn http_get(url: &str) -> Result<String> {
     ).send().await?
         .text()
         .await?)
+}
+
+
+pub fn token_to_bytes(t: &Token) -> Bytes {
+    let mut token = BytesMut::with_capacity(1024);
+    token.put_i64(t.uin);
+    token.write_bytes_short(&t.d2);
+    token.write_bytes_short(&t.d2key);
+    token.write_bytes_short(&t.tgt);
+    token.write_bytes_short(&t.srm_token);
+    token.write_bytes_short(&t.t133);
+    token.write_bytes_short(&t.encrypted_a1);
+    token.write_bytes_short(&t.wt_session_ticket_key);
+    token.write_bytes_short(&t.out_packet_session_id);
+    token.write_bytes_short(&t.tgtgt_key);
+    token.freeze()
+}
+
+pub fn bytes_to_token(token: Vec<u8>) -> Token {
+    let mut t = Bytes::from(token);
+    Token {
+        uin: t.get_i64(),
+        d2: t.read_bytes_short().to_vec(),
+        d2key: t.read_bytes_short().to_vec(),
+        tgt: t.read_bytes_short().to_vec(),
+        srm_token: t.read_bytes_short().to_vec(),
+        t133: t.read_bytes_short().to_vec(),
+        encrypted_a1: t.read_bytes_short().to_vec(),
+        wt_session_ticket_key: t.read_bytes_short().to_vec(),
+        out_packet_session_id: t.read_bytes_short().to_vec(),
+        tgtgt_key: t.read_bytes_short().to_vec(),
+    }
 }
