@@ -59,6 +59,14 @@ macro_rules! map_handlers {
 impl Handler for ClientHandler {
     async fn handle(&self, e: QEvent) {
         match e {
+            QEvent::Login(event) => {
+                tracing::debug!(
+                    target = "proc_qq",
+                    "LOGIN : (UIN={})",
+                    event,
+                );
+                let _ = map_handlers!(&self, &LoginEvent{uin:event}, ModuleEventProcess::LoginEvent);
+            }
             QEvent::GroupMessage(event) => {
                 tracing::debug!(
                     target = "proc_qq",
@@ -179,6 +187,8 @@ pub struct ModuleEventHandler {
 }
 
 pub enum ModuleEventProcess {
+    LoginEvent(Box<dyn LoginEventProcess>),
+
     GroupMessage(Box<dyn GroupMessageEventProcess>),
     PrivateMessage(Box<dyn PrivateMessageEventProcess>),
     TempMessage(Box<dyn TempMessageEventProcess>),
@@ -208,6 +218,8 @@ macro_rules! process_trait {
     };
 }
 
+process_trait!(LoginEventProcess, LoginEvent);
+
 process_trait!(GroupMessageEventProcess, GroupMessageEvent);
 process_trait!(PrivateMessageEventProcess, PrivateMessageEvent);
 process_trait!(TempMessageEventProcess, TempMessageEvent);
@@ -225,6 +237,10 @@ process_trait!(GroupNameUpdateEventProcess, GroupNameUpdateEvent);
 
 process_trait!(GroupMessageRecallEventProcess, GroupMessageRecallEvent);
 process_trait!(FriendMessageRecallEventProcess, FriendMessageRecallEvent);
+
+pub struct LoginEvent {
+    pub uin: i64,
+}
 
 pub enum MessageEvent<'a> {
     GroupMessage(&'a GroupMessageEvent),

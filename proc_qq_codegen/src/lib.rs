@@ -44,6 +44,11 @@ pub fn event(_: TokenStream, input: TokenStream) -> TokenStream {
     let param_ty = param.ty.as_ref();
     let param_ty = quote! {#param_ty};
     let tokens = match param_ty.to_string().as_str() {
+        "& LoginEvent" => (
+            quote! {::proc_qq::LoginEventProcess},
+            quote! {::proc_qq::ModuleEventProcess::LoginEvent},
+            false,
+        ),
         "& GroupMessageEvent" => (
             quote! {::proc_qq::GroupMessageEventProcess},
             quote! {::proc_qq::ModuleEventProcess::GroupMessage},

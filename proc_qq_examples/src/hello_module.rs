@@ -1,8 +1,11 @@
 use proc_qq::re_export::rs_qq::client::event::GroupMessageEvent;
-use proc_qq::{
-    event, module, MessageChainParseTrait, MessageContentTrait, MessageEvent,
-    MessageSendToSourceTrait, Module,
-};
+use proc_qq::{event, module, MessageChainParseTrait, MessageContentTrait, MessageEvent, MessageSendToSourceTrait, Module, LoginEvent};
+
+#[event]
+async fn login(event: &LoginEvent) -> anyhow::Result<bool> {
+    tracing::info!("登录成功了 : {}", event.uin);
+    Ok(false)
+}
 
 #[event]
 async fn print(event: &MessageEvent) -> anyhow::Result<bool> {
@@ -28,5 +31,5 @@ async fn group_hello(_: &GroupMessageEvent) -> anyhow::Result<bool> {
 }
 
 pub(crate) fn module() -> Module {
-    module!("hello", "你好", print, group_hello)
+    module!("hello", "你好", login, print, group_hello)
 }

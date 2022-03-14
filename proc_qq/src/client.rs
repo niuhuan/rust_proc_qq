@@ -30,6 +30,7 @@ impl Client {
 }
 
 pub async fn run_client(client: Client) -> Result<()> {
+    // todo // KickedOffline on token login
     loop {
         // connect to server
         let stream = match TcpStream::connect(client.rq_client.get_address())

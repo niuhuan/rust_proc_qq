@@ -132,7 +132,7 @@ use rs_qq::client::event::{
     GroupLeaveEvent, GroupMessageEvent, GroupMessageRecallEvent, GroupMuteEvent,
     GroupNameUpdateEvent, GroupRequestEvent, NewFriendEvent, PrivateMessageEvent, TempMessageEvent,
 };
-use proc_qq::{MessageEvent, };
+use proc_qq::{MessageEvent, LoginEvent, };
 ```
 
 支持更多种事件封装中...
@@ -165,6 +165,10 @@ MessageChainParseTrait;
 ```
 
 ## 其他
+
+实现的功能请转到RS-QQ仓库查看, 本仓库仅为RS-QQ的框架.
+
+RS-QQ 还在发展阶段, 迭代速度较快, 可能出现更改API的情况, 如遇无法运行, 请提issues.
 
 [使用此框架的模版](proc_qq_template)
 

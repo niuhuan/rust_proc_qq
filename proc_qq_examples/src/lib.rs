@@ -28,6 +28,7 @@ async fn test_password_login() {
         .priority_session("session.token")
         .authentication(UinPassword(123456, "password".to_owned()))
         .build(vec![])
+        .build(vec![hello_module::module()])
         .await
         .unwrap()
         .start()
@@ -46,7 +47,9 @@ fn init_tracing_subscriber() {
         .with(
             tracing_subscriber::filter::Targets::new()
                 .with_target("rs_qq", Level::DEBUG)
-                .with_target("proc_qq", Level::DEBUG),
+                .with_target("proc_qq", Level::DEBUG)
+                // 如果需搬运, 这里换成自己的creat名
+                .with_target("proc_qq_examples", Level::DEBUG),
         )
         .init();
 }
