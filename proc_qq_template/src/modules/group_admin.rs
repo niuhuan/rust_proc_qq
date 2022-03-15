@@ -18,7 +18,7 @@ static NAME: &'static str = "群管";
 
 lazy_static! {
     static ref BAN_REGEXP: Regex =
-        Regex::new("^(\\s+)?b(\\s+)?([0-9]{1,5})(\\s+)?([smhd]?)(\\s+)?$").unwrap();
+        Regex::new("^(\\s+)?b(\\s+)?([0-9]{1,5})(\\s+)?([smhd]?)(\\s+)?").unwrap();
 }
 
 pub fn module() -> Module {
@@ -111,8 +111,11 @@ async fn on_message(event: &MessageEvent) -> anyhow::Result<bool> {
                         _ => (),
                     }
                 }
-                // event.group_mute.target_uin;
-                // tracing::info!("禁言 : {}", event.group_mute.target_uin);
+                let mut chan = MessageChain::default();
+                chan.push(At::new(group_message.message.from_uin));
+                chan.push("\n\nOK".parse_text());
+                group_message.send_message_to_source(chan).await?;
+                return Ok(true);
             }
             Ok(false)
         }
