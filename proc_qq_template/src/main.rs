@@ -5,9 +5,7 @@ use tracing_subscriber::util::SubscriberInitExt;
 use proc_qq::Authentication::QRCode;
 use proc_qq::ClientBuilder;
 
-mod imglib;
-mod menu;
-mod misc;
+mod modules;
 
 #[tokio::main]
 async fn main() {
@@ -15,7 +13,7 @@ async fn main() {
     ClientBuilder::new()
         .priority_session("session.token")
         .authentication(QRCode)
-        .build(vec![menu::module(), imglib::module(), misc::module()])
+        .build(modules::all_modules())
         .await
         .unwrap()
         .start()

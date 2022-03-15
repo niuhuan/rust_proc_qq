@@ -2,12 +2,13 @@ use async_trait::async_trait;
 pub use events::*;
 pub use processes::*;
 use rs_qq::handler::{Handler, QEvent};
+use std::sync::Arc;
 
 mod events;
 mod processes;
 
 pub(crate) struct ClientHandler {
-    pub(crate) modules: Vec<Module>,
+    pub(crate) modules: Arc<Vec<Module>>,
 }
 
 impl ClientHandler {}
@@ -21,7 +22,7 @@ enum MapResult<'a> {
 macro_rules! map_handlers {
     ($self:expr $(,$event:expr, $process:path)* $(,)?) => {{
         let mut result = MapResult::None;
-        for m in &$self.modules {
+        for m in $self.modules.as_ref() {
             for h in &m.handles {
                 match &h.process {
                     $(

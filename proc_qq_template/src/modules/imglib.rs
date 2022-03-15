@@ -12,12 +12,12 @@ static NAME: &'static str = "图库";
 static MENU: &'static str = "图库 (请直接回复功能名) : \n ❤️ 动漫壁纸";
 static UA: &'static str = "Mozilla/5.0 (Linux; Android 6.0; Nexus 5 Build/MRA58N) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/98.0.4758.80 Mobile Safari/537.36";
 
-pub(crate) fn module() -> Module {
-    module!(ID, NAME, group_message, private_message)
+pub fn module() -> Module {
+    module!(ID, NAME, on_message)
 }
 
 #[event]
-async fn group_message(event: &MessageEvent) -> anyhow::Result<bool> {
+async fn on_message(event: &MessageEvent) -> anyhow::Result<bool> {
     let content = event.message_content();
     if content.eq(NAME) {
         event

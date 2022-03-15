@@ -41,4 +41,11 @@ impl MessageEvent<'_> {
             _ => false,
         }
     }
+    pub fn from_uin(&self) -> i64 {
+        match self {
+            MessageEvent::GroupMessage(message) => message.message.from_uin,
+            MessageEvent::PrivateMessage(message) => message.message.from_uin,
+            MessageEvent::TempMessage(message) => message.message.from_uin,
+        }
+    }
 }

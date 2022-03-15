@@ -1,3 +1,4 @@
+use std::sync::Arc;
 use tracing::Level;
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 
@@ -27,7 +28,7 @@ async fn test_password_login() {
     ClientBuilder::new()
         .priority_session("session.token")
         .authentication(UinPassword(123456, "password".to_owned()))
-        .build(vec![hello_module::module()])
+        .build(Arc::new(vec![hello_module::module()]))
         .await
         .unwrap()
         .start()

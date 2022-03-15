@@ -173,6 +173,6 @@ client
 
 RS-QQ 还在发展阶段, 迭代速度较快, 可能出现更改API的情况, 如遇无法运行, 请提issues.
 
-[使用此框架的模版](proc_qq_template)
+[Examples](proc_qq_examples) 中提供了HelloWorld
 
-[例子](proc_qq_examples)
+[Template](proc_qq_template) 是一个机器人模版, 并提供了一些模块

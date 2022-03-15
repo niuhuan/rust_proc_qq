@@ -311,7 +311,7 @@ impl ClientBuilder {
         }
     }
 
-    pub async fn build(&self, h: Vec<Module>) -> Result<Client, anyhow::Error> {
+    pub async fn build<S: Into<Arc<Vec<Module>>>>(&self, h: S) -> Result<Client, anyhow::Error> {
         Ok(Client {
             rq_client: Arc::new(rs_qq::Client::new(
                 match &self.device_source {
@@ -333,7 +333,7 @@ impl ClientBuilder {
                     JsonString(json_string) => parse_device_json(json_string)?,
                 },
                 self.version,
-                ClientHandler { modules: h },
+                ClientHandler { modules: h.into() },
             )),
             authentication: self
                 .authentication

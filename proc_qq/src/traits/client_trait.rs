@@ -2,6 +2,8 @@ use async_trait::async_trait;
 use rq_engine::msg::MessageChain;
 use rq_engine::structs::MessageReceipt;
 use rq_engine::{RQError, RQResult};
+use rs_qq::structs::Group;
+use std::sync::Arc;
 
 use crate::{MessageSource, MessageSourceTrait};
 
@@ -12,6 +14,7 @@ pub trait ClientTrait: Send + Sync {
         source: &impl MessageSourceTrait,
         message: S,
     ) -> RQResult<MessageReceipt>;
+    async fn must_find_group(&self, group_code: i64, auto_reload: bool) -> RQResult<Arc<Group>>;
 }
 
 #[async_trait]
@@ -39,6 +42,13 @@ impl ClientTrait for rs_qq::Client {
             }
         }
     }
+    async fn must_find_group(&self, group_code: i64, auto_reload: bool) -> RQResult<Arc<Group>> {
+        let group = self.find_group(group_code, auto_reload).await;
+        match group {
+            Some(group) => RQResult::Ok(group),
+            None => RQResult::Err(RQError::Other(format!("Group not found : {}", group_code))),
+        }
+    }
 }
 
 #[async_trait]
@@ -50,6 +60,12 @@ impl ClientTrait for crate::Client {
     ) -> RQResult<MessageReceipt> {
         self.rq_client
             .send_message_to_source(source, message.into())
+            .await
+    }
+
+    async fn must_find_group(&self, group_code: i64, auto_reload: bool) -> RQResult<Arc<Group>> {
+        self.rq_client
+            .must_find_group(group_code, auto_reload)
             .await
     }
 }
