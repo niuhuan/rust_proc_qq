@@ -1,13 +1,14 @@
+use crate::tools::ReplyChain;
 use proc_qq::re_exports::rs_qq::client::event::PrivateMessageEvent;
 use proc_qq::re_exports::rs_qq::msg::elem::Text;
 use proc_qq::re_exports::rs_qq::msg::MessageChain;
 use proc_qq::re_exports::{bytes, reqwest};
 use proc_qq::{
-    event, module, MessageChainParseTrait, MessageContentTrait, MessageEvent,
-    MessageSendToSourceTrait, Module,
+    event, module, MessageChainTrait, MessageContentTrait, MessageEvent, MessageSendToSourceTrait,
+    Module, TextEleParseTrait,
 };
 
-static ID: &'static str = "imglib";
+static ID: &'static str = "image_lib";
 static NAME: &'static str = "图库";
 static MENU: &'static str = "图库 (请直接回复功能名) : \n ❤️ 动漫壁纸";
 static UA: &'static str = "Mozilla/5.0 (Linux; Android 6.0; Nexus 5 Build/MRA58N) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/98.0.4758.80 Mobile Safari/537.36";
@@ -20,22 +21,26 @@ pub fn module() -> Module {
 async fn on_message(event: &MessageEvent) -> anyhow::Result<bool> {
     let content = event.message_content();
     if content.eq(NAME) {
-        event
-            .send_message_to_source(
-                if event.is_temp_message() {
-                    "临时会话不能使用此功能奥"
-                } else {
-                    MENU
-                }
-                .parse_message_chain(),
-            )
-            .await?;
+        if event.is_temp_message() {
+            event
+                .send_message_to_source(
+                    event
+                        .reply_chain()
+                        .await
+                        .append("临时会话不能使用此功能奥".parse_text()),
+                )
+                .await?;
+        } else {
+            event
+                .send_message_to_source(event.reply_chain().await.append(MENU.parse_text()))
+                .await?;
+        }
         Ok(true)
     } else if content.eq("动漫壁纸") {
         let img = get_img().await?.to_vec();
         let img = event.upload_image_to_source(img).await?;
         event
-            .send_message_to_source(img.parse_message_chain())
+            .send_message_to_source(event.reply_chain().await.append(img))
             .await?;
         Ok(true)
     } else {

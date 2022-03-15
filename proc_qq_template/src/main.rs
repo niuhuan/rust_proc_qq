@@ -6,6 +6,7 @@ use proc_qq::Authentication::QRCode;
 use proc_qq::ClientBuilder;
 
 mod modules;
+mod tools;
 
 #[tokio::main]
 async fn main() {

@@ -14,9 +14,18 @@ RUST_PROC_QQ
 
 ## 如何使用 / demo
 
+新建一个rust项目, 并将rust环境设置为nightly
+
+```shell
+# 设置rust默认环境为 nightly
+rustup default nightly
+# 设置当前项目rust环境设置为 nightly
+rustup override set nightly
+```
+
 ### 引用
 
-Cargo.toml
+在Cargo.toml中引入proc_qq
 
 ```toml
 proc_qq = { git = "https://github.com/niuhuan/rust_proc_qq.git", branch = "master" }
@@ -149,15 +158,11 @@ MessageEvent::message_content;
 #### 直接回复消息到消息源
 
 ```rust
-use prco_qq::MessageSendToSourceTrait;
-MessageEvent::send_message_to_source;
-// or
-use prco_qq::MessageSourceTrait;
-use prco_qq::ClientTrait;
 Client::send_message_to_source;
+Event::send_message_to_source;
 ```
 
-#### 直接将文字/图片当作MessageChain使用
+#### 直接将单个消息文字/图片当作MessageChain使用
 
 ```rust
 MessageChainParseTrait;
@@ -165,6 +170,17 @@ MessageChainParseTrait;
 client
 .send_group_message(group_code, "".parse_message_chain())
 .await?;
+```
+
+#### 
+
+MessageChain链式追加
+
+```rust
+MessageChainTrait;
+
+let chain: MessageChain;
+let chain = chain.append(at).append(text).append(image);
 ```
 
 ## 其他

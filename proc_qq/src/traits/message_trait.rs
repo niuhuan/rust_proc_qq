@@ -5,10 +5,12 @@ use rq_engine::pb::msg::elem::Elem;
 use rq_engine::structs::{GroupMessage, MessageReceipt, PrivateMessage, TempMessage};
 use rq_engine::{RQError, RQResult};
 use rs_qq::client::event::{GroupMessageEvent, PrivateMessageEvent, TempMessageEvent};
+use rs_qq::structs::Group;
+use std::sync::Arc;
 
 use crate::{ClientTrait, MessageEvent};
 
-pub enum MessageSource {
+pub enum MessageTarget {
     // Group(group_code,uin)
     Group(i64, i64),
     // Private(uin)
@@ -31,8 +33,8 @@ impl Into<Vec<Elem>> for UploadImage {
     }
 }
 
-pub trait MessageSourceTrait: Send + Sync {
-    fn message_source(&self) -> MessageSource;
+pub trait MessageTargetTrait: Send + Sync {
+    fn target(&self) -> MessageTarget;
 }
 
 pub trait MessageContentTrait: Send + Sync {
@@ -40,7 +42,7 @@ pub trait MessageContentTrait: Send + Sync {
 }
 
 #[async_trait]
-pub trait MessageSendToSourceTrait: Send + Sync {
+pub trait MessageSendToSourceTrait: Send + Sync + ClientTrait {
     async fn send_message_to_source<S: Into<MessageChain> + Send + Sync>(
         &self,
         message: S,
@@ -66,9 +68,9 @@ impl MessageContentTrait for MessageChain {
     }
 }
 
-impl MessageSourceTrait for GroupMessage {
-    fn message_source(&self) -> MessageSource {
-        MessageSource::Group(self.group_code, self.from_uin)
+impl MessageTargetTrait for GroupMessage {
+    fn target(&self) -> MessageTarget {
+        MessageTarget::Group(self.group_code, self.from_uin)
     }
 }
 
@@ -78,9 +80,9 @@ impl MessageContentTrait for GroupMessage {
     }
 }
 
-impl MessageSourceTrait for GroupMessageEvent {
-    fn message_source(&self) -> MessageSource {
-        self.message.message_source()
+impl MessageTargetTrait for GroupMessageEvent {
+    fn target(&self) -> MessageTarget {
+        self.message.target()
     }
 }
 
@@ -91,12 +93,31 @@ impl MessageContentTrait for GroupMessageEvent {
 }
 
 #[async_trait]
+impl ClientTrait for GroupMessageEvent {
+    async fn send_message_to_target<S: Into<MessageChain> + Send + Sync>(
+        &self,
+        source: &impl MessageTargetTrait,
+        message: S,
+    ) -> RQResult<MessageReceipt> {
+        self.client.send_message_to_target(source, message).await
+    }
+
+    async fn must_find_group(&self, group_code: i64, auto_reload: bool) -> RQResult<Arc<Group>> {
+        self.client.must_find_group(group_code, auto_reload).await
+    }
+
+    async fn bot_uin(&self) -> i64 {
+        self.client.bot_uin().await
+    }
+}
+
+#[async_trait]
 impl MessageSendToSourceTrait for GroupMessageEvent {
     async fn send_message_to_source<S: Into<MessageChain> + Send + Sync>(
         &self,
         message: S,
     ) -> RQResult<MessageReceipt> {
-        self.client.send_message_to_source(self, message).await
+        self.client.send_message_to_target(self, message).await
     }
 
     async fn upload_image_to_source<S: Into<Vec<u8>> + Send + Sync>(
@@ -111,9 +132,9 @@ impl MessageSendToSourceTrait for GroupMessageEvent {
     }
 }
 
-impl MessageSourceTrait for PrivateMessage {
-    fn message_source(&self) -> MessageSource {
-        MessageSource::Private(self.from_uin)
+impl MessageTargetTrait for PrivateMessage {
+    fn target(&self) -> MessageTarget {
+        MessageTarget::Private(self.from_uin)
     }
 }
 
@@ -123,9 +144,9 @@ impl MessageContentTrait for PrivateMessage {
     }
 }
 
-impl MessageSourceTrait for PrivateMessageEvent {
-    fn message_source(&self) -> MessageSource {
-        self.message.message_source()
+impl MessageTargetTrait for PrivateMessageEvent {
+    fn target(&self) -> MessageTarget {
+        self.message.target()
     }
 }
 
@@ -136,12 +157,31 @@ impl MessageContentTrait for PrivateMessageEvent {
 }
 
 #[async_trait]
+impl ClientTrait for PrivateMessageEvent {
+    async fn send_message_to_target<S: Into<MessageChain> + Send + Sync>(
+        &self,
+        source: &impl MessageTargetTrait,
+        message: S,
+    ) -> RQResult<MessageReceipt> {
+        self.client.send_message_to_target(source, message).await
+    }
+
+    async fn must_find_group(&self, group_code: i64, auto_reload: bool) -> RQResult<Arc<Group>> {
+        self.client.must_find_group(group_code, auto_reload).await
+    }
+
+    async fn bot_uin(&self) -> i64 {
+        self.client.bot_uin().await
+    }
+}
+
+#[async_trait]
 impl MessageSendToSourceTrait for PrivateMessageEvent {
     async fn send_message_to_source<S: Into<MessageChain> + Send + Sync>(
         &self,
         message: S,
     ) -> RQResult<MessageReceipt> {
-        self.client.send_message_to_source(self, message).await
+        self.client.send_message_to_target(self, message).await
     }
 
     async fn upload_image_to_source<S: Into<Vec<u8>> + Send + Sync>(
@@ -156,9 +196,9 @@ impl MessageSendToSourceTrait for PrivateMessageEvent {
     }
 }
 
-impl MessageSourceTrait for TempMessage {
-    fn message_source(&self) -> MessageSource {
-        MessageSource::Temp(self.group_code, self.from_uin)
+impl MessageTargetTrait for TempMessage {
+    fn target(&self) -> MessageTarget {
+        MessageTarget::Temp(self.group_code, self.from_uin)
     }
 }
 
@@ -168,9 +208,9 @@ impl MessageContentTrait for TempMessage {
     }
 }
 
-impl MessageSourceTrait for TempMessageEvent {
-    fn message_source(&self) -> MessageSource {
-        self.message.message_source()
+impl MessageTargetTrait for TempMessageEvent {
+    fn target(&self) -> MessageTarget {
+        self.message.target()
     }
 }
 
@@ -181,12 +221,31 @@ impl MessageContentTrait for TempMessageEvent {
 }
 
 #[async_trait]
+impl ClientTrait for TempMessageEvent {
+    async fn send_message_to_target<S: Into<MessageChain> + Send + Sync>(
+        &self,
+        source: &impl MessageTargetTrait,
+        message: S,
+    ) -> RQResult<MessageReceipt> {
+        self.client.send_message_to_target(source, message).await
+    }
+
+    async fn must_find_group(&self, group_code: i64, auto_reload: bool) -> RQResult<Arc<Group>> {
+        self.client.must_find_group(group_code, auto_reload).await
+    }
+
+    async fn bot_uin(&self) -> i64 {
+        self.client.bot_uin().await
+    }
+}
+
+#[async_trait]
 impl MessageSendToSourceTrait for TempMessageEvent {
     async fn send_message_to_source<S: Into<MessageChain> + Send + Sync>(
         &self,
         message: S,
     ) -> RQResult<MessageReceipt> {
-        self.client.send_message_to_source(self, message).await
+        self.client.send_message_to_target(self, message).await
     }
 
     async fn upload_image_to_source<S: Into<Vec<u8>> + Send + Sync>(
@@ -199,12 +258,12 @@ impl MessageSendToSourceTrait for TempMessageEvent {
     }
 }
 
-impl MessageSourceTrait for MessageEvent<'_> {
-    fn message_source(&self) -> MessageSource {
+impl MessageTargetTrait for MessageEvent<'_> {
+    fn target(&self) -> MessageTarget {
         match self {
-            MessageEvent::GroupMessage(event) => event.message_source(),
-            MessageEvent::PrivateMessage(event) => event.message_source(),
-            MessageEvent::TempMessage(event) => event.message_source(),
+            MessageEvent::GroupMessage(event) => event.target(),
+            MessageEvent::PrivateMessage(event) => event.target(),
+            MessageEvent::TempMessage(event) => event.target(),
         }
     }
 }
@@ -216,6 +275,25 @@ impl MessageContentTrait for MessageEvent<'_> {
             MessageEvent::PrivateMessage(event) => event.message_content(),
             MessageEvent::TempMessage(event) => event.message_content(),
         }
+    }
+}
+
+#[async_trait]
+impl ClientTrait for MessageEvent<'_> {
+    async fn send_message_to_target<S: Into<MessageChain> + Send + Sync>(
+        &self,
+        source: &impl MessageTargetTrait,
+        message: S,
+    ) -> RQResult<MessageReceipt> {
+        self.client().send_message_to_target(source, message).await
+    }
+
+    async fn must_find_group(&self, group_code: i64, auto_reload: bool) -> RQResult<Arc<Group>> {
+        self.client().must_find_group(group_code, auto_reload).await
+    }
+
+    async fn bot_uin(&self) -> i64 {
+        self.client().bot_uin().await
     }
 }
 

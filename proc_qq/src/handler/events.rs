@@ -1,3 +1,4 @@
+use rq_engine::{RQError, RQResult};
 pub use rs_qq::client::event::{
     DeleteFriendEvent, FriendMessageRecallEvent, FriendPokeEvent, FriendRequestEvent,
     GroupLeaveEvent, GroupMessageEvent, GroupMessageRecallEvent, GroupMuteEvent,
@@ -29,16 +30,34 @@ impl MessageEvent<'_> {
             _ => false,
         }
     }
+    pub fn as_group_message(&self) -> RQResult<&'_ GroupMessageEvent> {
+        match self {
+            MessageEvent::GroupMessage(group_message) => RQResult::Ok(group_message),
+            _ => RQResult::Err(RQError::Other("Not is a group message".to_owned())),
+        }
+    }
     pub fn is_private_message(&self) -> bool {
         match self {
             MessageEvent::PrivateMessage(_) => true,
             _ => false,
         }
     }
+    pub fn as_private_message(&self) -> RQResult<&'_ PrivateMessageEvent> {
+        match self {
+            MessageEvent::PrivateMessage(private_message) => RQResult::Ok(private_message),
+            _ => RQResult::Err(RQError::Other("Not is a group message".to_owned())),
+        }
+    }
     pub fn is_temp_message(&self) -> bool {
         match self {
             MessageEvent::TempMessage(_) => true,
             _ => false,
+        }
+    }
+    pub fn as_temp_message(&self) -> RQResult<&'_ TempMessageEvent> {
+        match self {
+            MessageEvent::TempMessage(temp_message) => RQResult::Ok(temp_message),
+            _ => RQResult::Err(RQError::Other("Not is a group message".to_owned())),
         }
     }
     pub fn from_uin(&self) -> i64 {
