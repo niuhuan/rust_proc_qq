@@ -9,7 +9,7 @@ use rq_engine::command::wtlogin::{
 };
 use rq_engine::protocol::device::Device;
 use rq_engine::protocol::version::{Version, ANDROID_PHONE};
-use rq_engine::{RQResult, Token};
+use rq_engine::{RQError, RQResult, Token};
 use rs_qq::ext::common::after_login;
 use std::path::Path;
 use std::sync::Arc;
@@ -31,7 +31,8 @@ impl Client {
 }
 
 pub async fn run_client(client: Client) -> Result<()> {
-    // todo // KickedOffline on token login
+    // todo // max try count
+    // todo // not retry qr
     loop {
         // connect to server
         let stream = match TcpStream::connect(client.rq_client.get_address())
@@ -89,11 +90,21 @@ async fn token_login(client: &Client) -> bool {
                     return false;
                 }
             };
-            client
+            let result = client
                 .rq_client
                 .token_login(bytes_to_token(session_data))
-                .await
-                .is_ok()
+                .await;
+            match result {
+                Ok(_) => true,
+                Err(err) => match err {
+                    RQError::TokenLoginFailed => {
+                        // token error (KickedOffline)
+                        let _ = tokio::fs::remove_file(session_file).await;
+                        false
+                    }
+                    _ => false,
+                },
+            }
         } else {
             false
         }

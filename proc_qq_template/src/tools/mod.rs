@@ -2,7 +2,9 @@ use proc_qq::re_exports::async_trait::async_trait;
 use proc_qq::re_exports::rq_engine::msg::elem::At;
 use proc_qq::re_exports::rq_engine::structs::GroupMemberInfo;
 use proc_qq::re_exports::rs_qq::msg::MessageChain;
-use proc_qq::{ClientTrait, GroupMessageEvent, GroupTrait, MessageChainTrait, MessageEvent};
+use proc_qq::{
+    ClientTrait, GroupMessageEvent, GroupTrait, MessageChainTrait, MessageEvent, TextEleParseTrait,
+};
 
 #[async_trait]
 pub(crate) trait ReplyChain {
@@ -21,7 +23,9 @@ impl ReplyChain for GroupMessageEvent {
             let member = group.must_find_member(self.message.from_uin).await;
             if member.is_ok() {
                 let member = member.unwrap();
-                return MessageChain::default().append(at_member(&member));
+                return MessageChain::default()
+                    .append(at_member(&member))
+                    .append("\n\n".parse_text());
             }
         }
         MessageChain::default().append(At::new(self.message.from_uin))

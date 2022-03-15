@@ -2,8 +2,9 @@ use tracing::Level;
 use tracing_subscriber::layer::SubscriberExt;
 use tracing_subscriber::util::SubscriberInitExt;
 
+use proc_qq::re_exports::rs_qq::version::ANDROID_WATCH;
 use proc_qq::Authentication::QRCode;
-use proc_qq::ClientBuilder;
+use proc_qq::{ClientBuilder, DeviceSource};
 
 mod modules;
 mod tools;
@@ -12,6 +13,8 @@ mod tools;
 async fn main() {
     init_tracing_subscriber();
     ClientBuilder::new()
+        .device(DeviceSource::JsonFile("device.json".to_owned()))
+        .version(&ANDROID_WATCH)
         .priority_session("session.token")
         .authentication(QRCode)
         .build(modules::all_modules())
