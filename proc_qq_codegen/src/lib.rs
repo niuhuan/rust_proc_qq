@@ -137,17 +137,17 @@ pub fn event(_: TokenStream, input: TokenStream) -> TokenStream {
     let build_trait = if build_in {
         let block = &method.block;
         quote! {
-            #[::proc_qq::re_export::async_trait::async_trait]
+            #[::proc_qq::re_exports::async_trait::async_trait]
             impl #trait_name for #ident {
-                async fn handle(&self, event: #param_ty) -> ::proc_qq::re_export::anyhow::Result<bool> #block
+                async fn handle(&self, event: #param_ty) -> ::proc_qq::re_exports::anyhow::Result<bool> #block
             }
         }
     } else {
         quote! {
             #method
-            #[::proc_qq::re_export::async_trait::async_trait]
+            #[::proc_qq::re_exports::async_trait::async_trait]
             impl #trait_name for #ident {
-                async fn handle(&self, event: #param_ty) -> ::proc_qq::re_export::anyhow::Result<bool> {
+                async fn handle(&self, event: #param_ty) -> ::proc_qq::re_exports::anyhow::Result<bool> {
                     Ok(#ident(event).await?)
                 }
             }

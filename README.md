@@ -27,7 +27,7 @@ proc_qq = { git = "https://github.com/niuhuan/rust_proc_qq.git", branch = "maste
 hello_module.rs
 
 ```rust
-use proc_qq::re_export::rs_qq::client::event::GroupMessageEvent;
+use proc_qq::re_exports::rs_qq::client::event::GroupMessageEvent;
 use proc_qq::{
     event, module, MessageChainParseTrait, MessageContentTrait, MessageEvent, MessageSendToSourceTrait,
     Module,

@@ -27,7 +27,6 @@ async fn test_password_login() {
     ClientBuilder::new()
         .priority_session("session.token")
         .authentication(UinPassword(123456, "password".to_owned()))
-        .build(vec![])
         .build(vec![hello_module::module()])
         .await
         .unwrap()

@@ -1,4 +1,4 @@
-use proc_qq::re_export::rs_qq::client::event::GroupMessageEvent;
+use proc_qq::re_exports::rs_qq::client::event::GroupMessageEvent;
 use proc_qq::{
     event, module, LoginEvent, MessageChainParseTrait, MessageContentTrait, MessageEvent,
     MessageSendToSourceTrait, Module,

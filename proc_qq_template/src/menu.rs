@@ -1,6 +1,6 @@
-use proc_qq::re_export::rs_qq::client::event::{GroupMessageEvent, PrivateMessageEvent};
-use proc_qq::re_export::rs_qq::msg::elem::Text;
-use proc_qq::re_export::rs_qq::msg::MessageChain;
+use proc_qq::re_exports::rs_qq::client::event::{GroupMessageEvent, PrivateMessageEvent};
+use proc_qq::re_exports::rs_qq::msg::elem::Text;
+use proc_qq::re_exports::rs_qq::msg::MessageChain;
 use proc_qq::{event, module, Module};
 
 static ID: &'static str = "menu";

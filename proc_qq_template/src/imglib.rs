@@ -1,7 +1,7 @@
-use proc_qq::re_export::rs_qq::client::event::PrivateMessageEvent;
-use proc_qq::re_export::rs_qq::msg::elem::Text;
-use proc_qq::re_export::rs_qq::msg::MessageChain;
-use proc_qq::re_export::{bytes, reqwest};
+use proc_qq::re_exports::rs_qq::client::event::PrivateMessageEvent;
+use proc_qq::re_exports::rs_qq::msg::elem::Text;
+use proc_qq::re_exports::rs_qq::msg::MessageChain;
+use proc_qq::re_exports::{bytes, reqwest};
 use proc_qq::{
     event, module, MessageChainParseTrait, MessageContentTrait, MessageEvent,
     MessageSendToSourceTrait, Module,
