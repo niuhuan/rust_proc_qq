@@ -258,7 +258,7 @@ impl MessageSendToSourceTrait for TempMessageEvent {
     }
 }
 
-impl MessageTargetTrait for MessageEvent<'_> {
+impl MessageTargetTrait for MessageEvent {
     fn target(&self) -> MessageTarget {
         match self {
             MessageEvent::GroupMessage(event) => event.target(),
@@ -268,7 +268,7 @@ impl MessageTargetTrait for MessageEvent<'_> {
     }
 }
 
-impl MessageContentTrait for MessageEvent<'_> {
+impl MessageContentTrait for MessageEvent {
     fn message_content(&self) -> String {
         match self {
             MessageEvent::GroupMessage(event) => event.message_content(),
@@ -279,7 +279,7 @@ impl MessageContentTrait for MessageEvent<'_> {
 }
 
 #[async_trait]
-impl ClientTrait for MessageEvent<'_> {
+impl ClientTrait for MessageEvent {
     async fn send_message_to_target<S: Into<MessageChain> + Send + Sync>(
         &self,
         source: &impl MessageTargetTrait,
@@ -298,7 +298,7 @@ impl ClientTrait for MessageEvent<'_> {
 }
 
 #[async_trait]
-impl MessageSendToSourceTrait for MessageEvent<'_> {
+impl MessageSendToSourceTrait for MessageEvent {
     async fn send_message_to_source<S: Into<MessageChain> + Send + Sync>(
         &self,
         message: S,

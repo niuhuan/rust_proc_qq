@@ -2,18 +2,22 @@ use proc_qq::re_exports::async_trait::async_trait;
 use proc_qq::re_exports::rq_engine::msg::elem::At;
 use proc_qq::re_exports::rq_engine::structs::GroupMemberInfo;
 use proc_qq::re_exports::rs_qq::msg::MessageChain;
+use proc_qq::re_exports::rs_qq::RQResult;
 use proc_qq::{
-    ClientTrait, GroupMessageEvent, GroupTrait, MessageChainTrait, MessageEvent, TextEleParseTrait,
+    ClientTrait, GroupMessageEvent, GroupTrait, MessageChainParseTrait, MessageChainTrait,
+    MessageEvent, MessageSendToSourceTrait, TextEleParseTrait,
 };
 
 #[async_trait]
-pub(crate) trait ReplyChain {
-    async fn reply_chain(&self) -> MessageChain;
+pub(crate) trait CanReply {
+    async fn make_reply_chain(&self) -> MessageChain;
+    async fn reply_text(&self, text: &str) -> RQResult<()>;
+    async fn reply_raw_text(&self, text: &str) -> RQResult<()>;
 }
 
 #[async_trait]
-impl ReplyChain for GroupMessageEvent {
-    async fn reply_chain(&self) -> MessageChain {
+impl CanReply for GroupMessageEvent {
+    async fn make_reply_chain(&self) -> MessageChain {
         let group = self
             .client
             .must_find_group(self.message.group_code, true)
@@ -30,15 +34,38 @@ impl ReplyChain for GroupMessageEvent {
         }
         MessageChain::default().append(At::new(self.message.from_uin))
     }
+
+    async fn reply_text(&self, text: &str) -> RQResult<()> {
+        self.send_message_to_source(self.make_reply_chain().await.append(text.parse_text()))
+            .await?;
+        RQResult::Ok(())
+    }
+
+    async fn reply_raw_text(&self, text: &str) -> RQResult<()> {
+        self.send_message_to_source(text.parse_message_chain())
+            .await?;
+        RQResult::Ok(())
+    }
 }
 
 #[async_trait]
-impl ReplyChain for MessageEvent<'_> {
-    async fn reply_chain(&self) -> MessageChain {
+impl CanReply for MessageEvent {
+    async fn make_reply_chain(&self) -> MessageChain {
         match self {
-            MessageEvent::GroupMessage(group_message) => group_message.reply_chain().await,
+            MessageEvent::GroupMessage(group_message) => group_message.make_reply_chain().await,
             _ => MessageChain::default(),
         }
+    }
+    async fn reply_text(&self, text: &str) -> RQResult<()> {
+        self.send_message_to_source(self.make_reply_chain().await.append(text.parse_text()))
+            .await?;
+        RQResult::Ok(())
+    }
+
+    async fn reply_raw_text(&self, text: &str) -> RQResult<()> {
+        self.send_message_to_source(text.parse_message_chain())
+            .await?;
+        RQResult::Ok(())
     }
 }
 

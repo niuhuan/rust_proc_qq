@@ -189,6 +189,18 @@ let chain = chain.append(at).append(text).append(image);
 
 RS-QQ 还在发展阶段, 迭代速度较快, 可能出现更改API的情况, 如遇无法运行, 请提issues.
 
-[Examples](proc_qq_examples) 中提供了HelloWorld
+#### [Examples](proc_qq_examples) 中提供了HelloWorld
 
-[Template](proc_qq_template) 是一个机器人模版, 并提供了一些模块
+#### [Template](proc_qq_template) 是一个机器人模版, 并提供了一些模块
+
+##### 模版中封装了一些常用功能
+
+直接回复文字, 如果是在群中会自动@
+```rust
+event.reply_text("你好").await?;
+```
+![](images/img_lib_01.png)
+
+![](images/img_lib_02.png)
+
+![](images/group_admin_01.png)

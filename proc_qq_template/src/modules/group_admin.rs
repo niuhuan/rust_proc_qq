@@ -1,11 +1,8 @@
-use crate::tools::ReplyChain;
+use crate::tools::CanReply;
 use lazy_static::lazy_static;
 use proc_qq::re_exports::rq_engine::msg::elem::RQElem;
-use proc_qq::re_exports::rs_qq::msg::elem::At;
-use proc_qq::re_exports::rs_qq::msg::MessageChain;
 use proc_qq::{
-    event, module, ClientTrait, GroupTrait, MemberTrait, MessageChainTrait, MessageContentTrait,
-    MessageEvent, MessageSendToSourceTrait, Module, TextEleParseTrait,
+    event, module, ClientTrait, GroupTrait, MemberTrait, MessageContentTrait, MessageEvent, Module,
 };
 use regex::Regex;
 use std::time::Duration;
@@ -22,34 +19,32 @@ pub fn module() -> Module {
     module!(ID, NAME, on_message)
 }
 
+async fn not_in_group_and_reply(event: &MessageEvent) -> anyhow::Result<bool> {
+    Ok(if !event.is_group_message() {
+        event.reply_text("只能在群中使用").await?;
+        true
+    } else {
+        false
+    })
+}
+
 #[event]
 async fn on_message(event: &MessageEvent) -> anyhow::Result<bool> {
     let content = event.message_content();
     if content == NAME {
-        if !event.is_group_message() {
-            event
-                .send_message_to_source(
-                    event
-                        .reply_chain()
-                        .await
-                        .append("只能在群中使用".parse_text()),
-                )
-                .await?;
-        } else {
-            event
-                .send_message_to_source(
-                    event.reply_chain().await.append(
-                        ("".to_owned()
-                            + "b+禁言时间 @一个或多个人\n\n"
-                            + "比如禁言张三12小时 : b12h @张三 \n\n"
-                            + "比如禁言张三李四12天 : b12h @张三 @李四 \n\n"
-                            + " s 秒, m 分, h 小时, d 天\n\n"
-                            + "b0 则解除禁言")
-                            .parse_text(),
-                    ),
-                )
-                .await?;
+        if not_in_group_and_reply(event).await? {
+            return Ok(true);
         }
+        event
+            .reply_text(
+                &("".to_owned()
+                    + "b+禁言时间 @一个或多个人\n\n"
+                    + "比如禁言张三12小时 : b12h @张三 \n\n"
+                    + "比如禁言张三李四12天 : b12h @张三 @李四 \n\n"
+                    + " s 秒, m 分, h 小时, d 天\n\n"
+                    + "b0 则解除禁言"),
+            )
+            .await?;
         return Ok(true);
     }
     if !event.is_group_message() {
@@ -64,20 +59,14 @@ async fn on_message(event: &MessageEvent) -> anyhow::Result<bool> {
         let bot_member = group.must_find_member(event.bot_uin().await).await?;
         if call_member.is_member() {
             group_message
-                .send_message_to_source(
-                    group_message
-                        .reply_chain()
-                        .await
-                        .append("您必须是群主或管理员才能使用".parse_text()),
-                )
+                .reply_text("您必须是群主或管理员才能使用")
                 .await?;
             return Ok(true);
         }
         if bot_member.is_member() {
-            let mut chan = MessageChain::default();
-            chan.push(At::new(group_message.message.from_uin));
-            chan.push("\n\n机器人必须是群主或管理员才能使用".parse_text());
-            group_message.send_message_to_source(chan).await?;
+            group_message
+                .reply_text("机器人必须是群主或管理员才能使用")
+                .await?;
             return Ok(true);
         }
         let e = BAN_REGEXP.captures_iter(&content).next().unwrap();
@@ -89,10 +78,7 @@ async fn on_message(event: &MessageEvent) -> anyhow::Result<bool> {
             _ => time,
         };
         if time >= 60 * 60 * 24 * 29 {
-            let mut chan = MessageChain::default();
-            chan.push(At::new(group_message.message.from_uin));
-            chan.push("\n\n最多禁言29天".parse_text());
-            group_message.send_message_to_source(chan).await?;
+            group_message.reply_text("最多禁言29天").await?;
             return Ok(true);
         }
         for x in group_message.message.elements.clone().into_iter() {
@@ -110,10 +96,7 @@ async fn on_message(event: &MessageEvent) -> anyhow::Result<bool> {
                 _ => (),
             }
         }
-        let mut chan = MessageChain::default();
-        chan.push(At::new(group_message.message.from_uin));
-        chan.push("\n\nOK".parse_text());
-        group_message.send_message_to_source(chan).await?;
+        group_message.reply_text("OK").await?;
         return Ok(true);
     }
     Ok(false)

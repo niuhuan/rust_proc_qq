@@ -10,13 +10,13 @@ pub struct LoginEvent {
     pub uin: i64,
 }
 
-pub enum MessageEvent<'a> {
-    GroupMessage(&'a GroupMessageEvent),
-    PrivateMessage(&'a PrivateMessageEvent),
-    TempMessage(&'a TempMessageEvent),
+pub enum MessageEvent {
+    GroupMessage(GroupMessageEvent),
+    PrivateMessage(PrivateMessageEvent),
+    TempMessage(TempMessageEvent),
 }
 
-impl MessageEvent<'_> {
+impl MessageEvent {
     pub fn client(&self) -> Arc<rs_qq::Client> {
         match self {
             MessageEvent::GroupMessage(e) => e.client.clone(),

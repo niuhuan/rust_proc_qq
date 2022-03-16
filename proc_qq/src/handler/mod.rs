@@ -74,7 +74,7 @@ impl Handler for ClientHandler {
                     event.message.from_uin,
                     event.message.elements.to_string()
                 );
-                let me = MessageEvent::GroupMessage(&event);
+                let me = MessageEvent::GroupMessage(event.clone());
                 let _ = map_handlers!(
                     &self,
                     &event,
@@ -90,7 +90,7 @@ impl Handler for ClientHandler {
                     event.message.from_uin,
                     event.message.elements.to_string()
                 );
-                let me = MessageEvent::PrivateMessage(&event);
+                let me = MessageEvent::PrivateMessage(event.clone());
                 let _ = map_handlers!(
                     &self,
                     &event,
@@ -106,7 +106,7 @@ impl Handler for ClientHandler {
                     event.message.from_uin,
                     event.message.elements.to_string()
                 );
-                let me = MessageEvent::TempMessage(&event);
+                let me = MessageEvent::TempMessage(event.clone());
                 let _ = map_handlers!(
                     &self,
                     &event,

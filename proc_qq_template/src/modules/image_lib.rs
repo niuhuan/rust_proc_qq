@@ -1,4 +1,4 @@
-use crate::tools::ReplyChain;
+use crate::tools::CanReply;
 use anyhow::Context;
 use proc_qq::re_exports::rs_qq::msg::MessageChain;
 use proc_qq::re_exports::{bytes, reqwest};
@@ -29,7 +29,7 @@ async fn on_message(event: &MessageEvent) -> anyhow::Result<bool> {
             event.send_message_to_source(no_temp_message()).await?;
         } else {
             event
-                .send_message_to_source(event.reply_chain().await.append(MENU.parse_text()))
+                .send_message_to_source(event.make_reply_chain().await.append(MENU.parse_text()))
                 .await?;
         }
         Ok(true)
@@ -41,7 +41,7 @@ async fn on_message(event: &MessageEvent) -> anyhow::Result<bool> {
         let img = get_laopo_img().await?.to_vec();
         let img = event.upload_image_to_source(img).await?;
         event
-            .send_message_to_source(event.reply_chain().await.append(img))
+            .send_message_to_source(event.make_reply_chain().await.append(img))
             .await?;
         Ok(true)
     } else if content.eq("动漫壁纸") {
@@ -52,7 +52,7 @@ async fn on_message(event: &MessageEvent) -> anyhow::Result<bool> {
         let img = get_dongman_img().await?.to_vec();
         let img = event.upload_image_to_source(img).await?;
         event
-            .send_message_to_source(event.reply_chain().await.append(img))
+            .send_message_to_source(event.make_reply_chain().await.append(img))
             .await?;
         Ok(true)
     } else {
