@@ -1,4 +1,4 @@
-use crate::tools::CanReply;
+use crate::utils::CanReply;
 use anyhow::Context;
 use proc_qq::re_exports::rs_qq::msg::MessageChain;
 use proc_qq::re_exports::{bytes, reqwest};

@@ -8,3 +8,4 @@ device.json
 qrcode.png
 session.token
 *.token
+bot.yml

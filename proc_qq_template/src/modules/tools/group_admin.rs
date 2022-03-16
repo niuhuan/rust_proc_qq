@@ -1,4 +1,4 @@
-use crate::tools::CanReply;
+use crate::utils::CanReply;
 use lazy_static::lazy_static;
 use proc_qq::re_exports::rq_engine::msg::elem::RQElem;
 use proc_qq::{

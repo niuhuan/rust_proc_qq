@@ -204,3 +204,11 @@ event.reply_text("你好").await?;
 ![](images/img_lib_02.png)
 
 ![](images/group_admin_01.png)
+
+##### 数据库的说明
+
+模版中使用了redis作为缓存, mongo作为数据库. 两个数据源搭建都非常简单.
+- redis: 先下载[源码](https://redis.io/download), make, 运行 ./redis-server
+- mongo: 下载[安装包](https://www.mongodb.com/try/download/community), 运行 ./mongod
+
+如不需要, 请将database删除, 删除引用它的module, 最后删除main.rs中的init_mongo和init_redis.

@@ -2,15 +2,15 @@ use lazy_static::lazy_static;
 use proc_qq::Module;
 use std::sync::Arc;
 
-mod group_admin;
-mod image_lib;
 mod menu;
+mod query;
+mod tools;
 
 lazy_static! {
     static ref MODULES: Arc<Vec<Module>> = Arc::new(vec![
         menu::module(),
-        image_lib::module(),
-        group_admin::module()
+        tools::group_admin::module(),
+        query::image_lib::module(),
     ]);
 }
 
