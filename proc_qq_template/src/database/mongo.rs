@@ -1,7 +1,7 @@
 use crate::config::Mongo;
 use anyhow::Context;
 use mongodb::options::ClientOptions;
-use mongodb::{Client, Database};
+use mongodb::{Client, Collection, Database};
 use once_cell::sync::OnceCell;
 
 static DATABASE: OnceCell<String> = OnceCell::new();
@@ -27,4 +27,14 @@ pub(crate) async fn init_mongo(mongo: &Mongo) -> anyhow::Result<()> {
 #[allow(dead_code)]
 pub(crate) async fn db() -> Database {
     CLIENT.get().unwrap().default_database().unwrap()
+}
+
+#[allow(dead_code)]
+pub(crate) async fn collection<T>(collection_name: &str) -> Collection<T> {
+    CLIENT
+        .get()
+        .unwrap()
+        .default_database()
+        .unwrap()
+        .collection(collection_name)
 }

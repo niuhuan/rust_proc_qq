@@ -41,6 +41,7 @@ pub fn event(_: TokenStream, input: TokenStream) -> TokenStream {
         FnArg::Receiver(_) => abort!(&param.span(), "不支持self"),
         FnArg::Typed(pt) => pt,
     };
+    let param_pat = param.pat.as_ref();
     let param_ty = param.ty.as_ref();
     let param_ty = quote! {#param_ty};
     let tokens = match param_ty.to_string().as_str() {
@@ -122,7 +123,7 @@ pub fn event(_: TokenStream, input: TokenStream) -> TokenStream {
     let build_trait = quote! {
         #[::proc_qq::re_exports::async_trait::async_trait]
         impl #trait_name for #ident {
-            async fn handle(&self, event: #param_ty) -> ::proc_qq::re_exports::anyhow::Result<bool> #block
+            async fn handle(&self, #param_pat: #param_ty) -> ::proc_qq::re_exports::anyhow::Result<bool> #block
         }
     };
     let build_into = quote! {

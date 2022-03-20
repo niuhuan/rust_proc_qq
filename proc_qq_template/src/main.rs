@@ -20,6 +20,7 @@ async fn main() -> anyhow::Result<()> {
     let config = load_config().await?;
     init_redis(&config.redis).await?;
     init_mongo(&config.mongo).await?;
+    modules::init_modules().await?;
     let password_vec = hex::decode(config.account.password_md5)?;
     let mut password = [0 as u8; 16];
     password[..16].clone_from_slice(password_vec.as_slice());
