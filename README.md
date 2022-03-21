@@ -160,6 +160,7 @@ MessageEvent::message_content;
 ```rust
 Client::send_message_to_source;
 Event::send_message_to_source;
+Event::send_audio_to_source;
 ```
 
 #### 直接将单个消息文字/图片当作MessageChain使用
