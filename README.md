@@ -218,4 +218,7 @@ event.reply_text("你好").await?;
 
 模版中演示了如何发送语音消息
 
-每日英语模块需要运行环境已经安装ffmpeg命令, 并且依赖silk-rs, silk在windows环境中可能无法编译, 如果您是windows操作系统, 可能需要删除这个模块才能编译成功
+每日英语模块需要运行环境已经安装ffmpeg命令, 并且依赖silk-rs, 编译silk-rs需要libclang.dll.
+
+- 下载LLVM-${version}-win64.exe并安装 : https://github.com/llvm/llvm-project/releases/ 
+- 下载ffmpeg : https://www.ffmpeg.org/download.html

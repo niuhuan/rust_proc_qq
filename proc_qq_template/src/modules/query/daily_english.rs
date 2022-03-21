@@ -32,7 +32,7 @@ async fn on_message(message: &MessageEvent) -> anyhow::Result<bool> {
     Ok(false)
 }
 
-async fn reply_daily_english(message: &MessageEvent) -> anyhow::Result<MessageReceipt> {
+async fn reply_daily_english(message: &MessageEvent) -> anyhow::Result<()> {
     let today = chrono::Local::today();
     let today = today.format("%Y-%m-%d").to_string();
     let key = format!("DAILY_ENGLISH::{}", today);
@@ -57,9 +57,13 @@ async fn reply_daily_english(message: &MessageEvent) -> anyhow::Result<MessageRe
         redis_set(&key, s, 3600 * 24).await?;
     };
     let buff = daily.with_context(|| "wtf")?;
-    Ok(message
+    message
         .send_audio_to_source(buff.buff, 1, Duration::from_secs(10))
-        .await?)
+        .await?;
+    message
+        .reply_text(&format!("{}\n\n{}", buff.content, buff.note))
+        .await?;
+    Ok(())
 }
 
 async fn load_form_network(day: &str) -> anyhow::Result<DailyEnglish> {
@@ -78,7 +82,7 @@ async fn load_form_network(day: &str) -> anyhow::Result<DailyEnglish> {
     Ok(DailyEnglish {
         note: rsp.note,
         content: rsp.content,
-        buff: encode_silk(tokio::fs::read(&pcm).await?, 24000, 24000, true)?,
+        buff: encode_silk(tokio::fs::read(&pcm).await?, 24000, 48000, true)?,
     })
 }
 
