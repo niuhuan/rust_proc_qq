@@ -1,9 +1,9 @@
 use super::events::*;
 use async_trait::async_trait;
 use rs_qq::client::event::{
-    DeleteFriendEvent, FriendMessageRecallEvent, FriendPokeEvent, FriendRequestEvent,
-    GroupLeaveEvent, GroupMessageEvent, GroupMessageRecallEvent, GroupMuteEvent,
-    GroupNameUpdateEvent, GroupRequestEvent, NewFriendEvent, PrivateMessageEvent, TempMessageEvent,
+    DeleteFriendEvent, FriendMessageEvent, FriendMessageRecallEvent, FriendPokeEvent,
+    FriendRequestEvent, GroupLeaveEvent, GroupMessageEvent, GroupMessageRecallEvent,
+    GroupMuteEvent, GroupNameUpdateEvent, GroupRequestEvent, NewFriendEvent, TempMessageEvent,
 };
 
 #[macro_export]
@@ -26,7 +26,7 @@ pub enum ModuleEventProcess {
     LoginEvent(Box<dyn LoginEventProcess>),
 
     GroupMessage(Box<dyn GroupMessageEventProcess>),
-    PrivateMessage(Box<dyn PrivateMessageEventProcess>),
+    FriendMessage(Box<dyn FriendMessageEventProcess>),
     TempMessage(Box<dyn TempMessageEventProcess>),
     GroupRequest(Box<dyn GroupRequestEventProcess>),
     FriendRequest(Box<dyn FriendRequestEventProcess>),
@@ -57,7 +57,7 @@ macro_rules! process_trait {
 process_trait!(LoginEventProcess, LoginEvent);
 
 process_trait!(GroupMessageEventProcess, GroupMessageEvent);
-process_trait!(PrivateMessageEventProcess, PrivateMessageEvent);
+process_trait!(FriendMessageEventProcess, FriendMessageEvent);
 process_trait!(TempMessageEventProcess, TempMessageEvent);
 
 process_trait!(GroupRequestEventProcess, GroupRequestEvent);

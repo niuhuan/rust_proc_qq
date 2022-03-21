@@ -4,11 +4,11 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
-quote = "1"
-syn = { version = "1.0.72", features = ["full", "visit", "visit-mut", "extra-traits"] }
-proc-macro2 = "1.0.27"
-proc-macro-error = { version = "1", default-features = false }
-devise = "0.3.1"
+quote = "1.0"
+syn = { version = "1.0", features = ["full", "visit", "visit-mut", "extra-traits"] }
+proc-macro2 = "1.0"
+proc-macro-error = { version = "1.0", default-features = false }
+devise = "0.3"
 
 [lib]
 proc-macro = true

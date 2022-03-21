@@ -139,7 +139,7 @@ fn init_tracing_subscriber() {
 use rs_qq::client::event::{
     DeleteFriendEvent, FriendMessageRecallEvent, FriendPokeEvent, FriendRequestEvent,
     GroupLeaveEvent, GroupMessageEvent, GroupMessageRecallEvent, GroupMuteEvent,
-    GroupNameUpdateEvent, GroupRequestEvent, NewFriendEvent, PrivateMessageEvent, TempMessageEvent,
+    GroupNameUpdateEvent, GroupRequestEvent, NewFriendEvent, FriendMessageEvent, TempMessageEvent,
 };
 use proc_qq::{MessageEvent, LoginEvent, };
 ```

@@ -2,9 +2,9 @@ use async_trait::async_trait;
 use rq_engine::msg::elem::{FlashImage, FriendImage, GroupImage, Text};
 use rq_engine::msg::MessageChain;
 use rq_engine::pb::msg::elem::Elem;
-use rq_engine::structs::{GroupMessage, MessageReceipt, PrivateMessage, TempMessage};
+use rq_engine::structs::{FriendMessage, GroupMessage, MessageReceipt, TempMessage};
 use rq_engine::{RQError, RQResult};
-use rs_qq::client::event::{GroupMessageEvent, PrivateMessageEvent, TempMessageEvent};
+use rs_qq::client::event::{FriendMessageEvent, GroupMessageEvent, TempMessageEvent};
 use rs_qq::structs::Group;
 use std::sync::Arc;
 
@@ -132,32 +132,32 @@ impl MessageSendToSourceTrait for GroupMessageEvent {
     }
 }
 
-impl MessageTargetTrait for PrivateMessage {
+impl MessageTargetTrait for FriendMessage {
     fn target(&self) -> MessageTarget {
         MessageTarget::Private(self.from_uin)
     }
 }
 
-impl MessageContentTrait for PrivateMessage {
+impl MessageContentTrait for FriendMessage {
     fn message_content(&self) -> String {
         self.elements.to_string()
     }
 }
 
-impl MessageTargetTrait for PrivateMessageEvent {
+impl MessageTargetTrait for FriendMessageEvent {
     fn target(&self) -> MessageTarget {
         self.message.target()
     }
 }
 
-impl MessageContentTrait for PrivateMessageEvent {
+impl MessageContentTrait for FriendMessageEvent {
     fn message_content(&self) -> String {
         self.message.message_content()
     }
 }
 
 #[async_trait]
-impl ClientTrait for PrivateMessageEvent {
+impl ClientTrait for FriendMessageEvent {
     async fn send_message_to_target<S: Into<MessageChain> + Send + Sync>(
         &self,
         source: &impl MessageTargetTrait,
@@ -176,7 +176,7 @@ impl ClientTrait for PrivateMessageEvent {
 }
 
 #[async_trait]
-impl MessageSendToSourceTrait for PrivateMessageEvent {
+impl MessageSendToSourceTrait for FriendMessageEvent {
     async fn send_message_to_source<S: Into<MessageChain> + Send + Sync>(
         &self,
         message: S,
@@ -190,7 +190,7 @@ impl MessageSendToSourceTrait for PrivateMessageEvent {
     ) -> RQResult<UploadImage> {
         Ok(UploadImage::FriendImage(
             self.client
-                .upload_private_image(self.message.from_uin, data.into())
+                .upload_friend_image(self.message.from_uin, data.into())
                 .await?,
         ))
     }
@@ -262,7 +262,7 @@ impl MessageTargetTrait for MessageEvent {
     fn target(&self) -> MessageTarget {
         match self {
             MessageEvent::GroupMessage(event) => event.target(),
-            MessageEvent::PrivateMessage(event) => event.target(),
+            MessageEvent::FriendMessage(event) => event.target(),
             MessageEvent::TempMessage(event) => event.target(),
         }
     }
@@ -272,7 +272,7 @@ impl MessageContentTrait for MessageEvent {
     fn message_content(&self) -> String {
         match self {
             MessageEvent::GroupMessage(event) => event.message_content(),
-            MessageEvent::PrivateMessage(event) => event.message_content(),
+            MessageEvent::FriendMessage(event) => event.message_content(),
             MessageEvent::TempMessage(event) => event.message_content(),
         }
     }
@@ -305,7 +305,7 @@ impl MessageSendToSourceTrait for MessageEvent {
     ) -> RQResult<MessageReceipt> {
         match self {
             MessageEvent::GroupMessage(event) => event.send_message_to_source(message).await,
-            MessageEvent::PrivateMessage(event) => event.send_message_to_source(message).await,
+            MessageEvent::FriendMessage(event) => event.send_message_to_source(message).await,
             MessageEvent::TempMessage(event) => event.send_message_to_source(message).await,
         }
     }
@@ -316,7 +316,7 @@ impl MessageSendToSourceTrait for MessageEvent {
     ) -> RQResult<UploadImage> {
         match self {
             MessageEvent::GroupMessage(event) => event.upload_image_to_source(data).await,
-            MessageEvent::PrivateMessage(event) => event.upload_image_to_source(data).await,
+            MessageEvent::FriendMessage(event) => event.upload_image_to_source(data).await,
             MessageEvent::TempMessage(event) => event.upload_image_to_source(data).await,
         }
     }

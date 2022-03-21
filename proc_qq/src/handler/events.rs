@@ -1,8 +1,8 @@
 use rq_engine::{RQError, RQResult};
 pub use rs_qq::client::event::{
-    DeleteFriendEvent, FriendMessageRecallEvent, FriendPokeEvent, FriendRequestEvent,
-    GroupLeaveEvent, GroupMessageEvent, GroupMessageRecallEvent, GroupMuteEvent,
-    GroupNameUpdateEvent, GroupRequestEvent, NewFriendEvent, PrivateMessageEvent, TempMessageEvent,
+    DeleteFriendEvent, FriendMessageEvent, FriendMessageRecallEvent, FriendPokeEvent,
+    FriendRequestEvent, GroupLeaveEvent, GroupMessageEvent, GroupMessageRecallEvent,
+    GroupMuteEvent, GroupNameUpdateEvent, GroupRequestEvent, NewFriendEvent, TempMessageEvent,
 };
 use std::sync::Arc;
 
@@ -12,7 +12,7 @@ pub struct LoginEvent {
 
 pub enum MessageEvent {
     GroupMessage(GroupMessageEvent),
-    PrivateMessage(PrivateMessageEvent),
+    FriendMessage(FriendMessageEvent),
     TempMessage(TempMessageEvent),
 }
 
@@ -20,7 +20,7 @@ impl MessageEvent {
     pub fn client(&self) -> Arc<rs_qq::Client> {
         match self {
             MessageEvent::GroupMessage(e) => e.client.clone(),
-            MessageEvent::PrivateMessage(e) => e.client.clone(),
+            MessageEvent::FriendMessage(e) => e.client.clone(),
             MessageEvent::TempMessage(e) => e.client.clone(),
         }
     }
@@ -38,13 +38,13 @@ impl MessageEvent {
     }
     pub fn is_private_message(&self) -> bool {
         match self {
-            MessageEvent::PrivateMessage(_) => true,
+            MessageEvent::FriendMessage(_) => true,
             _ => false,
         }
     }
-    pub fn as_private_message(&self) -> RQResult<&'_ PrivateMessageEvent> {
+    pub fn as_private_message(&self) -> RQResult<&'_ FriendMessageEvent> {
         match self {
-            MessageEvent::PrivateMessage(private_message) => RQResult::Ok(private_message),
+            MessageEvent::FriendMessage(private_message) => RQResult::Ok(private_message),
             _ => RQResult::Err(RQError::Other("Not is a group message".to_owned())),
         }
     }
@@ -63,7 +63,7 @@ impl MessageEvent {
     pub fn from_uin(&self) -> i64 {
         match self {
             MessageEvent::GroupMessage(message) => message.message.from_uin,
-            MessageEvent::PrivateMessage(message) => message.message.from_uin,
+            MessageEvent::FriendMessage(message) => message.message.from_uin,
             MessageEvent::TempMessage(message) => message.message.from_uin,
         }
     }

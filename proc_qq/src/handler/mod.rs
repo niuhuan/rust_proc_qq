@@ -83,18 +83,18 @@ impl Handler for ClientHandler {
                     ModuleEventProcess::Message,
                 );
             }
-            QEvent::PrivateMessage(event) => {
+            QEvent::FriendMessage(event) => {
                 tracing::debug!(
                     target = "proc_qq",
                     "(UIN={}) MESSAGE : {}",
                     event.message.from_uin,
                     event.message.elements.to_string()
                 );
-                let me = MessageEvent::PrivateMessage(event.clone());
+                let me = MessageEvent::FriendMessage(event.clone());
                 let _ = map_handlers!(
                     &self,
                     &event,
-                    ModuleEventProcess::PrivateMessage,
+                    ModuleEventProcess::FriendMessage,
                     &me,
                     ModuleEventProcess::Message,
                 );

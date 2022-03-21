@@ -30,7 +30,7 @@ impl ClientTrait for rs_qq::Client {
             MessageTarget::Group(group_code, _) => {
                 self.send_group_message(group_code, message).await
             }
-            MessageTarget::Private(uin) => self.send_private_message(uin, message).await,
+            MessageTarget::Private(uin) => self.send_friend_message(uin, message).await,
             MessageTarget::Temp(group_code, uin) => {
                 if let Some(group_code) = group_code {
                     match self.send_temp_message(group_code, uin, message).await {
