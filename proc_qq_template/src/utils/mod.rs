@@ -7,6 +7,8 @@ use proc_qq::{
     ClientTrait, GroupMessageEvent, GroupTrait, MessageChainParseTrait, MessageChainTrait,
     MessageEvent, MessageSendToSourceTrait, TextEleParseTrait,
 };
+pub(crate) mod ffmpeg_cmd;
+pub(crate) mod local;
 
 #[async_trait]
 pub(crate) trait CanReply {

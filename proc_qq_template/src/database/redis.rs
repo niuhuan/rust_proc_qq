@@ -1,7 +1,7 @@
 use crate::config::Redis;
 use anyhow::Context;
 use once_cell::sync::OnceCell;
-use redis::{AsyncCommands, Client, RedisResult};
+use redis::{AsyncCommands, Client, FromRedisValue, RedisResult};
 static CLIENT: OnceCell<Client> = OnceCell::new();
 
 pub(crate) async fn init_redis(redis: &Redis) -> anyhow::Result<()> {
@@ -17,7 +17,10 @@ pub(crate) async fn init_redis(redis: &Redis) -> anyhow::Result<()> {
 }
 
 #[allow(dead_code)]
-pub(crate) async fn get_string(key: &str) -> RedisResult<Option<String>> {
+pub(crate) async fn redis_get<T>(key: &str) -> RedisResult<Option<T>>
+where
+    T: FromRedisValue,
+{
     CLIENT
         .get()
         .unwrap()
@@ -28,7 +31,10 @@ pub(crate) async fn get_string(key: &str) -> RedisResult<Option<String>> {
 }
 
 #[allow(dead_code)]
-pub(crate) async fn set_string(key: &str, value: &str, expire_seconds: usize) -> RedisResult<()> {
+pub(crate) async fn redis_set<T>(key: &str, value: T, expire_seconds: usize) -> RedisResult<()>
+where
+    T: redis::ToRedisArgs + Send + Sync,
+{
     CLIENT
         .get()
         .unwrap()

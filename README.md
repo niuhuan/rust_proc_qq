@@ -212,3 +212,9 @@ event.reply_text("你好").await?;
 - mongo: 下载[安装包](https://www.mongodb.com/try/download/community), 运行 ./mongod
 
 如不需要, 请将database删除, 删除引用它的module, 最后删除main.rs中的init_mongo和init_redis.
+
+##### 额外依赖的说明
+
+模版中演示了如何发送语音消息
+
+每日英语模块需要运行环境已经安装ffmpeg命令, 并且依赖silk-rs, silk在windows环境中可能无法编译, 如果您是windows操作系统, 可能需要删除这个模块才能编译成功

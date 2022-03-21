@@ -7,6 +7,7 @@ use rq_engine::{RQError, RQResult};
 use rs_qq::client::event::{FriendMessageEvent, GroupMessageEvent, TempMessageEvent};
 use rs_qq::structs::Group;
 use std::sync::Arc;
+use std::time::Duration;
 
 use crate::{ClientTrait, MessageEvent};
 
@@ -52,6 +53,13 @@ pub trait MessageSendToSourceTrait: Send + Sync + ClientTrait {
         &self,
         data: S,
     ) -> RQResult<UploadImage>;
+
+    async fn send_audio_to_source<S: Into<Vec<u8>> + Send + Sync>(
+        &self,
+        data: S,
+        codec: u32,
+        audio_duration: Duration,
+    ) -> RQResult<MessageReceipt>;
 }
 
 pub trait TextEleParseTrait {
@@ -130,6 +138,21 @@ impl MessageSendToSourceTrait for GroupMessageEvent {
                 .await?,
         ))
     }
+
+    async fn send_audio_to_source<S: Into<Vec<u8>> + Send + Sync>(
+        &self,
+        data: S,
+        codec: u32,
+        _audio_duration: Duration,
+    ) -> RQResult<MessageReceipt> {
+        let group_audio = self
+            .client
+            .upload_group_audio(self.message.group_code, data.into(), codec)
+            .await?;
+        self.client
+            .send_group_audio(self.message.group_code, group_audio)
+            .await
+    }
 }
 
 impl MessageTargetTrait for FriendMessage {
@@ -194,6 +217,21 @@ impl MessageSendToSourceTrait for FriendMessageEvent {
                 .await?,
         ))
     }
+
+    async fn send_audio_to_source<S: Into<Vec<u8>> + Send + Sync>(
+        &self,
+        data: S,
+        _codec: u32,
+        audio_duration: Duration,
+    ) -> RQResult<MessageReceipt> {
+        let friend_audio = self
+            .client
+            .upload_friend_audio(self.message.from_uin, data.into(), audio_duration)
+            .await?;
+        self.client
+            .send_friend_audio(self.message.from_uin, friend_audio)
+            .await
+    }
 }
 
 impl MessageTargetTrait for TempMessage {
@@ -256,6 +294,17 @@ impl MessageSendToSourceTrait for TempMessageEvent {
             "tmp message not supported upload image".to_owned(),
         ))
     }
+
+    async fn send_audio_to_source<S: Into<Vec<u8>> + Send + Sync>(
+        &self,
+        _data: S,
+        _codec: u32,
+        _audio_duration: Duration,
+    ) -> RQResult<MessageReceipt> {
+        RQResult::Err(RQError::Other(
+            "tmp message not supported upload audio".to_owned(),
+        ))
+    }
 }
 
 impl MessageTargetTrait for MessageEvent {
@@ -304,10 +353,11 @@ impl MessageSendToSourceTrait for MessageEvent {
         message: S,
     ) -> RQResult<MessageReceipt> {
         match self {
-            MessageEvent::GroupMessage(event) => event.send_message_to_source(message).await,
-            MessageEvent::FriendMessage(event) => event.send_message_to_source(message).await,
-            MessageEvent::TempMessage(event) => event.send_message_to_source(message).await,
+            MessageEvent::GroupMessage(event) => event.send_message_to_source(message),
+            MessageEvent::FriendMessage(event) => event.send_message_to_source(message),
+            MessageEvent::TempMessage(event) => event.send_message_to_source(message),
         }
+        .await
     }
 
     async fn upload_image_to_source<S: Into<Vec<u8>> + Send + Sync>(
@@ -315,10 +365,31 @@ impl MessageSendToSourceTrait for MessageEvent {
         data: S,
     ) -> RQResult<UploadImage> {
         match self {
-            MessageEvent::GroupMessage(event) => event.upload_image_to_source(data).await,
-            MessageEvent::FriendMessage(event) => event.upload_image_to_source(data).await,
-            MessageEvent::TempMessage(event) => event.upload_image_to_source(data).await,
+            MessageEvent::GroupMessage(event) => event.upload_image_to_source(data),
+            MessageEvent::FriendMessage(event) => event.upload_image_to_source(data),
+            MessageEvent::TempMessage(event) => event.upload_image_to_source(data),
         }
+        .await
+    }
+
+    async fn send_audio_to_source<S: Into<Vec<u8>> + Send + Sync>(
+        &self,
+        data: S,
+        codec: u32,
+        audio_duration: Duration,
+    ) -> RQResult<MessageReceipt> {
+        match self {
+            MessageEvent::GroupMessage(event) => {
+                event.send_audio_to_source(data, codec, audio_duration)
+            }
+            MessageEvent::FriendMessage(event) => {
+                event.send_audio_to_source(data, codec, audio_duration)
+            }
+            MessageEvent::TempMessage(event) => {
+                event.send_audio_to_source(data, codec, audio_duration)
+            }
+        }
+        .await
     }
 }
 

@@ -13,6 +13,7 @@ lazy_static! {
         game::group_sign_in::module(),
         tools::group_admin::module(),
         query::image_lib::module(),
+        query::daily_english::module(),
     ]);
 }
 
