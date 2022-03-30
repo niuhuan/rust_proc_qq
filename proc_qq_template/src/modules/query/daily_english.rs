@@ -4,7 +4,6 @@ use crate::utils::local::{join_paths, template_dir};
 use crate::utils::CanReply;
 use anyhow::Context;
 use proc_qq::re_exports::rs_qq::device::random_uuid;
-use proc_qq::re_exports::rs_qq::structs::MessageReceipt;
 use proc_qq::{event, module, MessageContentTrait, Module};
 use proc_qq::{MessageEvent, MessageSendToSourceTrait};
 use serde_derive::Deserialize;
