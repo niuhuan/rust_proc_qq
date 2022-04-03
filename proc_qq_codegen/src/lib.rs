@@ -105,6 +105,14 @@ pub fn event(_: TokenStream, input: TokenStream) -> TokenStream {
             quote! {::proc_qq::MessageEventProcess},
             quote! {::proc_qq::ModuleEventProcess::Message},
         ),
+        "& MSFOfflineEvent" => (
+            quote! {::proc_qq::MSFOfflineEventProcess},
+            quote! {::proc_qq::ModuleEventProcess::MSFOffline},
+        ),
+        "& KickedOfflineEvent" => (
+            quote! {::proc_qq::KickedOfflineEventProcess},
+            quote! {::proc_qq::ModuleEventProcess::KickedOffline},
+        ),
         t => abort!(
             param.span(),
             format!("未知的参数类型 {}, 请在文档中查看兼容的事件以及参数类型 https://github.com/niuhuan/rust_proc_qq", t),

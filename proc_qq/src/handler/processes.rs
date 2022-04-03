@@ -23,8 +23,6 @@ pub struct ModuleEventHandler {
 }
 
 pub enum ModuleEventProcess {
-    LoginEvent(Box<dyn LoginEventProcess>),
-
     GroupMessage(Box<dyn GroupMessageEventProcess>),
     FriendMessage(Box<dyn FriendMessageEventProcess>),
     TempMessage(Box<dyn TempMessageEventProcess>),
@@ -42,6 +40,10 @@ pub enum ModuleEventProcess {
     GroupMessageRecall(Box<dyn GroupMessageRecallEventProcess>),
     FriendMessageRecall(Box<dyn FriendMessageRecallEventProcess>),
 
+    MSFOffline(Box<dyn MSFOfflineEventProcess>),
+    KickedOffline(Box<dyn KickedOfflineEventProcess>),
+
+    LoginEvent(Box<dyn LoginEventProcess>),
     Message(Box<dyn MessageEventProcess>),
 }
 
@@ -53,8 +55,6 @@ macro_rules! process_trait {
         }
     };
 }
-
-process_trait!(LoginEventProcess, LoginEvent);
 
 process_trait!(GroupMessageEventProcess, GroupMessageEvent);
 process_trait!(FriendMessageEventProcess, FriendMessageEvent);
@@ -74,4 +74,8 @@ process_trait!(GroupNameUpdateEventProcess, GroupNameUpdateEvent);
 process_trait!(GroupMessageRecallEventProcess, GroupMessageRecallEvent);
 process_trait!(FriendMessageRecallEventProcess, FriendMessageRecallEvent);
 
+process_trait!(MSFOfflineEventProcess, MSFOfflineEvent);
+process_trait!(KickedOfflineEventProcess, KickedOfflineEvent);
+
+process_trait!(LoginEventProcess, LoginEvent);
 process_trait!(MessageEventProcess, MessageEvent);

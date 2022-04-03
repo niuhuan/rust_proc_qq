@@ -137,9 +137,10 @@ fn init_tracing_subscriber() {
 
 ```rust
 use rs_qq::client::event::{
-    DeleteFriendEvent, FriendMessageRecallEvent, FriendPokeEvent, FriendRequestEvent,
-    GroupLeaveEvent, GroupMessageEvent, GroupMessageRecallEvent, GroupMuteEvent,
-    GroupNameUpdateEvent, GroupRequestEvent, NewFriendEvent, FriendMessageEvent, TempMessageEvent,
+  DeleteFriendEvent, FriendMessageEvent, FriendMessageRecallEvent, FriendPokeEvent,
+  FriendRequestEvent, GroupLeaveEvent, GroupMessageEvent, GroupMessageRecallEvent,
+  GroupMuteEvent, GroupNameUpdateEvent, GroupRequestEvent, KickedOfflineEvent, MSFOfflineEvent,
+  NewFriendEvent, TempMessageEvent,
 };
 use proc_qq::{MessageEvent, LoginEvent, };
 ```

@@ -2,7 +2,8 @@ use rq_engine::{RQError, RQResult};
 pub use rs_qq::client::event::{
     DeleteFriendEvent, FriendMessageEvent, FriendMessageRecallEvent, FriendPokeEvent,
     FriendRequestEvent, GroupLeaveEvent, GroupMessageEvent, GroupMessageRecallEvent,
-    GroupMuteEvent, GroupNameUpdateEvent, GroupRequestEvent, NewFriendEvent, TempMessageEvent,
+    GroupMuteEvent, GroupNameUpdateEvent, GroupRequestEvent, KickedOfflineEvent, MSFOfflineEvent,
+    NewFriendEvent, TempMessageEvent,
 };
 use std::sync::Arc;
 

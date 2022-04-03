@@ -1,3 +1,4 @@
+use crate::ModuleEventProcess::KickedOffline;
 use async_trait::async_trait;
 pub use events::*;
 pub use processes::*;
@@ -157,6 +158,12 @@ impl Handler for ClientHandler {
             }
             QEvent::FriendMessageRecall(event) => {
                 let _ = map_handlers!(&self, &event, ModuleEventProcess::FriendMessageRecall);
+            }
+            QEvent::MSFOffline(event) => {
+                let _ = map_handlers!(&self, &event, ModuleEventProcess::MSFOffline);
+            }
+            QEvent::KickedOffline(event) => {
+                let _ = map_handlers!(&self, &event, KickedOffline);
             }
             _ => tracing::debug!(target = "proc_qq", "{:?}", e),
         }
