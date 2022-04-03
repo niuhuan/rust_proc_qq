@@ -113,6 +113,14 @@ pub fn event(_: TokenStream, input: TokenStream) -> TokenStream {
             quote! {::proc_qq::KickedOfflineEventProcess},
             quote! {::proc_qq::ModuleEventProcess::KickedOffline},
         ),
+        "& ConnectedAndOnlineEvent" => (
+            quote! {::proc_qq::ConnectedAndOnlineEventProcess},
+            quote! {::proc_qq::ModuleEventProcess::ConnectedAndOnline},
+        ),
+        "& DisconnectedAndOfflineEvent" => (
+            quote! {::proc_qq::DisconnectedAndOfflineEventProcess},
+            quote! {::proc_qq::ModuleEventProcess::DisconnectedAndOffline},
+        ),
         t => abort!(
             param.span(),
             format!("未知的参数类型 {}, 请在文档中查看兼容的事件以及参数类型 https://github.com/niuhuan/rust_proc_qq", t),

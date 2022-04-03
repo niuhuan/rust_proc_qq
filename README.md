@@ -142,8 +142,13 @@ use rs_qq::client::event::{
   GroupMuteEvent, GroupNameUpdateEvent, GroupRequestEvent, KickedOfflineEvent, MSFOfflineEvent,
   NewFriendEvent, TempMessageEvent,
 };
-use proc_qq::{MessageEvent, LoginEvent, };
+use proc_qq::{MessageEvent, LoginEvent, ConnectedAndOnlineEvent, DisconnectedAndOfflineEvent, };
 ```
+
+- MessageEvent: 同时适配多种消息
+- LoginEvent: 登录成功事件 (rs-qq中这个事件类型为i64,这里做了封装)
+- ConnectedAndOnlineEvent: 连接成功, 并且登录后 (proc-qq状态)
+- DisconnectedAndOfflineEvent: 掉线并且断开连接 (proc-qq状态)
 
 支持更多种事件封装中...
 

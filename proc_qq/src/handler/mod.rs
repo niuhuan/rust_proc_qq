@@ -175,3 +175,30 @@ pub struct Module {
     pub name: String,
     pub handles: Vec<ModuleEventHandler>,
 }
+
+pub(crate) struct EventSender {
+    pub(crate) modules: Arc<Vec<Module>>,
+}
+
+impl EventSender {
+    pub async fn send_connected_and_online(&self) -> anyhow::Result<()> {
+        match map_handlers!(
+            &self,
+            &ConnectedAndOnlineEvent {},
+            ModuleEventProcess::ConnectedAndOnline
+        ) {
+            MapResult::Exception(_, _) => Err(anyhow::Error::msg("err")),
+            _ => Ok(()),
+        }
+    }
+    pub async fn send_disconnected_and_offline(&self) -> anyhow::Result<()> {
+        match map_handlers!(
+            &self,
+            &DisconnectedAndOfflineEvent {},
+            ModuleEventProcess::DisconnectAndOffline,
+        ) {
+            MapResult::Exception(_, _) => Err(anyhow::Error::msg("err")),
+            _ => Ok(()),
+        }
+    }
+}

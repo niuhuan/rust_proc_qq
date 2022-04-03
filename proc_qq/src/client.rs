@@ -22,6 +22,7 @@ pub struct Client {
     pub rq_client: Arc<rs_qq::Client>,
     pub authentication: Authentication,
     pub priority_session: Option<String>,
+    pub(crate) modules: Arc<Vec<Module>>,
 }
 
 impl Client {
@@ -31,6 +32,9 @@ impl Client {
 }
 
 pub async fn run_client(client: Client) -> Result<()> {
+    let event_sender = crate::handler::EventSender {
+        modules: client.modules.clone(),
+    };
     // todo // max try count
     // todo // not retry qr
     loop {
@@ -67,11 +71,14 @@ pub async fn run_client(client: Client) -> Result<()> {
             .await
             .with_context(|| "写入session出错")?;
         }
+        //
+        let _ = event_sender.send_connected_and_online().await;
         // hold handle
         match handle.await {
             Ok(_) => {}
             Err(err) => tracing::info!("{:?}", err),
         };
+        let _ = event_sender.send_disconnected_and_offline().await;
         tracing::info!("连接已断开, 五秒钟之后重试");
         sleep(Duration::from_secs(5)).await;
     }
@@ -323,6 +330,7 @@ impl ClientBuilder {
     }
 
     pub async fn build<S: Into<Arc<Vec<Module>>>>(&self, h: S) -> Result<Client, anyhow::Error> {
+        let modules = h.into();
         Ok(Client {
             rq_client: Arc::new(rs_qq::Client::new(
                 match &self.device_source {
@@ -344,13 +352,16 @@ impl ClientBuilder {
                     JsonString(json_string) => parse_device_json(json_string)?,
                 },
                 self.version,
-                ClientHandler { modules: h.into() },
+                ClientHandler {
+                    modules: modules.clone(),
+                },
             )),
             authentication: self
                 .authentication
                 .clone()
                 .with_context(|| "您必须设置验证方式 (调用authentication)")?,
             priority_session: self.priority_session.clone(),
+            modules,
         })
     }
 

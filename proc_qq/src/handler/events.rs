@@ -69,3 +69,7 @@ impl MessageEvent {
         }
     }
 }
+
+pub struct ConnectedAndOnlineEvent {}
+
+pub struct DisconnectedAndOfflineEvent {}

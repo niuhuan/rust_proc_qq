@@ -45,6 +45,8 @@ pub enum ModuleEventProcess {
 
     LoginEvent(Box<dyn LoginEventProcess>),
     Message(Box<dyn MessageEventProcess>),
+    ConnectedAndOnline(Box<dyn ConnectedAndOnlineEventProcess>),
+    DisconnectAndOffline(Box<dyn DisconnectedAndOfflineEventProcess>),
 }
 
 macro_rules! process_trait {
@@ -79,3 +81,9 @@ process_trait!(KickedOfflineEventProcess, KickedOfflineEvent);
 
 process_trait!(LoginEventProcess, LoginEvent);
 process_trait!(MessageEventProcess, MessageEvent);
+
+process_trait!(ConnectedAndOnlineEventProcess, ConnectedAndOnlineEvent);
+process_trait!(
+    DisconnectedAndOfflineEventProcess,
+    DisconnectedAndOfflineEvent
+);
