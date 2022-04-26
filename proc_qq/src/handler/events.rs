@@ -1,3 +1,4 @@
+use rq_engine::msg::MessageChain;
 use rq_engine::{RQError, RQResult};
 pub use rs_qq::client::event::{
     DeleteFriendEvent, FriendMessageEvent, FriendMessageRecallEvent, FriendPokeEvent,
@@ -67,6 +68,14 @@ impl MessageEvent {
             MessageEvent::FriendMessage(message) => message.message.from_uin,
             MessageEvent::TempMessage(message) => message.message.from_uin,
         }
+    }
+    pub fn elements(&self) -> MessageChain {
+        match self {
+            MessageEvent::GroupMessage(message) => &message.message.elements,
+            MessageEvent::FriendMessage(message) => &message.message.elements,
+            MessageEvent::TempMessage(message) => &message.message.elements,
+        }
+        .clone()
     }
 }
 

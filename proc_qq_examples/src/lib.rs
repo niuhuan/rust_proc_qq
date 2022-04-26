@@ -53,7 +53,7 @@ fn init_tracing_subscriber() {
             tracing_subscriber::filter::Targets::new()
                 .with_target("rs_qq", Level::DEBUG)
                 .with_target("proc_qq", Level::DEBUG)
-                // 如果需搬运, 这里换成自己的creat名
+                // 如果需搬运, 这里换成自己的项目名
                 .with_target("proc_qq_examples", Level::DEBUG),
         )
         .init();
