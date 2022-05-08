@@ -1,8 +1,8 @@
 use async_trait::async_trait;
-use rq_engine::msg::MessageChain;
-use rq_engine::structs::MessageReceipt;
-use rq_engine::{RQError, RQResult};
-use rs_qq::structs::Group;
+use ricq::structs::Group;
+use ricq_core::msg::MessageChain;
+use ricq_core::structs::MessageReceipt;
+use ricq_core::{RQError, RQResult};
 use std::sync::Arc;
 
 use crate::{MessageTarget, MessageTargetTrait};
@@ -19,7 +19,7 @@ pub trait ClientTrait: Send + Sync {
 }
 
 #[async_trait]
-impl ClientTrait for rs_qq::Client {
+impl ClientTrait for ricq::Client {
     async fn send_message_to_target<S: Into<MessageChain> + Send + Sync>(
         &self,
         source: &impl MessageTargetTrait,

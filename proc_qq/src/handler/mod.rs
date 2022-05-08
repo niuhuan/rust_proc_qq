@@ -2,7 +2,7 @@ use crate::ModuleEventProcess::KickedOffline;
 use async_trait::async_trait;
 pub use events::*;
 pub use processes::*;
-use rs_qq::handler::{Handler, QEvent};
+use ricq::handler::{Handler, QEvent};
 use std::sync::Arc;
 
 mod events;

@@ -1,4 +1,4 @@
-use rq_engine::structs::{GroupMemberInfo, GroupMemberPermission};
+use ricq_core::structs::{GroupMemberInfo, GroupMemberPermission};
 
 pub trait MemberTrait {
     fn is_member(&self) -> bool;

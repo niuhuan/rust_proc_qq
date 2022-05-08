@@ -1,7 +1,7 @@
 RUST_PROC_QQ
 ============
 
-- Rust语言的QQ机器人框架. (基于[RS-QQ](https://github.com/lz1998/rs-qq))
+- Rust语言的QQ机器人框架. (基于[RICQ](https://github.com/lz1998/ricq))
 - 开箱即用, 操作简单, 代码极简
 
 ## 框架目的
@@ -36,7 +36,7 @@ proc_qq = { git = "https://github.com/niuhuan/rust_proc_qq.git", branch = "maste
 hello_module.rs
 
 ```rust
-use proc_qq::re_exports::rs_qq::client::event::GroupMessageEvent;
+use proc_qq::re_exports::ricq::client::event::GroupMessageEvent;
 use proc_qq::{
     event, module, MessageChainParseTrait, MessageContentTrait, MessageEvent, MessageSendToSourceTrait,
     Module,
@@ -44,7 +44,7 @@ use proc_qq::{
 
 /// 监听群消息
 /// 使用event宏进行声明监听消息
-/// 参数为rs-qq支持的任何一个类型的消息事件, 必须是引用.
+/// 参数为RICQ支持的任何一个类型的消息事件, 必须是引用.
 /// 返回值为 anyhow::Result<bool>, Ok(true)为拦截事件, 不再向下一个监听器传递
 #[event]
 async fn print(event: &MessageEvent) -> anyhow::Result<bool> {
@@ -117,7 +117,7 @@ fn init_tracing_subscriber() {
         )
         .with(
             tracing_subscriber::filter::Targets::new()
-                .with_target("rs_qq", Level::DEBUG)
+                .with_target("ricq", Level::DEBUG)
                 .with_target("proc_qq", Level::DEBUG)
                 // 这里改成自己的crate名称
                 .with_target("proc_qq_examples", Level::DEBUG),
@@ -136,7 +136,7 @@ fn init_tracing_subscriber() {
 ### 支持的事件
 
 ```rust
-use rs_qq::client::event::{
+use ricq::client::event::{
   DeleteFriendEvent, FriendMessageEvent, FriendMessageRecallEvent, FriendPokeEvent,
   FriendRequestEvent, GroupLeaveEvent, GroupMessageEvent, GroupMessageRecallEvent,
   GroupMuteEvent, GroupNameUpdateEvent, GroupRequestEvent, KickedOfflineEvent, MSFOfflineEvent,
@@ -146,7 +146,7 @@ use proc_qq::{MessageEvent, LoginEvent, ConnectedAndOnlineEvent, DisconnectedAnd
 ```
 
 - MessageEvent: 同时适配多种消息
-- LoginEvent: 登录成功事件 (rs-qq中这个事件类型为i64,这里做了封装)
+- LoginEvent: 登录成功事件 (RICQ中这个事件类型为i64,这里做了封装)
 - ConnectedAndOnlineEvent: 连接成功, 并且登录后 (proc-qq状态)
 - DisconnectedAndOfflineEvent: 掉线并且断开连接 (proc-qq状态)
 
@@ -192,9 +192,9 @@ let chain = chain.append(at).append(text).append(image);
 
 ## 其他
 
-实现的功能请转到RS-QQ仓库查看, 本仓库仅为RS-QQ的框架.
+实现的功能请转到RICQ仓库查看, 本仓库仅为RICQ的框架.
 
-RS-QQ 还在发展阶段, 迭代速度较快, 可能出现更改API的情况, 如遇无法运行, 请提issues.
+RICQ 还在发展阶段, 迭代速度较快, 可能出现更改API的情况, 如遇无法运行, 请提issues.
 
 #### [Examples](proc_qq_examples) 中提供了HelloWorld
 

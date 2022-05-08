@@ -1,7 +1,7 @@
 use async_trait::async_trait;
-use rq_engine::structs::GroupMemberInfo;
-use rq_engine::{RQError, RQResult};
-use rs_qq::structs::Group;
+use ricq::structs::Group;
+use ricq_core::structs::GroupMemberInfo;
+use ricq_core::{RQError, RQResult};
 
 #[async_trait]
 pub trait GroupTrait {

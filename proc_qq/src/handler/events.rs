@@ -1,10 +1,10 @@
-use rq_engine::{RQError, RQResult};
-pub use rs_qq::client::event::{
+pub use ricq::client::event::{
     DeleteFriendEvent, FriendMessageEvent, FriendMessageRecallEvent, FriendPokeEvent,
     FriendRequestEvent, GroupLeaveEvent, GroupMessageEvent, GroupMessageRecallEvent,
     GroupMuteEvent, GroupNameUpdateEvent, GroupRequestEvent, KickedOfflineEvent, MSFOfflineEvent,
     NewFriendEvent, TempMessageEvent,
 };
+use ricq_core::{RQError, RQResult};
 use std::sync::Arc;
 
 pub struct LoginEvent {
@@ -18,7 +18,7 @@ pub enum MessageEvent {
 }
 
 impl MessageEvent {
-    pub fn client(&self) -> Arc<rs_qq::Client> {
+    pub fn client(&self) -> Arc<ricq::Client> {
         match self {
             MessageEvent::GroupMessage(e) => e.client.clone(),
             MessageEvent::FriendMessage(e) => e.client.clone(),

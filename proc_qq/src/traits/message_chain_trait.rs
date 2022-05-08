@@ -1,5 +1,5 @@
-use rq_engine::msg::MessageChain;
-use rq_engine::pb::msg::elem::Elem;
+use ricq_core::msg::MessageChain;
+use ricq_core::pb::msg::elem::Elem;
 
 pub trait MessageChainTrait {
     fn append<S: Into<Vec<Elem>>>(self, elem: S) -> Self;

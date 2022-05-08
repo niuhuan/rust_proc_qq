@@ -7,7 +7,7 @@ use tracing_subscriber::util::SubscriberInitExt;
 use crate::config::load_config;
 use crate::database::mongo::init_mongo;
 use crate::database::redis::init_redis;
-use proc_qq::re_exports::rs_qq::version::ANDROID_WATCH;
+use proc_qq::re_exports::ricq::version::ANDROID_WATCH;
 use proc_qq::Authentication::UinPasswordMd5;
 use proc_qq::{ClientBuilder, DeviceSource};
 
@@ -50,7 +50,7 @@ fn init_tracing_subscriber() {
         )
         .with(
             tracing_subscriber::filter::Targets::new()
-                .with_target("rs_qq", Level::DEBUG)
+                .with_target("ricq", Level::DEBUG)
                 .with_target("proc_qq", Level::DEBUG)
                 .with_target("proc_qq_template", Level::DEBUG),
         )

@@ -2,15 +2,15 @@ use crate::DeviceSource::{JsonFile, JsonString};
 use crate::{Authentication, ClientHandler, DeviceSource, Module};
 use anyhow::{Context, Result};
 use bytes::{Buf, BufMut, Bytes, BytesMut};
-use rq_engine::binary::{BinaryReader, BinaryWriter};
-use rq_engine::command::wtlogin::{
+use ricq::ext::common::after_login;
+use ricq_core::binary::{BinaryReader, BinaryWriter};
+use ricq_core::command::wtlogin::{
     LoginDeviceLocked, LoginNeedCaptcha, LoginResponse, LoginSuccess, LoginUnknownStatus,
     QRCodeConfirmed, QRCodeImageFetch, QRCodeState,
 };
-use rq_engine::protocol::device::Device;
-use rq_engine::protocol::version::{Version, ANDROID_PHONE};
-use rq_engine::{RQError, RQResult, Token};
-use rs_qq::ext::common::after_login;
+use ricq_core::protocol::device::Device;
+use ricq_core::protocol::version::{Version, ANDROID_PHONE};
+use ricq_core::{RQError, RQResult, Token};
 use std::path::Path;
 use std::sync::Arc;
 use std::time::Duration;
@@ -19,7 +19,7 @@ use tokio::task::JoinHandle;
 use tokio::time::sleep;
 
 pub struct Client {
-    pub rq_client: Arc<rs_qq::Client>,
+    pub rq_client: Arc<ricq::Client>,
     pub authentication: Authentication,
     pub priority_session: Option<String>,
     pub(crate) modules: Arc<Vec<Module>>,
@@ -60,7 +60,7 @@ pub async fn run_client(client: Client) -> Result<()> {
             // The error of login failure is fatal
             login_authentication(&client).await?;
         }
-        // Reference rs-qq docs, this function must be called after login is completed, maybe it's to register the device.
+        // Reference RICQ docs, this function must be called after login is completed, maybe it's to register the device.
         after_login(&client.rq_client.clone()).await;
         // save session, IO errors are fatal.
         if let Some(session_file) = &client.priority_session {
@@ -135,7 +135,7 @@ async fn login_authentication(client: &Client) -> Result<()> {
     }
 }
 
-async fn qr_login(rq_client: Arc<rs_qq::Client>) -> Result<()> {
+async fn qr_login(rq_client: Arc<ricq::Client>) -> Result<()> {
     let mut image_sig = Bytes::new();
     let mut resp = rq_client
         .fetch_qrcode()
@@ -192,7 +192,7 @@ async fn qr_login(rq_client: Arc<rs_qq::Client>) -> Result<()> {
     }
 }
 
-async fn loop_login(client: Arc<rs_qq::Client>, first: RQResult<LoginResponse>) -> Result<()> {
+async fn loop_login(client: Arc<ricq::Client>, first: RQResult<LoginResponse>) -> Result<()> {
     let mut resp = first.unwrap();
     loop {
         match resp {
@@ -332,7 +332,7 @@ impl ClientBuilder {
     pub async fn build<S: Into<Arc<Vec<Module>>>>(&self, h: S) -> Result<Client, anyhow::Error> {
         let modules = h.into();
         Ok(Client {
-            rq_client: Arc::new(rs_qq::Client::new(
+            rq_client: Arc::new(ricq::Client::new(
                 match &self.device_source {
                     JsonFile(file_name) => {
                         if Path::new(file_name).exists() {

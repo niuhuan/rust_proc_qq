@@ -1,8 +1,8 @@
 use proc_qq::re_exports::async_trait::async_trait;
-use proc_qq::re_exports::rq_engine::msg::elem::At;
-use proc_qq::re_exports::rq_engine::structs::GroupMemberInfo;
-use proc_qq::re_exports::rs_qq::msg::MessageChain;
-use proc_qq::re_exports::rs_qq::RQResult;
+use proc_qq::re_exports::ricq::msg::MessageChain;
+use proc_qq::re_exports::ricq::RQResult;
+use proc_qq::re_exports::ricq_core::msg::elem::At;
+use proc_qq::re_exports::ricq_core::structs::GroupMemberInfo;
 use proc_qq::{
     ClientTrait, GroupMessageEvent, GroupTrait, MessageChainParseTrait, MessageChainTrait,
     MessageEvent, MessageSendToSourceTrait, TextEleParseTrait,

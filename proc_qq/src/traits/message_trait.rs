@@ -1,11 +1,11 @@
 use async_trait::async_trait;
-use rq_engine::msg::elem::{FlashImage, FriendImage, GroupImage, Text};
-use rq_engine::msg::MessageChain;
-use rq_engine::pb::msg::elem::Elem;
-use rq_engine::structs::{FriendMessage, GroupMessage, MessageReceipt, TempMessage};
-use rq_engine::{RQError, RQResult};
-use rs_qq::client::event::{FriendMessageEvent, GroupMessageEvent, TempMessageEvent};
-use rs_qq::structs::Group;
+use ricq::client::event::{FriendMessageEvent, GroupMessageEvent, TempMessageEvent};
+use ricq::structs::Group;
+use ricq_core::msg::elem::{FlashImage, FriendImage, GroupImage, Text};
+use ricq_core::msg::MessageChain;
+use ricq_core::pb::msg::elem::Elem;
+use ricq_core::structs::{FriendMessage, GroupMessage, MessageReceipt, TempMessage};
+use ricq_core::{RQError, RQResult};
 use std::sync::Arc;
 use std::time::Duration;
 
