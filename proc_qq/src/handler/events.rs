@@ -4,6 +4,7 @@ pub use ricq::client::event::{
     GroupMuteEvent, GroupNameUpdateEvent, GroupRequestEvent, KickedOfflineEvent, MSFOfflineEvent,
     NewFriendEvent, TempMessageEvent,
 };
+use ricq_core::msg::MessageChain;
 use ricq_core::{RQError, RQResult};
 use std::sync::Arc;
 
@@ -67,6 +68,14 @@ impl MessageEvent {
             MessageEvent::FriendMessage(message) => message.message.from_uin,
             MessageEvent::TempMessage(message) => message.message.from_uin,
         }
+    }
+    pub fn elements(&self) -> MessageChain {
+        match self {
+            MessageEvent::GroupMessage(message) => &message.message.elements,
+            MessageEvent::FriendMessage(message) => &message.message.elements,
+            MessageEvent::TempMessage(message) => &message.message.elements,
+        }
+        .clone()
     }
 }
 
