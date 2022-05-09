@@ -2,6 +2,8 @@
 name = "proc_qq_codegen"
 version = "0.1.0"
 edition = "2021"
+description = "QQ client framework"
+license = "MIT"
 
 [dependencies]
 quote = "1.0"
