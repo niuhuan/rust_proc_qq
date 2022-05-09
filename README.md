@@ -19,6 +19,9 @@ RUST_PROC_QQ
 ```shell
 # 设置rust默认环境为 nightly
 rustup default nightly
+
+# 或
+
 # 设置当前项目rust环境设置为 nightly
 rustup override set nightly
 ```
@@ -28,7 +31,7 @@ rustup override set nightly
 在Cargo.toml中引入proc_qq
 
 ```toml
-proc_qq = { git = "https://github.com/niuhuan/rust_proc_qq.git", branch = "master" }
+proc_qq = "0.1"
 ```
 
 ### 声明一个模块
