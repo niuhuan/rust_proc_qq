@@ -1,15 +1,17 @@
-use crate::ModuleEventProcess::KickedOffline;
 use async_trait::async_trait;
 pub use events::*;
 pub use processes::*;
+pub use results::*;
 use ricq::handler::{Handler, QEvent};
 use std::sync::Arc;
 
 mod events;
 mod processes;
+mod results;
 
 pub(crate) struct ClientHandler {
     pub(crate) modules: Arc<Vec<Module>>,
+    pub(crate) result_handlers: Arc<Vec<EventResultHandler>>,
 }
 
 impl ClientHandler {}
@@ -20,22 +22,71 @@ enum MapResult<'a> {
     Exception(&'a str, &'a str),
 }
 
+macro_rules! map_result {
+    ($self:expr, $event:expr, $result_handler:path, $event_result:expr) => {
+        for h in $self.result_handlers.as_ref() {
+            let mut hand = false;
+            match &h.process {
+                $result_handler(e) => match e.handle($event, $event_result).await {
+                    Ok(b) => {
+                        hand = b;
+                    }
+                    Err(err) => {
+                        tracing::error!(target = "proc_qq", " 出现错误 : {:?}", err);
+                        hand = true;
+                    }
+                },
+                ResultProcess::OnlyResult(e) => match e.handle($event_result).await {
+                    Ok(b) => {
+                        hand = b;
+                    }
+                    Err(err) => {
+                        tracing::error!(target = "proc_qq", " 出现错误 : {:?}", err);
+                        hand = true;
+                    }
+                },
+                _ => (),
+            }
+            if hand {
+                break;
+            }
+        }
+    };
+}
+
 macro_rules! map_handlers {
-    ($self:expr $(,$event:expr, $process:path)* $(,)?) => {{
+    ($self:expr $(,$event:expr, $process:path, $result_handler:path)* $(,)?) => {{
         let mut result = MapResult::None;
         for m in $self.modules.as_ref() {
             for h in &m.handles {
                 match &h.process {
                     $(
-                    $process(e) => match e.handle(&$event).await {
+                    $process(e) => match e.handle($event).await {
                         Ok(b) => {
                             if b {
                                 result = MapResult::Process(&m.id, &h.name);
+                                let event_result = EventResult::Process(
+                                    ModuleInfo{
+                                        module_id: m.id.clone(),
+                                        module_name: m.name.clone(),
+                                        handle_name: h.name.clone(),
+                                    },
+                                );
+                                map_result!($self, $event, $result_handler, &event_result);
                             }
                         }
                         Err(err) => {
                             tracing::error!(target = "proc_qq", " 出现错误 : {:?}", err);
                             result = MapResult::Exception(&m.id, &h.name);
+                            let event_result = EventResult::Exception(
+                                ModuleInfo{
+                                    module_id: m.id.clone(),
+                                    module_name: m.name.clone(),
+                                    handle_name: h.name.clone(),
+                                },
+                                err,
+                            );
+                            map_result!($self, $event, $result_handler, &event_result);
                         }
                     },
                     )*
@@ -64,7 +115,8 @@ impl Handler for ClientHandler {
                 let _ = map_handlers!(
                     &self,
                     &LoginEvent { uin: event },
-                    ModuleEventProcess::LoginEvent
+                    ModuleEventProcess::LoginEvent,
+                    ResultProcess::LoginEvent,
                 );
             }
             QEvent::GroupMessage(event) => {
@@ -80,8 +132,10 @@ impl Handler for ClientHandler {
                     &self,
                     &event,
                     ModuleEventProcess::GroupMessage,
+                    ResultProcess::GroupMessage,
                     &me,
                     ModuleEventProcess::Message,
+                    ResultProcess::Message,
                 );
             }
             QEvent::FriendMessage(event) => {
@@ -96,8 +150,10 @@ impl Handler for ClientHandler {
                     &self,
                     &event,
                     ModuleEventProcess::FriendMessage,
+                    ResultProcess::FriendMessage,
                     &me,
                     ModuleEventProcess::Message,
+                    ResultProcess::Message,
                 );
             }
             QEvent::TempMessage(event) => {
@@ -112,8 +168,10 @@ impl Handler for ClientHandler {
                     &self,
                     &event,
                     ModuleEventProcess::TempMessage,
+                    ResultProcess::TempMessage,
                     &me,
                     ModuleEventProcess::Message,
+                    ResultProcess::Message,
                 );
             }
             QEvent::GroupRequest(event) => {
@@ -124,7 +182,12 @@ impl Handler for ClientHandler {
                     event.request.req_uin,
                     event.request.message,
                 );
-                let _ = map_handlers!(&self, &event, ModuleEventProcess::GroupRequest);
+                let _ = map_handlers!(
+                    &self,
+                    &event,
+                    ModuleEventProcess::GroupRequest,
+                    ResultProcess::GroupRequest,
+                );
             }
             QEvent::FriendRequest(event) => {
                 tracing::debug!(
@@ -133,37 +196,92 @@ impl Handler for ClientHandler {
                     event.request.req_uin,
                     event.request.message
                 );
-                let _ = map_handlers!(&self, &event, ModuleEventProcess::FriendRequest);
+                let _ = map_handlers!(
+                    &self,
+                    &event,
+                    ModuleEventProcess::FriendRequest,
+                    ResultProcess::FriendRequest,
+                );
             }
             QEvent::NewFriend(event) => {
-                let _ = map_handlers!(&self, &event, ModuleEventProcess::NewFriend);
+                let _ = map_handlers!(
+                    &self,
+                    &event,
+                    ModuleEventProcess::NewFriend,
+                    ResultProcess::NewFriend
+                );
             }
             QEvent::FriendPoke(event) => {
-                let _ = map_handlers!(&self, &event, ModuleEventProcess::FriendPoke);
+                let _ = map_handlers!(
+                    &self,
+                    &event,
+                    ModuleEventProcess::FriendPoke,
+                    ResultProcess::FriendPoke
+                );
             }
             QEvent::DeleteFriend(event) => {
-                let _ = map_handlers!(&self, &event, ModuleEventProcess::DeleteFriend);
+                let _ = map_handlers!(
+                    &self,
+                    &event,
+                    ModuleEventProcess::DeleteFriend,
+                    ResultProcess::DeleteFriend
+                );
             }
             QEvent::GroupMute(event) => {
-                let _ = map_handlers!(&self, &event, ModuleEventProcess::GroupMute);
+                let _ = map_handlers!(
+                    &self,
+                    &event,
+                    ModuleEventProcess::GroupMute,
+                    ResultProcess::GroupMute
+                );
             }
             QEvent::GroupLeave(event) => {
-                let _ = map_handlers!(&self, &event, ModuleEventProcess::GroupLeave);
+                let _ = map_handlers!(
+                    &self,
+                    &event,
+                    ModuleEventProcess::GroupLeave,
+                    ResultProcess::GroupLeave
+                );
             }
             QEvent::GroupNameUpdate(event) => {
-                let _ = map_handlers!(&self, &event, ModuleEventProcess::GroupNameUpdate);
+                let _ = map_handlers!(
+                    &self,
+                    &event,
+                    ModuleEventProcess::GroupNameUpdate,
+                    ResultProcess::GroupNameUpdate
+                );
             }
             QEvent::GroupMessageRecall(event) => {
-                let _ = map_handlers!(&self, &event, ModuleEventProcess::GroupMessageRecall);
+                let _ = map_handlers!(
+                    &self,
+                    &event,
+                    ModuleEventProcess::GroupMessageRecall,
+                    ResultProcess::GroupMessageRecall
+                );
             }
             QEvent::FriendMessageRecall(event) => {
-                let _ = map_handlers!(&self, &event, ModuleEventProcess::FriendMessageRecall);
+                let _ = map_handlers!(
+                    &self,
+                    &event,
+                    ModuleEventProcess::FriendMessageRecall,
+                    ResultProcess::FriendMessageRecall
+                );
             }
             QEvent::MSFOffline(event) => {
-                let _ = map_handlers!(&self, &event, ModuleEventProcess::MSFOffline);
+                let _ = map_handlers!(
+                    &self,
+                    &event,
+                    ModuleEventProcess::MSFOffline,
+                    ResultProcess::MSFOffline
+                );
             }
             QEvent::KickedOffline(event) => {
-                let _ = map_handlers!(&self, &event, KickedOffline);
+                let _ = map_handlers!(
+                    &self,
+                    &event,
+                    ModuleEventProcess::KickedOffline,
+                    ResultProcess::KickedOffline
+                );
             }
             _ => tracing::debug!(target = "proc_qq", "{:?}", e),
         }
@@ -178,6 +296,7 @@ pub struct Module {
 
 pub(crate) struct EventSender {
     pub(crate) modules: Arc<Vec<Module>>,
+    pub(crate) result_handlers: Arc<Vec<EventResultHandler>>,
 }
 
 impl EventSender {
@@ -185,7 +304,8 @@ impl EventSender {
         match map_handlers!(
             &self,
             &ConnectedAndOnlineEvent {},
-            ModuleEventProcess::ConnectedAndOnline
+            ModuleEventProcess::ConnectedAndOnline,
+            ResultProcess::ConnectedAndOnline,
         ) {
             MapResult::Exception(_, _) => Err(anyhow::Error::msg("err")),
             _ => Ok(()),
@@ -196,6 +316,7 @@ impl EventSender {
             &self,
             &DisconnectedAndOfflineEvent {},
             ModuleEventProcess::DisconnectAndOffline,
+            ResultProcess::DisconnectAndOffline,
         ) {
             MapResult::Exception(_, _) => Err(anyhow::Error::msg("err")),
             _ => Ok(()),

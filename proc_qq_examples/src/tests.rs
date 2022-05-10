@@ -16,7 +16,8 @@ async fn test_qr_login() {
         .version(&ANDROID_WATCH)
         .priority_session("session.token")
         .authentication(QRCode)
-        .build(vec![hello_module::module()])
+        .modules(vec![hello_module::module()])
+        .build()
         .await
         .unwrap()
         .start()
@@ -33,7 +34,8 @@ async fn test_password_login() {
         .version(&ANDROID_WATCH)
         .priority_session("session.token")
         .authentication(UinPassword(123456, "password".to_owned()))
-        .build(Arc::new(vec![hello_module::module()]))
+        .modules(vec![hello_module::module()])
+        .build()
         .await
         .unwrap()
         .start()

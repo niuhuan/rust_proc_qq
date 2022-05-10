@@ -158,3 +158,52 @@ pub fn event(_: TokenStream, input: TokenStream) -> TokenStream {
         #build_into
     })
 }
+
+#[proc_macro_error]
+#[proc_macro_attribute]
+pub fn result(_: TokenStream, input: TokenStream) -> TokenStream {
+    // must append to async fn
+    let method = parse_macro_input!(input as syn::ItemFn);
+    if method.sig.asyncness.is_none() {
+        abort!(&method.sig.span(), "必须是async方法");
+    }
+    // params check
+    let params = &method.sig.inputs;
+    if params.len() != 1 && params.len() != 2 {
+        abort!(&method.sig.span(), "必须有且只能有1~2个参数");
+    };
+    if params.len() == 1 {
+        let pm = params.first().unwrap();
+        let pm = match pm {
+            FnArg::Receiver(_) => abort!(&pm.span(), "不支持self"),
+            FnArg::Typed(pt) => pt,
+        };
+        let pm_ty = pm.ty.as_ref();
+        let pm_ty = quote! {#pm_ty};
+        if !pm_ty.to_string().as_str().eq("& EventResult") {
+            abort!(&pm.span(), "一个参数时只支持 &EventResult");
+        }
+        let pm_pat = pm.pat.as_ref();
+        // gen token stream
+        let ident = &method.sig.ident;
+        let ident_str = format!("{}", ident);
+        let block = &method.block;
+        return emit!(quote! {
+            #[allow(non_camel_case_types)]
+            pub struct #ident {}
+            #[::proc_qq::re_exports::async_trait::async_trait]
+            impl ::proc_qq::OnlyResultHandler for #ident {
+                async fn handle(&self, #pm_pat: #pm_ty) -> ::proc_qq::re_exports::anyhow::Result<bool> #block
+            }
+            impl Into<::proc_qq::EventResultHandler> for #ident {
+                fn into(self) -> ::proc_qq::EventResultHandler {
+                    ::proc_qq::EventResultHandler{
+                        name: #ident_str.into(),
+                        process: ::proc_qq::ResultProcess::OnlyResult(Box::new(self)),
+                    }
+                }
+            }
+        });
+    }
+    abort!(method.span(), "现在只支持一个参数");
+}

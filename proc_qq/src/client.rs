@@ -1,5 +1,5 @@
 use crate::DeviceSource::{JsonFile, JsonString};
-use crate::{Authentication, ClientHandler, DeviceSource, Module};
+use crate::{Authentication, ClientHandler, DeviceSource, EventResultHandler, Module};
 use anyhow::{Context, Result};
 use bytes::{Buf, BufMut, Bytes, BytesMut};
 use ricq::ext::common::after_login;
@@ -23,6 +23,7 @@ pub struct Client {
     pub authentication: Authentication,
     pub priority_session: Option<String>,
     pub(crate) modules: Arc<Vec<Module>>,
+    pub(crate) result_handlers: Arc<Vec<EventResultHandler>>,
 }
 
 impl Client {
@@ -34,6 +35,7 @@ impl Client {
 pub async fn run_client(client: Client) -> Result<()> {
     let event_sender = crate::handler::EventSender {
         modules: client.modules.clone(),
+        result_handlers: client.result_handlers.clone(),
     };
     // todo // max try count
     // todo // not retry qr
@@ -311,12 +313,13 @@ pub fn bytes_to_token(token: Vec<u8>) -> Token {
     }
 }
 
-#[derive(Debug)]
 pub struct ClientBuilder {
     device_source: DeviceSource,
     version: &'static Version,
     authentication: Option<Authentication>,
     priority_session: Option<String>,
+    modules_vec: Arc<Vec<Module>>,
+    result_handlers_vec: Arc<Vec<EventResultHandler>>,
 }
 
 impl ClientBuilder {
@@ -326,11 +329,22 @@ impl ClientBuilder {
             version: ANDROID_PHONE,
             authentication: None,
             priority_session: None,
+            modules_vec: Arc::new(vec![]),
+            result_handlers_vec: Arc::new(vec![]),
         }
     }
 
-    pub async fn build<S: Into<Arc<Vec<Module>>>>(&self, h: S) -> Result<Client, anyhow::Error> {
-        let modules = h.into();
+    pub fn modules<S: Into<Arc<Vec<Module>>>>(mut self, h: S) -> Self {
+        self.modules_vec = h.into();
+        self
+    }
+
+    pub fn result_handlers<E: Into<Arc<Vec<EventResultHandler>>>>(mut self, e: E) -> Self {
+        self.result_handlers_vec = e.into();
+        self
+    }
+
+    pub async fn build(&self) -> Result<Client, anyhow::Error> {
         Ok(Client {
             rq_client: Arc::new(ricq::Client::new(
                 match &self.device_source {
@@ -353,7 +367,8 @@ impl ClientBuilder {
                 },
                 self.version,
                 ClientHandler {
-                    modules: modules.clone(),
+                    modules: self.modules_vec.clone(),
+                    result_handlers: self.result_handlers_vec.clone(),
                 },
             )),
             authentication: self
@@ -361,7 +376,8 @@ impl ClientBuilder {
                 .clone()
                 .with_context(|| "您必须设置验证方式 (调用authentication)")?,
             priority_session: self.priority_session.clone(),
-            modules,
+            modules: self.modules_vec.clone(),
+            result_handlers: self.result_handlers_vec.clone(),
         })
     }
 

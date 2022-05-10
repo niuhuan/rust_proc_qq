@@ -31,7 +31,8 @@ async fn main() -> anyhow::Result<()> {
         .version(&ANDROID_WATCH)
         .priority_session("session.token")
         .authentication(UinPasswordMd5(config.account.uin, password))
-        .build(modules::all_modules())
+        .modules(modules::all_modules())
+        .build()
         .await
         .unwrap()
         .start()

@@ -12,6 +12,13 @@ RUST_PROC_QQ
 - 模块化 : 让调理更清晰
     - 模块化, 实现插件之间的分离, 更好的启用禁用
 
+
+# 设计思路
+
+所有的功能都是由插件完成, 事件发生时, 调度器对插件轮训调用, 插件响应是否处理该事件, 直至有插件响应事件, 插件发生异常, 或插件轮训结束, 最后日志结果被记录, 事件响应周期结束。
+
+![img.png](images/invoke.png)
+
 ## 如何使用 / demo
 
 新建一个rust项目, 并将rust环境设置为nightly
@@ -102,7 +109,8 @@ async fn test_qr_login() {
         .priority_session("session.token")      // 默认使用session.token登录
         // .device(JsonFile("device.json")) // 设备默认值 
         .authentication(QRCode)                 // 若不成功则使用二维码登录
-        .build(vec![hello_module::module()])    // 您可以注册多个模块
+        .modules(vec![hello_module::module()])    // 您可以注册多个模块
+        .build()
         .await
         .unwrap()
         .start()
