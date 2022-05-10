@@ -7,6 +7,7 @@ use proc_qq::Authentication::{QRCode, UinPassword};
 use proc_qq::{ClientBuilder, DeviceSource};
 
 use crate::hello_module;
+use crate::result_handlers;
 
 #[tokio::test]
 async fn test_qr_login() {
@@ -14,7 +15,7 @@ async fn test_qr_login() {
     ClientBuilder::new()
         .device(DeviceSource::JsonFile("device.json".to_owned()))
         .version(&ANDROID_WATCH)
-        .priority_session("session.token")
+        // .priority_session("session.token")
         .authentication(QRCode)
         .modules(vec![hello_module::module()])
         .build()
@@ -32,9 +33,10 @@ async fn test_password_login() {
     ClientBuilder::new()
         .device(DeviceSource::JsonFile("device.json".to_owned()))
         .version(&ANDROID_WATCH)
-        .priority_session("session.token")
+        // .priority_session("session.token")
         .authentication(UinPassword(123456, "password".to_owned()))
-        .modules(vec![hello_module::module()])
+        .modules(Arc::new(vec![hello_module::module()]))
+        .result_handlers(vec![result_handlers::on_result {}.into()])
         .build()
         .await
         .unwrap()

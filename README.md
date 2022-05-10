@@ -106,8 +106,8 @@ async fn test_qr_login() {
     init_tracing_subscriber();
     // 使用builder创建
     ClientBuilder::new()
-        .priority_session("session.token")      // 默认使用session.token登录
-        // .device(JsonFile("device.json")) // 设备默认值 
+        // .priority_session("session.token")      // 使用session.token登录
+        .device(JsonFile("device.json")) // 设备默认值 
         .authentication(QRCode)                 // 若不成功则使用二维码登录
         .modules(vec![hello_module::module()])    // 您可以注册多个模块
         .build()
@@ -199,6 +199,40 @@ MessageChainTrait;
 
 let chain: MessageChain;
 let chain = chain.append(at).append(text).append(image);
+```
+
+## 事件结果
+
+使用result_handlers监听处理结果 (事件参数正在开发)
+
+```rust
+use proc_qq::result;
+use proc_qq::EventResult;
+
+#[result]
+async fn on_result(result: &EventResult) -> anyhow::Result<bool> {
+  match result {
+    EventResult::Process(info) => {
+      tracing::info!("{} : {} : 处理了一条消息", info.module_id, info.handle_name);
+    }
+    EventResult::Exception(info, err) => {
+      tracing::info!(
+                "{} : {} : 遇到了错误 : {}",
+                info.module_id,
+                info.handle_name,
+                err
+            );
+    }
+  }
+  Ok(false)
+}
+```
+
+```rust
+ClientBuilder::new()
+    .modules(vec![hello_module::module()])
+    .result_handlers(vec![result_handlers::on_result {}.into()])
+    .build()
 ```
 
 ## 其他

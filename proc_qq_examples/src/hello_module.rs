@@ -23,6 +23,8 @@ async fn print(event: &MessageEvent) -> anyhow::Result<bool> {
             .send_message_to_source("NB".parse_message_chain())
             .await?;
         Ok(true)
+    } else if content.eq("EX") {
+        Err(anyhow::Error::msg("Text exception"))
     } else {
         Ok(false)
     }
