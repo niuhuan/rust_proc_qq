@@ -1,6 +1,9 @@
 RUST_PROC_QQ
 ============
 
+[![license](https://img.shields.io/github/license/niuhuan/rust_proc_qq)](https://raw.githubusercontent.com/niuhuan/rust_proc_qq/master/LICENSE)
+[![crates.io](https://img.shields.io/crates/v/proc_qq.svg)](https://crates.io/crates/proc_qq)
+
 - Rust语言的QQ机器人框架. (基于[RICQ](https://github.com/lz1998/ricq))
 - 开箱即用, 操作简单, 代码极简
 
@@ -273,3 +276,9 @@ event.reply_text("你好").await?;
 
 - 下载LLVM-${version}-win64.exe并安装 : https://github.com/llvm/llvm-project/releases/ 
 - 下载ffmpeg : https://www.ffmpeg.org/download.html
+
+##### 额外协议的说明
+
+- 本仓库开源协议与RICQ保持一致.
+  - AGPL: 现阶段协议, 您无论以任何方法使用这个库, 都需要将您的代码开源并使用AGPL协议.
+  - 如RICQ更换协议, 请以最新协议为准
