@@ -198,7 +198,7 @@ client
 MessageChain链式追加
 
 ```rust
-MessageChainTrait;
+MessageChainAppendTrait;
 
 let chain: MessageChain;
 let chain = chain.append(at).append(text).append(image);

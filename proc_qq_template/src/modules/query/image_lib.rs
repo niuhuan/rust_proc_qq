@@ -3,8 +3,8 @@ use anyhow::Context;
 use proc_qq::re_exports::ricq::msg::MessageChain;
 use proc_qq::re_exports::{bytes, reqwest};
 use proc_qq::{
-    event, module, MessageChainTrait, MessageContentTrait, MessageEvent, MessageSendToSourceTrait,
-    Module, TextEleParseTrait,
+    event, module, MessageChainAppendTrait, MessageContentTrait, MessageEvent,
+    MessageSendToSourceTrait, Module, TextEleParseTrait,
 };
 use regex::Regex;
 

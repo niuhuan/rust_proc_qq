@@ -36,7 +36,11 @@ pub trait MessageTargetTrait: Send + Sync {
     fn target(&self) -> MessageTarget;
 }
 
-pub trait MessageContentTrait: Send + Sync {
+pub trait MessageChainPointTrait: Send + Sync {
+    fn message_chain(&self) -> &MessageChain;
+}
+
+pub trait MessageContentTrait: Send + Sync + MessageChainPointTrait {
     fn message_content(&self) -> String;
 }
 
@@ -74,6 +78,12 @@ pub trait MessageChainParseTrait {
     fn parse_message_chain(self) -> MessageChain;
 }
 
+impl MessageChainPointTrait for MessageChain {
+    fn message_chain(&self) -> &MessageChain {
+        &self
+    }
+}
+
 impl MessageContentTrait for MessageChain {
     fn message_content(&self) -> String {
         self.to_string()
@@ -86,9 +96,15 @@ impl MessageTargetTrait for GroupMessage {
     }
 }
 
+impl MessageChainPointTrait for GroupMessage {
+    fn message_chain(&self) -> &MessageChain {
+        self.elements.message_chain()
+    }
+}
+
 impl MessageContentTrait for GroupMessage {
     fn message_content(&self) -> String {
-        self.elements.message_content()
+        self.message_chain().message_content()
     }
 }
 
@@ -98,9 +114,15 @@ impl MessageTargetTrait for GroupMessageEvent {
     }
 }
 
+impl MessageChainPointTrait for GroupMessageEvent {
+    fn message_chain(&self) -> &MessageChain {
+        self.message.message_chain()
+    }
+}
+
 impl MessageContentTrait for GroupMessageEvent {
     fn message_content(&self) -> String {
-        self.message.message_content()
+        self.message_chain().message_content()
     }
 }
 
@@ -175,9 +197,15 @@ impl MessageTargetTrait for FriendMessage {
     }
 }
 
+impl MessageChainPointTrait for FriendMessage {
+    fn message_chain(&self) -> &MessageChain {
+        self.elements.message_chain()
+    }
+}
+
 impl MessageContentTrait for FriendMessage {
     fn message_content(&self) -> String {
-        self.elements.to_string()
+        self.message_chain().message_content()
     }
 }
 
@@ -187,9 +215,15 @@ impl MessageTargetTrait for FriendMessageEvent {
     }
 }
 
+impl MessageChainPointTrait for FriendMessageEvent {
+    fn message_chain(&self) -> &MessageChain {
+        self.message.message_chain()
+    }
+}
+
 impl MessageContentTrait for FriendMessageEvent {
     fn message_content(&self) -> String {
-        self.message.message_content()
+        self.message_chain().message_content()
     }
 }
 
@@ -265,9 +299,15 @@ impl MessageTargetTrait for TempMessage {
     }
 }
 
+impl MessageChainPointTrait for TempMessage {
+    fn message_chain(&self) -> &MessageChain {
+        self.elements.message_chain()
+    }
+}
+
 impl MessageContentTrait for TempMessage {
     fn message_content(&self) -> String {
-        self.elements.to_string()
+        self.message_chain().message_content()
     }
 }
 
@@ -277,9 +317,15 @@ impl MessageTargetTrait for TempMessageEvent {
     }
 }
 
+impl MessageChainPointTrait for TempMessageEvent {
+    fn message_chain(&self) -> &MessageChain {
+        self.message.message_chain()
+    }
+}
+
 impl MessageContentTrait for TempMessageEvent {
     fn message_content(&self) -> String {
-        self.message.message_content()
+        self.message_chain().message_content()
     }
 }
 
@@ -352,13 +398,19 @@ impl MessageTargetTrait for MessageEvent {
     }
 }
 
+impl MessageChainPointTrait for MessageEvent {
+    fn message_chain(&self) -> &MessageChain {
+        match self {
+            MessageEvent::GroupMessage(event) => event.message_chain(),
+            MessageEvent::FriendMessage(event) => event.message_chain(),
+            MessageEvent::TempMessage(event) => event.message_chain(),
+        }
+    }
+}
+
 impl MessageContentTrait for MessageEvent {
     fn message_content(&self) -> String {
-        match self {
-            MessageEvent::GroupMessage(event) => event.message_content(),
-            MessageEvent::FriendMessage(event) => event.message_content(),
-            MessageEvent::TempMessage(event) => event.message_content(),
-        }
+        self.message_chain().message_content()
     }
 }
 

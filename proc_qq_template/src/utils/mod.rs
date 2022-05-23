@@ -3,7 +3,7 @@ use proc_qq::re_exports::ricq::msg::MessageChain;
 use proc_qq::re_exports::ricq::RQResult;
 use proc_qq::re_exports::ricq_core::msg::elem::At;
 use proc_qq::{
-    GroupMessageEvent, MessageChainParseTrait, MessageChainTrait, MessageEvent,
+    GroupMessageEvent, MessageChainAppendTrait, MessageChainParseTrait, MessageEvent,
     MessageSendToSourceTrait, TextEleParseTrait,
 };
 pub(crate) mod ffmpeg_cmd;
@@ -20,8 +20,10 @@ pub(crate) trait CanReply {
 impl CanReply for GroupMessageEvent {
     async fn make_reply_chain(&self) -> MessageChain {
         let mut at = At::new(self.message.from_uin);
-        at.display = self.message.group_card.clone();
-        MessageChain::default().append(at)
+        at.display = format!("@{}", self.message.group_card);
+        MessageChain::default()
+            .append(at)
+            .append("\n\n".parse_text())
     }
 
     async fn reply_text(&self, text: &str) -> RQResult<()> {
