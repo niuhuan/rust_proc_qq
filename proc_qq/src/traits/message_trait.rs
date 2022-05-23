@@ -1,7 +1,7 @@
 use async_trait::async_trait;
 use ricq::client::event::{FriendMessageEvent, GroupMessageEvent, TempMessageEvent};
 use ricq::structs::Group;
-use ricq_core::msg::elem::{FlashImage, FriendImage, GroupImage, Text};
+use ricq_core::msg::elem::{FlashImage, FriendImage, GroupImage, Text, VideoFile};
 use ricq_core::msg::MessageChain;
 use ricq_core::pb::msg::elem::Elem;
 use ricq_core::structs::{FriendMessage, GroupMessage, MessageReceipt, TempMessage};
@@ -53,6 +53,12 @@ pub trait MessageSendToSourceTrait: Send + Sync + ClientTrait {
         &self,
         data: S,
     ) -> RQResult<UploadImage>;
+
+    async fn upload_short_video_buff_to_source<S: Into<Vec<u8>> + Send + Sync>(
+        &self,
+        data: S,
+        thumb: S,
+    ) -> RQResult<VideoFile>;
 
     async fn send_audio_to_source<S: Into<Vec<u8>> + Send + Sync>(
         &self,
@@ -139,6 +145,16 @@ impl MessageSendToSourceTrait for GroupMessageEvent {
         ))
     }
 
+    async fn upload_short_video_buff_to_source<S: Into<Vec<u8>> + Send + Sync>(
+        &self,
+        data: S,
+        thumb: S,
+    ) -> RQResult<VideoFile> {
+        self.client
+            .upload_group_short_video(self.message.group_code, data.into(), thumb.into())
+            .await
+    }
+
     async fn send_audio_to_source<S: Into<Vec<u8>> + Send + Sync>(
         &self,
         data: S,
@@ -218,6 +234,17 @@ impl MessageSendToSourceTrait for FriendMessageEvent {
         ))
     }
 
+    async fn upload_short_video_buff_to_source<S: Into<Vec<u8>> + Send + Sync>(
+        &self,
+        data: S,
+        thumb: S,
+    ) -> RQResult<VideoFile> {
+        // todo RICQ 并没有区分
+        self.client
+            .upload_group_short_video(self.message.from_uin, data.into(), thumb.into())
+            .await
+    }
+
     async fn send_audio_to_source<S: Into<Vec<u8>> + Send + Sync>(
         &self,
         data: S,
@@ -295,6 +322,16 @@ impl MessageSendToSourceTrait for TempMessageEvent {
         ))
     }
 
+    async fn upload_short_video_buff_to_source<S: Into<Vec<u8>> + Send + Sync>(
+        &self,
+        _data: S,
+        _thumb: S,
+    ) -> RQResult<VideoFile> {
+        RQResult::Err(RQError::Other(
+            "tmp message not supported upload short video".to_owned(),
+        ))
+    }
+
     async fn send_audio_to_source<S: Into<Vec<u8>> + Send + Sync>(
         &self,
         _data: S,
@@ -368,6 +405,25 @@ impl MessageSendToSourceTrait for MessageEvent {
             MessageEvent::GroupMessage(event) => event.upload_image_to_source(data),
             MessageEvent::FriendMessage(event) => event.upload_image_to_source(data),
             MessageEvent::TempMessage(event) => event.upload_image_to_source(data),
+        }
+        .await
+    }
+
+    async fn upload_short_video_buff_to_source<S: Into<Vec<u8>> + Send + Sync>(
+        &self,
+        data: S,
+        thumb: S,
+    ) -> RQResult<VideoFile> {
+        match self {
+            MessageEvent::GroupMessage(event) => {
+                event.upload_short_video_buff_to_source(data, thumb)
+            }
+            MessageEvent::FriendMessage(event) => {
+                event.upload_short_video_buff_to_source(data, thumb)
+            }
+            MessageEvent::TempMessage(event) => {
+                event.upload_short_video_buff_to_source(data, thumb)
+            }
         }
         .await
     }
