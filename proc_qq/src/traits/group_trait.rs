@@ -1,5 +1,4 @@
 use async_trait::async_trait;
-use ricq::structs::Group;
 use ricq_core::structs::GroupMemberInfo;
 use ricq_core::{RQError, RQResult};
 
@@ -9,17 +8,13 @@ pub trait GroupTrait {
 }
 
 #[async_trait]
-impl GroupTrait for Group {
+impl GroupTrait for Vec<GroupMemberInfo> {
     async fn must_find_member(&self, uin: i64) -> RQResult<GroupMemberInfo> {
-        let lock = self.members.read().await;
-        for x in lock.iter() {
+        for x in self.iter() {
             if x.uin == uin {
                 return RQResult::Ok(x.clone());
             }
         }
-        return RQResult::Err(RQError::Other(format!(
-            "Member nor found : (GROUP_CODE={},uin={})",
-            self.info.code, uin
-        )));
+        return RQResult::Err(RQError::Other(format!("Member nor found : (uin={})", uin)));
     }
 }

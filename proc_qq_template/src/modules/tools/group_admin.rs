@@ -6,7 +6,6 @@ use proc_qq::{
 };
 use regex::Regex;
 use std::time::Duration;
-
 static ID: &'static str = "group_admin";
 static NAME: &'static str = "群管";
 
@@ -52,11 +51,16 @@ async fn on_message(event: &MessageEvent) -> anyhow::Result<bool> {
     }
     let group_message = event.as_group_message()?;
     if BAN_REGEXP.is_match(&content) {
-        let group = group_message
-            .must_find_group(group_message.message.group_code, true)
+        // todo 缓存?
+        let group = event
+            .must_find_group(group_message.message.group_code)
             .await?;
-        let call_member = group.must_find_member(event.from_uin()).await?;
-        let bot_member = group.must_find_member(event.bot_uin().await).await?;
+        let list = group_message
+            .client
+            .get_group_member_list(group.code, group.owner_uin)
+            .await?;
+        let call_member = list.must_find_member(event.from_uin()).await?;
+        let bot_member = list.must_find_member(event.bot_uin().await).await?;
         if call_member.is_member() {
             group_message
                 .reply_text("您必须是群主或管理员才能使用")

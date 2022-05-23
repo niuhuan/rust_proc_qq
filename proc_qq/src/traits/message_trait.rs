@@ -1,12 +1,10 @@
 use async_trait::async_trait;
 use ricq::client::event::{FriendMessageEvent, GroupMessageEvent, TempMessageEvent};
-use ricq::structs::Group;
 use ricq_core::msg::elem::{FlashImage, FriendImage, GroupImage, Text, VideoFile};
 use ricq_core::msg::MessageChain;
 use ricq_core::pb::msg::elem::Elem;
-use ricq_core::structs::{FriendMessage, GroupMessage, MessageReceipt, TempMessage};
+use ricq_core::structs::{FriendMessage, GroupInfo, GroupMessage, MessageReceipt, TempMessage};
 use ricq_core::{RQError, RQResult};
-use std::sync::Arc;
 use std::time::Duration;
 
 use crate::{ClientTrait, MessageEvent};
@@ -116,8 +114,8 @@ impl ClientTrait for GroupMessageEvent {
         self.client.send_message_to_target(source, message).await
     }
 
-    async fn must_find_group(&self, group_code: i64, auto_reload: bool) -> RQResult<Arc<Group>> {
-        self.client.must_find_group(group_code, auto_reload).await
+    async fn must_find_group(&self, group_code: i64) -> RQResult<GroupInfo> {
+        self.client.must_find_group(group_code).await
     }
 
     async fn bot_uin(&self) -> i64 {
@@ -205,8 +203,8 @@ impl ClientTrait for FriendMessageEvent {
         self.client.send_message_to_target(source, message).await
     }
 
-    async fn must_find_group(&self, group_code: i64, auto_reload: bool) -> RQResult<Arc<Group>> {
-        self.client.must_find_group(group_code, auto_reload).await
+    async fn must_find_group(&self, group_code: i64) -> RQResult<GroupInfo> {
+        self.client.must_find_group(group_code).await
     }
 
     async fn bot_uin(&self) -> i64 {
@@ -295,8 +293,8 @@ impl ClientTrait for TempMessageEvent {
         self.client.send_message_to_target(source, message).await
     }
 
-    async fn must_find_group(&self, group_code: i64, auto_reload: bool) -> RQResult<Arc<Group>> {
-        self.client.must_find_group(group_code, auto_reload).await
+    async fn must_find_group(&self, group_code: i64) -> RQResult<GroupInfo> {
+        self.client.must_find_group(group_code).await
     }
 
     async fn bot_uin(&self) -> i64 {
@@ -374,8 +372,8 @@ impl ClientTrait for MessageEvent {
         self.client().send_message_to_target(source, message).await
     }
 
-    async fn must_find_group(&self, group_code: i64, auto_reload: bool) -> RQResult<Arc<Group>> {
-        self.client().must_find_group(group_code, auto_reload).await
+    async fn must_find_group(&self, group_code: i64) -> RQResult<GroupInfo> {
+        self.client().must_find_group(group_code).await
     }
 
     async fn bot_uin(&self) -> i64 {
