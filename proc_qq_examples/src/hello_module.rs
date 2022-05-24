@@ -1,7 +1,8 @@
+pub use proc_qq::re_exports::async_trait::async_trait;
 use proc_qq::re_exports::ricq::client::event::GroupMessageEvent;
 use proc_qq::{
     event, module, LoginEvent, MessageChainParseTrait, MessageContentTrait, MessageEvent,
-    MessageSendToSourceTrait, Module,
+    MessageEventProcess, MessageSendToSourceTrait, Module, ModuleEventHandler, ModuleEventProcess,
 };
 
 #[event]
@@ -35,6 +36,47 @@ async fn group_hello(_: &GroupMessageEvent) -> anyhow::Result<bool> {
     Ok(false)
 }
 
+struct OnMessage;
+
+#[async_trait]
+impl MessageEventProcess for OnMessage {
+    async fn handle(&self, event: &MessageEvent) -> anyhow::Result<bool> {
+        self.do_some(event).await?;
+        Ok(true)
+    }
+}
+
+impl OnMessage {
+    async fn do_some(&self, _: &MessageEvent) -> anyhow::Result<()> {
+        Ok(())
+    }
+}
+
+fn on_message() -> ModuleEventHandler {
+    ModuleEventHandler {
+        name: "OnMessage".to_owned(),
+        process: ModuleEventProcess::Message(Box::new(OnMessage {})),
+    }
+}
+
+async fn do_some(_event: &MessageEvent) -> anyhow::Result<()> {
+    Ok(())
+}
+
+#[event]
+async fn handle(event: &MessageEvent) -> anyhow::Result<bool> {
+    do_some(event).await?;
+    Ok(true)
+}
+
 pub(crate) fn module() -> Module {
-    module!("hello", "你好", login, print, group_hello)
+    module!(
+        "hello",
+        "你好",
+        login,
+        print,
+        group_hello,
+        on_message,
+        handle,
+    )
 }

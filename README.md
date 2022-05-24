@@ -15,7 +15,6 @@ RUST_PROC_QQ
 - 模块化 : 让调理更清晰
     - 模块化, 实现插件之间的分离, 更好的启用禁用
 
-
 # 设计思路
 
 所有的功能都是由插件完成, 事件发生时, 调度器对插件轮训调用, 插件响应是否处理该事件, 直至有插件响应事件, 插件发生异常, 或插件轮训结束, 最后日志结果被记录, 事件响应周期结束。
@@ -151,10 +150,10 @@ fn init_tracing_subscriber() {
 
 ```rust
 use ricq::client::event::{
-  DeleteFriendEvent, FriendMessageEvent, FriendMessageRecallEvent, FriendPokeEvent,
-  FriendRequestEvent, GroupLeaveEvent, GroupMessageEvent, GroupMessageRecallEvent,
-  GroupMuteEvent, GroupNameUpdateEvent, GroupRequestEvent, KickedOfflineEvent, MSFOfflineEvent,
-  NewFriendEvent, TempMessageEvent,
+    DeleteFriendEvent, FriendMessageEvent, FriendMessageRecallEvent, FriendPokeEvent,
+    FriendRequestEvent, GroupLeaveEvent, GroupMessageEvent, GroupMessageRecallEvent,
+    GroupMuteEvent, GroupNameUpdateEvent, GroupRequestEvent, KickedOfflineEvent, MSFOfflineEvent,
+    NewFriendEvent, TempMessageEvent,
 };
 use proc_qq::{MessageEvent, LoginEvent, ConnectedAndOnlineEvent, DisconnectedAndOfflineEvent, };
 ```
@@ -193,7 +192,7 @@ client
 .await?;
 ```
 
-#### 
+####  
 
 MessageChain链式追加
 
@@ -214,29 +213,87 @@ use proc_qq::EventResult;
 
 #[result]
 async fn on_result(result: &EventResult) -> anyhow::Result<bool> {
-  match result {
-    EventResult::Process(info) => {
-      tracing::info!("{} : {} : 处理了一条消息", info.module_id, info.handle_name);
-    }
-    EventResult::Exception(info, err) => {
-      tracing::info!(
+    match result {
+        EventResult::Process(info) => {
+            tracing::info!("{} : {} : 处理了一条消息", info.module_id, info.handle_name);
+        }
+        EventResult::Exception(info, err) => {
+            tracing::info!(
                 "{} : {} : 遇到了错误 : {}",
                 info.module_id,
                 info.handle_name,
                 err
             );
+        }
     }
-  }
-  Ok(false)
+    Ok(false)
 }
 ```
 
 ```rust
 ClientBuilder::new()
-    .modules(vec![hello_module::module()])
-    .result_handlers(vec![result_handlers::on_result {}.into()])
-    .build()
+.modules(vec![hello_module::module()])
+.result_handlers(vec![result_handlers::on_result {}.into()])
+.build()
 ```
+
+## 手动实现handler和原理
+
+手动实现一个handler
+
+```rust
+
+/// 每个handler都是一个struct
+struct OnMessage;
+
+/// 给他实现一个Process, 它就对应着监听什么事件
+#[async_trait]
+impl MessageEventProcess for OnMessage {
+    async fn handle(&self, event: &MessageEvent) -> anyhow::Result<bool> {
+        self.do_some(event).await?;
+        Ok(true)
+    }
+}
+
+/// 实现一些其他的方法用于调用
+impl OnMessage {
+    async fn do_some(&self, _event: &MessageEvent) -> anyhow::Result<()> {
+        Ok(())
+    }
+}
+
+/// 将process转换成handler
+fn on_message() -> ModuleEventHandler {
+    ModuleEventHandler {
+        name: "OnMessage".to_owned(),
+        process: ModuleEventProcess::Message(Box::new(OnMessage {})),
+    }
+}
+
+/// 将转化的方法名写到里面
+pub(crate) fn module() -> Module {
+    module!("hello", "你好", login, print, group_hello, on_message)
+}
+```
+
+为什么要强调一下手动创造handler
+
+```rust
+
+async fn do_some(_event: &MessageEvent) -> anyhow::Result<()> {
+    // 做一些线程不安全的事情
+    Ok(())
+}
+
+#[event]
+async fn handle(event: &MessageEvent) -> anyhow::Result<bool> {
+    do_some(event).await?;  // 那么这里的引用生命周期有问题
+    Ok(true)
+}
+
+```
+
+总会遇到一些线程不安全的类, 例如*scraper*. 这个时候编译器会反复告诉你 "maybe used later". 您可以尝试使用手创造一个handler解决.
 
 ## 其他
 
@@ -251,9 +308,11 @@ RICQ 还在发展阶段, 迭代速度较快, 可能出现更改API的情况, 如
 ##### 模版中封装了一些常用功能
 
 直接回复文字, 如果是在群中会自动@
+
 ```rust
 event.reply_text("你好").await?;
 ```
+
 ![](images/img_lib_01.png)
 
 ![](images/img_lib_02.png)
@@ -263,6 +322,7 @@ event.reply_text("你好").await?;
 ##### 数据库的说明
 
 模版中使用了redis作为缓存, mongo作为数据库. 两个数据源搭建都非常简单.
+
 - redis: 先下载[源码](https://redis.io/download), make, 运行 ./redis-server
 - mongo: 下载[安装包](https://www.mongodb.com/try/download/community), 运行 ./mongod
 
@@ -274,11 +334,11 @@ event.reply_text("你好").await?;
 
 每日英语模块需要运行环境已经安装ffmpeg命令, 并且依赖silk-rs, 编译silk-rs需要libclang.dll.
 
-- 下载LLVM-${version}-win64.exe并安装 : https://github.com/llvm/llvm-project/releases/ 
+- 下载LLVM-${version}-win64.exe并安装 : https://github.com/llvm/llvm-project/releases/
 - 下载ffmpeg : https://www.ffmpeg.org/download.html
 
 ##### 额外协议的说明
 
 - 本仓库开源协议与RICQ保持一致.
-  - AGPL: 现阶段协议, 您无论以任何方法使用这个库, 都需要将您的代码开源并使用AGPL协议.
-  - 如RICQ更换协议, 请以最新协议为准
+    - AGPL: 现阶段协议, 您无论以任何方法使用这个库, 都需要将您的代码开源并使用AGPL协议.
+    - 如RICQ更换协议, 请以最新协议为准
