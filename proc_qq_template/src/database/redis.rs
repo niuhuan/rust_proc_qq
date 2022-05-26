@@ -43,3 +43,14 @@ where
         .set_ex(key, value, expire_seconds)
         .await
 }
+
+#[allow(dead_code)]
+pub(crate) async fn redis_delete(key: &str) -> RedisResult<()> {
+    CLIENT
+        .get()
+        .unwrap()
+        .get_async_connection()
+        .await?
+        .del(key)
+        .await
+}
