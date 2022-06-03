@@ -283,6 +283,30 @@ impl Handler for ClientHandler {
                     ResultProcess::KickedOffline
                 );
             }
+            QEvent::GroupDisband(event) => {
+                let _ = map_handlers!(
+                    &self,
+                    &event,
+                    ModuleEventProcess::GroupDisband,
+                    ResultProcess::GroupDisband
+                );
+            }
+            QEvent::MemberPermissionChange(event) => {
+                let _ = map_handlers!(
+                    &self,
+                    &event,
+                    ModuleEventProcess::MemberPermissionChange,
+                    ResultProcess::MemberPermissionChange
+                );
+            }
+            QEvent::SelfInvited(event) => {
+                let _ = map_handlers!(
+                    &self,
+                    &event,
+                    ModuleEventProcess::SelfInvited,
+                    ResultProcess::SelfInvited
+                );
+            }
             _ => tracing::debug!(target = "proc_qq", "{:?}", e),
         }
     }

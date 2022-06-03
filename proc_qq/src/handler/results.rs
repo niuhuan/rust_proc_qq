@@ -2,8 +2,10 @@ use super::events::*;
 use async_trait::async_trait;
 use ricq::client::event::{
     DeleteFriendEvent, FriendMessageEvent, FriendMessageRecallEvent, FriendPokeEvent,
-    FriendRequestEvent, GroupLeaveEvent, GroupMessageEvent, GroupMessageRecallEvent,
-    GroupMuteEvent, GroupNameUpdateEvent, GroupRequestEvent, NewFriendEvent, TempMessageEvent,
+    FriendRequestEvent, GroupDisbandEvent, GroupLeaveEvent, GroupMessageEvent,
+    GroupMessageRecallEvent, GroupMuteEvent, GroupNameUpdateEvent, GroupRequestEvent,
+    MemberPermissionChangeEvent, NewFriendEvent, NewMemberEvent, SelfInvitedEvent,
+    TempMessageEvent,
 };
 
 pub struct ModuleInfo {
@@ -57,6 +59,11 @@ pub enum ResultProcess {
     ConnectedAndOnline(Box<dyn ConnectedAndOnlineResultHandler>),
     DisconnectAndOffline(Box<dyn DisconnectedAndOfflineResultHandler>),
 
+    GroupDisband(Box<dyn GroupDisbandResultHandler>),
+    MemberPermissionChange(Box<dyn MemberPermissionChangeResultHandler>),
+    NewMember(Box<dyn NewMemberResultHandler>),
+    SelfInvited(Box<dyn SelfInvitedResultHandler>),
+
     OnlyResult(Box<dyn OnlyResultHandler>),
 }
 
@@ -89,6 +96,14 @@ error_trait!(
     DisconnectedAndOfflineResultHandler,
     DisconnectedAndOfflineEvent
 );
+
+error_trait!(GroupDisbandResultHandler, GroupDisbandEvent);
+error_trait!(
+    MemberPermissionChangeResultHandler,
+    MemberPermissionChangeEvent
+);
+error_trait!(NewMemberResultHandler, NewMemberEvent);
+error_trait!(SelfInvitedResultHandler, SelfInvitedEvent);
 
 #[async_trait]
 pub trait OnlyResultHandler: Sync + Send {

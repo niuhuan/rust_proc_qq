@@ -121,6 +121,22 @@ pub fn event(_: TokenStream, input: TokenStream) -> TokenStream {
             quote! {::proc_qq::DisconnectedAndOfflineEventProcess},
             quote! {::proc_qq::ModuleEventProcess::DisconnectedAndOffline},
         ),
+        "& GroupDisbandEvent" => (
+            quote! {::proc_qq::GroupDisbandEventProcess},
+            quote! {::proc_qq::ModuleEventProcess::GroupDisband},
+        ),
+        "& MemberPermissionChangeEvent" => (
+            quote! {::proc_qq::MemberPermissionChangeEventProcess},
+            quote! {::proc_qq::ModuleEventProcess::MemberPermissionChange},
+        ),
+        "& NewMemberEventEvent" => (
+            quote! {::proc_qq::NewMemberEventEventProcess},
+            quote! {::proc_qq::ModuleEventProcess::NewMemberEvent},
+        ),
+        "& SelfInvitedEventEvent" => (
+            quote! {::proc_qq::SelfInvitedEventEventProcess},
+            quote! {::proc_qq::ModuleEventProcess::SelfInvitedEvent},
+        ),
         t => abort!(
             param.span(),
             format!("未知的参数类型 {}, 请在文档中查看兼容的事件以及参数类型 https://github.com/niuhuan/rust_proc_qq", t),

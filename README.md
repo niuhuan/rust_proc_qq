@@ -155,6 +155,12 @@ use ricq::client::event::{
     GroupMuteEvent, GroupNameUpdateEvent, GroupRequestEvent, KickedOfflineEvent, MSFOfflineEvent,
     NewFriendEvent, TempMessageEvent,
 };
+use ricq::client::event::{
+  GroupDisbandEvent,
+  MemberPermissionChangeEvent,
+  NewMemberEvent,
+  SelfInvitedEvent,
+};
 use proc_qq::{MessageEvent, LoginEvent, ConnectedAndOnlineEvent, DisconnectedAndOfflineEvent, };
 ```
 
