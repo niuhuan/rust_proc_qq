@@ -3,12 +3,14 @@ use proc_qq::Module;
 use std::sync::Arc;
 
 mod game;
+mod ignore;
 mod menu;
 mod query;
 mod tools;
 
 lazy_static! {
     static ref MODULES: Arc<Vec<Module>> = Arc::new(vec![
+        ignore::module(),
         menu::module(),
         game::group_sign_in::module(),
         tools::group_admin::module(),

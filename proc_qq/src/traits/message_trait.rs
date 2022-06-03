@@ -68,6 +68,8 @@ pub trait MessageSendToSourceTrait: Send + Sync + ClientTrait {
         codec: u32,
         audio_duration: Duration,
     ) -> RQResult<MessageReceipt>;
+
+    fn from_uin(&self) -> i64;
 }
 
 pub trait TextEleParseTrait {
@@ -189,6 +191,10 @@ impl MessageSendToSourceTrait for GroupMessageEvent {
             .send_group_audio(self.message.group_code, group_audio)
             .await
     }
+
+    fn from_uin(&self) -> i64 {
+        self.message.from_uin
+    }
 }
 
 impl MessageTargetTrait for FriendMessage {
@@ -291,6 +297,10 @@ impl MessageSendToSourceTrait for FriendMessageEvent {
             .send_friend_audio(self.message.from_uin, friend_audio)
             .await
     }
+
+    fn from_uin(&self) -> i64 {
+        self.message.from_uin
+    }
 }
 
 impl MessageTargetTrait for TempMessage {
@@ -385,6 +395,10 @@ impl MessageSendToSourceTrait for TempMessageEvent {
         RQResult::Err(RQError::Other(
             "tmp message not supported upload audio".to_owned(),
         ))
+    }
+
+    fn from_uin(&self) -> i64 {
+        self.message.from_uin
     }
 }
 
@@ -496,6 +510,14 @@ impl MessageSendToSourceTrait for MessageEvent {
             }
         }
         .await
+    }
+
+    fn from_uin(&self) -> i64 {
+        match self {
+            MessageEvent::GroupMessage(event) => event.from_uin(),
+            MessageEvent::FriendMessage(event) => event.from_uin(),
+            MessageEvent::TempMessage(event) => event.from_uin(),
+        }
     }
 }
 
