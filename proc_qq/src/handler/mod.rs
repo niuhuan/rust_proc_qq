@@ -156,19 +156,19 @@ impl Handler for ClientHandler {
                     ResultProcess::Message,
                 );
             }
-            QEvent::TempMessage(event) => {
+            QEvent::GroupTempMessage(event) => {
                 tracing::debug!(
                     target = "proc_qq",
                     "(UIN={}) MESSAGE : {}",
                     event.message.from_uin,
                     event.message.elements.to_string()
                 );
-                let me = MessageEvent::TempMessage(event.clone());
+                let me = MessageEvent::GroupTempMessage(event.clone());
                 let _ = map_handlers!(
                     &self,
                     &event,
-                    ModuleEventProcess::TempMessage,
-                    ResultProcess::TempMessage,
+                    ModuleEventProcess::GroupTempMessage,
+                    ResultProcess::GroupTempMessage,
                     &me,
                     ModuleEventProcess::Message,
                     ResultProcess::Message,

@@ -57,9 +57,9 @@ pub fn event(_: TokenStream, input: TokenStream) -> TokenStream {
             quote! {::proc_qq::FriendMessageEventProcess},
             quote! {::proc_qq::ModuleEventProcess::FriendMessage},
         ),
-        "& TempMessageEvent" => (
-            quote! {::proc_qq::TempMessageEventProcess},
-            quote! {::proc_qq::ModuleEventProcess::TempMessage},
+        "& GroupTempMessageEvent" => (
+            quote! {::proc_qq::GroupTempMessageEventProcess},
+            quote! {::proc_qq::ModuleEventProcess::GroupTempMessage},
         ),
         "& GroupRequestEvent" => (
             quote! {::proc_qq::GroupRequestEventProcess},

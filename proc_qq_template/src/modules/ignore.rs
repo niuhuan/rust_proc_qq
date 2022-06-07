@@ -1,7 +1,7 @@
 /// 屏蔽一些特殊账号的消息
 use proc_qq::{
-    event, module, ClientTrait, FriendMessageEvent, GroupMessageEvent, MessageEvent,
-    MessageSendToSourceTrait, Module, TempMessageEvent,
+    event, module, ClientTrait, FriendMessageEvent, GroupMessageEvent, GroupTempMessageEvent,
+    MessageEvent, MessageSendToSourceTrait, Module,
 };
 
 static ID: &'static str = "ignore";
@@ -55,7 +55,7 @@ async fn on_group_message(event: &GroupMessageEvent) -> anyhow::Result<bool> {
 }
 
 #[event]
-async fn on_temp_message(event: &TempMessageEvent) -> anyhow::Result<bool> {
+async fn on_temp_message(event: &GroupTempMessageEvent) -> anyhow::Result<bool> {
     if event.from_uin() == event.bot_uin().await || in_ignore_list(event.from_uin()) {
         Ok(true)
     } else {

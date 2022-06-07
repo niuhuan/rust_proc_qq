@@ -153,7 +153,7 @@ use ricq::client::event::{
     DeleteFriendEvent, FriendMessageEvent, FriendMessageRecallEvent, FriendPokeEvent,
     FriendRequestEvent, GroupLeaveEvent, GroupMessageEvent, GroupMessageRecallEvent,
     GroupMuteEvent, GroupNameUpdateEvent, GroupRequestEvent, KickedOfflineEvent, MSFOfflineEvent,
-    NewFriendEvent, TempMessageEvent,
+    NewFriendEvent, GroupTempMessageEvent,
 };
 use ricq::client::event::{
   GroupDisbandEvent,

@@ -1,9 +1,11 @@
 use async_trait::async_trait;
-use ricq::client::event::{FriendMessageEvent, GroupMessageEvent, TempMessageEvent};
+use ricq::client::event::{FriendMessageEvent, GroupMessageEvent, GroupTempMessageEvent};
 use ricq_core::msg::elem::{FlashImage, FriendImage, GroupImage, Text, VideoFile};
 use ricq_core::msg::MessageChain;
 use ricq_core::pb::msg::elem::Elem;
-use ricq_core::structs::{FriendMessage, GroupInfo, GroupMessage, MessageReceipt, TempMessage};
+use ricq_core::structs::{
+    FriendMessage, GroupInfo, GroupMessage, GroupTempMessage, MessageReceipt,
+};
 use ricq_core::{RQError, RQResult};
 use std::time::Duration;
 
@@ -15,7 +17,7 @@ pub enum MessageTarget {
     // Private(uin)
     Private(i64),
     // Temp(group_code,uin)
-    Temp(Option<i64>, i64),
+    GroupTemp(i64, i64),
 }
 
 pub enum UploadImage {
@@ -303,44 +305,44 @@ impl MessageSendToSourceTrait for FriendMessageEvent {
     }
 }
 
-impl MessageTargetTrait for TempMessage {
+impl MessageTargetTrait for GroupTempMessage {
     fn target(&self) -> MessageTarget {
-        MessageTarget::Temp(self.group_code, self.from_uin)
+        MessageTarget::GroupTemp(self.group_code, self.from_uin)
     }
 }
 
-impl MessageChainPointTrait for TempMessage {
+impl MessageChainPointTrait for GroupTempMessage {
     fn message_chain(&self) -> &MessageChain {
         self.elements.message_chain()
     }
 }
 
-impl MessageContentTrait for TempMessage {
+impl MessageContentTrait for GroupTempMessage {
     fn message_content(&self) -> String {
         self.message_chain().message_content()
     }
 }
 
-impl MessageTargetTrait for TempMessageEvent {
+impl MessageTargetTrait for GroupTempMessageEvent {
     fn target(&self) -> MessageTarget {
         self.message.target()
     }
 }
 
-impl MessageChainPointTrait for TempMessageEvent {
+impl MessageChainPointTrait for GroupTempMessageEvent {
     fn message_chain(&self) -> &MessageChain {
         self.message.message_chain()
     }
 }
 
-impl MessageContentTrait for TempMessageEvent {
+impl MessageContentTrait for GroupTempMessageEvent {
     fn message_content(&self) -> String {
         self.message_chain().message_content()
     }
 }
 
 #[async_trait]
-impl ClientTrait for TempMessageEvent {
+impl ClientTrait for GroupTempMessageEvent {
     async fn send_message_to_target<S: Into<MessageChain> + Send + Sync>(
         &self,
         source: &impl MessageTargetTrait,
@@ -359,7 +361,7 @@ impl ClientTrait for TempMessageEvent {
 }
 
 #[async_trait]
-impl MessageSendToSourceTrait for TempMessageEvent {
+impl MessageSendToSourceTrait for GroupTempMessageEvent {
     async fn send_message_to_source<S: Into<MessageChain> + Send + Sync>(
         &self,
         message: S,
@@ -407,7 +409,7 @@ impl MessageTargetTrait for MessageEvent {
         match self {
             MessageEvent::GroupMessage(event) => event.target(),
             MessageEvent::FriendMessage(event) => event.target(),
-            MessageEvent::TempMessage(event) => event.target(),
+            MessageEvent::GroupTempMessage(event) => event.target(),
         }
     }
 }
@@ -417,7 +419,7 @@ impl MessageChainPointTrait for MessageEvent {
         match self {
             MessageEvent::GroupMessage(event) => event.message_chain(),
             MessageEvent::FriendMessage(event) => event.message_chain(),
-            MessageEvent::TempMessage(event) => event.message_chain(),
+            MessageEvent::GroupTempMessage(event) => event.message_chain(),
         }
     }
 }
@@ -456,7 +458,7 @@ impl MessageSendToSourceTrait for MessageEvent {
         match self {
             MessageEvent::GroupMessage(event) => event.send_message_to_source(message),
             MessageEvent::FriendMessage(event) => event.send_message_to_source(message),
-            MessageEvent::TempMessage(event) => event.send_message_to_source(message),
+            MessageEvent::GroupTempMessage(event) => event.send_message_to_source(message),
         }
         .await
     }
@@ -468,7 +470,7 @@ impl MessageSendToSourceTrait for MessageEvent {
         match self {
             MessageEvent::GroupMessage(event) => event.upload_image_to_source(data),
             MessageEvent::FriendMessage(event) => event.upload_image_to_source(data),
-            MessageEvent::TempMessage(event) => event.upload_image_to_source(data),
+            MessageEvent::GroupTempMessage(event) => event.upload_image_to_source(data),
         }
         .await
     }
@@ -485,7 +487,7 @@ impl MessageSendToSourceTrait for MessageEvent {
             MessageEvent::FriendMessage(event) => {
                 event.upload_short_video_buff_to_source(data, thumb)
             }
-            MessageEvent::TempMessage(event) => {
+            MessageEvent::GroupTempMessage(event) => {
                 event.upload_short_video_buff_to_source(data, thumb)
             }
         }
@@ -505,7 +507,7 @@ impl MessageSendToSourceTrait for MessageEvent {
             MessageEvent::FriendMessage(event) => {
                 event.send_audio_to_source(data, codec, audio_duration)
             }
-            MessageEvent::TempMessage(event) => {
+            MessageEvent::GroupTempMessage(event) => {
                 event.send_audio_to_source(data, codec, audio_duration)
             }
         }
@@ -516,7 +518,7 @@ impl MessageSendToSourceTrait for MessageEvent {
         match self {
             MessageEvent::GroupMessage(event) => event.from_uin(),
             MessageEvent::FriendMessage(event) => event.from_uin(),
-            MessageEvent::TempMessage(event) => event.from_uin(),
+            MessageEvent::GroupTempMessage(event) => event.from_uin(),
         }
     }
 }

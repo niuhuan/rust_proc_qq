@@ -1,5 +1,6 @@
 use async_trait::async_trait;
 use ricq::structs::GroupInfo;
+use ricq_core::common::group_code2uin;
 use ricq_core::msg::MessageChain;
 use ricq_core::structs::MessageReceipt;
 use ricq_core::{RQError, RQResult};
@@ -30,14 +31,22 @@ impl ClientTrait for ricq::Client {
                 self.send_group_message(group_code, message).await
             }
             MessageTarget::Private(uin) => self.send_friend_message(uin, message).await,
-            MessageTarget::Temp(group_code, uin) => {
-                if let Some(group_code) = group_code {
-                    match self.send_temp_message(group_code, uin, message).await {
-                        Ok(_) => RQResult::Ok(MessageReceipt::default()),
-                        Err(err) => RQResult::Err(err),
-                    }
-                } else {
-                    RQResult::Err(RQError::Other("不存在GroupCode".to_owned()))
+            MessageTarget::GroupTemp(group_code, uin) => {
+                match self
+                    .send_message(
+                        ricq_core::pb::msg::routing_head::RoutingHead::GrpTmp(
+                            ricq_core::pb::msg::GrpTmp {
+                                group_uin: Some(group_code2uin(group_code)),
+                                to_uin: Some(uin),
+                            },
+                        ),
+                        message,
+                        None,
+                    )
+                    .await
+                {
+                    Ok(_) => RQResult::Ok(MessageReceipt::default()),
+                    Err(err) => RQResult::Err(err),
                 }
             }
         }

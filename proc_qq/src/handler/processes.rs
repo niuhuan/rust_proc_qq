@@ -4,8 +4,8 @@ use ricq::client::event::{
     DeleteFriendEvent, FriendMessageEvent, FriendMessageRecallEvent, FriendPokeEvent,
     FriendRequestEvent, GroupDisbandEvent, GroupLeaveEvent, GroupMessageEvent,
     GroupMessageRecallEvent, GroupMuteEvent, GroupNameUpdateEvent, GroupRequestEvent,
-    MemberPermissionChangeEvent, NewFriendEvent, NewMemberEvent, SelfInvitedEvent,
-    TempMessageEvent,
+    GroupTempMessageEvent, MemberPermissionChangeEvent, NewFriendEvent, NewMemberEvent,
+    SelfInvitedEvent,
 };
 
 #[macro_export]
@@ -27,7 +27,7 @@ pub struct ModuleEventHandler {
 pub enum ModuleEventProcess {
     GroupMessage(Box<dyn GroupMessageEventProcess>),
     FriendMessage(Box<dyn FriendMessageEventProcess>),
-    TempMessage(Box<dyn TempMessageEventProcess>),
+    GroupTempMessage(Box<dyn GroupTempMessageEventProcess>),
     GroupRequest(Box<dyn GroupRequestEventProcess>),
     FriendRequest(Box<dyn FriendRequestEventProcess>),
 
@@ -67,7 +67,7 @@ macro_rules! process_trait {
 
 process_trait!(GroupMessageEventProcess, GroupMessageEvent);
 process_trait!(FriendMessageEventProcess, FriendMessageEvent);
-process_trait!(TempMessageEventProcess, TempMessageEvent);
+process_trait!(GroupTempMessageEventProcess, GroupTempMessageEvent);
 
 process_trait!(GroupRequestEventProcess, GroupRequestEvent);
 process_trait!(FriendRequestEventProcess, FriendRequestEvent);
