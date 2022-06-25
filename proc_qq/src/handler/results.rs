@@ -2,9 +2,9 @@ use super::events::*;
 use async_trait::async_trait;
 use ricq::client::event::{
     DeleteFriendEvent, FriendMessageEvent, FriendMessageRecallEvent, FriendPokeEvent,
-    FriendRequestEvent, GroupDisbandEvent, GroupLeaveEvent, GroupMessageEvent,
-    GroupMessageRecallEvent, GroupMuteEvent, GroupNameUpdateEvent, GroupRequestEvent,
-    GroupTempMessageEvent, MemberPermissionChangeEvent, NewFriendEvent, NewMemberEvent,
+    GroupDisbandEvent, GroupLeaveEvent, GroupMessageEvent, GroupMessageRecallEvent, GroupMuteEvent,
+    GroupNameUpdateEvent, GroupTempMessageEvent, JoinGroupRequestEvent,
+    MemberPermissionChangeEvent, NewFriendEvent, NewFriendRequestEvent, NewMemberEvent,
     SelfInvitedEvent,
 };
 
@@ -37,8 +37,8 @@ pub enum ResultProcess {
     GroupMessage(Box<dyn GroupMessageResultHandler>),
     FriendMessage(Box<dyn FriendMessageResultHandler>),
     GroupTempMessage(Box<dyn GroupTempMessageResultHandler>),
-    GroupRequest(Box<dyn GroupRequestResultHandler>),
-    FriendRequest(Box<dyn FriendRequestResultHandler>),
+    JoinGroupRequest(Box<dyn JoinGroupRequestResultHandler>),
+    NewFriendRequest(Box<dyn NewFriendRequestResultHandler>),
 
     NewFriend(Box<dyn NewFriendResultHandler>),
     FriendPoke(Box<dyn FriendPokeResultHandler>),
@@ -71,8 +71,8 @@ error_trait!(GroupMessageResultHandler, GroupMessageEvent);
 error_trait!(FriendMessageResultHandler, FriendMessageEvent);
 error_trait!(GroupTempMessageResultHandler, GroupTempMessageEvent);
 
-error_trait!(GroupRequestResultHandler, GroupRequestEvent);
-error_trait!(FriendRequestResultHandler, FriendRequestEvent);
+error_trait!(JoinGroupRequestResultHandler, JoinGroupRequestEvent);
+error_trait!(NewFriendRequestResultHandler, NewFriendRequestEvent);
 
 error_trait!(NewFriendResultHandler, NewFriendEvent);
 error_trait!(FriendPokeResultHandler, FriendPokeEvent);

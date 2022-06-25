@@ -30,7 +30,7 @@ async fn on_message(message: &MessageEvent) -> anyhow::Result<bool> {
         return Ok(true);
     }
     if message.is_group_message() {
-        let group_code = message.as_group_message()?.message.group_code;
+        let group_code = message.as_group_message()?.inner.group_code;
         let uin = message.from_uin();
         let signs_coll: Collection<GroupSignIn> = collection("group_sign_in").await;
         if content.eq("签到") {

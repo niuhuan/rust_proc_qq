@@ -19,8 +19,8 @@ pub(crate) trait CanReply {
 #[async_trait]
 impl CanReply for GroupMessageEvent {
     async fn make_reply_chain(&self) -> MessageChain {
-        let mut at = At::new(self.message.from_uin);
-        at.display = format!("@{}", self.message.group_card);
+        let mut at = At::new(self.inner.from_uin);
+        at.display = format!("@{}", self.inner.group_card);
         MessageChain::default()
             .append(at)
             .append("\n\n".parse_text())

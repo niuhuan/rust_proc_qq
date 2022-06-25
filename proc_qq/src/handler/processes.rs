@@ -2,9 +2,9 @@ use super::events::*;
 use async_trait::async_trait;
 use ricq::client::event::{
     DeleteFriendEvent, FriendMessageEvent, FriendMessageRecallEvent, FriendPokeEvent,
-    FriendRequestEvent, GroupDisbandEvent, GroupLeaveEvent, GroupMessageEvent,
-    GroupMessageRecallEvent, GroupMuteEvent, GroupNameUpdateEvent, GroupRequestEvent,
-    GroupTempMessageEvent, MemberPermissionChangeEvent, NewFriendEvent, NewMemberEvent,
+    GroupDisbandEvent, GroupLeaveEvent, GroupMessageEvent, GroupMessageRecallEvent, GroupMuteEvent,
+    GroupNameUpdateEvent, GroupTempMessageEvent, JoinGroupRequestEvent,
+    MemberPermissionChangeEvent, NewFriendEvent, NewFriendRequestEvent, NewMemberEvent,
     SelfInvitedEvent,
 };
 
@@ -28,8 +28,8 @@ pub enum ModuleEventProcess {
     GroupMessage(Box<dyn GroupMessageEventProcess>),
     FriendMessage(Box<dyn FriendMessageEventProcess>),
     GroupTempMessage(Box<dyn GroupTempMessageEventProcess>),
-    GroupRequest(Box<dyn GroupRequestEventProcess>),
-    FriendRequest(Box<dyn FriendRequestEventProcess>),
+    JoinGroupRequest(Box<dyn JoinGroupRequestEventProcess>),
+    NewFriendRequest(Box<dyn NewFriendRequestEventProcess>),
 
     NewFriend(Box<dyn NewFriendEventProcess>),
     FriendPoke(Box<dyn FriendPokeEventProcess>),
@@ -69,8 +69,8 @@ process_trait!(GroupMessageEventProcess, GroupMessageEvent);
 process_trait!(FriendMessageEventProcess, FriendMessageEvent);
 process_trait!(GroupTempMessageEventProcess, GroupTempMessageEvent);
 
-process_trait!(GroupRequestEventProcess, GroupRequestEvent);
-process_trait!(FriendRequestEventProcess, FriendRequestEvent);
+process_trait!(JoinGroupRequestEventProcess, JoinGroupRequestEvent);
+process_trait!(NewFriendRequestEventProcess, NewFriendRequestEvent);
 
 process_trait!(NewFriendEventProcess, NewFriendEvent);
 process_trait!(FriendPokeEventProcess, FriendPokeEvent);

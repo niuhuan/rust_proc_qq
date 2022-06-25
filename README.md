@@ -23,6 +23,9 @@ RUST_PROC_QQ
 
 ## 如何使用 / demo
 
+密码登录第一次需要滑块助手 https://github.com/mzdluo123/TxCaptchaHelper
+
+
 新建一个rust项目, 并将rust环境设置为nightly
 
 ```shell
@@ -151,8 +154,8 @@ fn init_tracing_subscriber() {
 ```rust
 use ricq::client::event::{
     DeleteFriendEvent, FriendMessageEvent, FriendMessageRecallEvent, FriendPokeEvent,
-    FriendRequestEvent, GroupLeaveEvent, GroupMessageEvent, GroupMessageRecallEvent,
-    GroupMuteEvent, GroupNameUpdateEvent, GroupRequestEvent, KickedOfflineEvent, MSFOfflineEvent,
+    NewFriendRequestEvent, GroupLeaveEvent, GroupMessageEvent, GroupMessageRecallEvent,
+    GroupMuteEvent, GroupNameUpdateEvent, JoinGroupRequestEvent, KickedOfflineEvent, MSFOfflineEvent,
     NewFriendEvent, GroupTempMessageEvent,
 };
 use ricq::client::event::{

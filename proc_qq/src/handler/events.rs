@@ -1,8 +1,8 @@
 pub use ricq::client::event::{
     DeleteFriendEvent, FriendMessageEvent, FriendMessageRecallEvent, FriendPokeEvent,
-    FriendRequestEvent, GroupLeaveEvent, GroupMessageEvent, GroupMessageRecallEvent,
-    GroupMuteEvent, GroupNameUpdateEvent, GroupRequestEvent, GroupTempMessageEvent,
-    KickedOfflineEvent, MSFOfflineEvent, NewFriendEvent,
+    GroupLeaveEvent, GroupMessageEvent, GroupMessageRecallEvent, GroupMuteEvent,
+    GroupNameUpdateEvent, GroupTempMessageEvent, JoinGroupRequestEvent, KickedOfflineEvent,
+    MSFOfflineEvent, NewFriendEvent, NewFriendRequestEvent,
 };
 use ricq_core::msg::MessageChain;
 use ricq_core::{RQError, RQResult};
@@ -64,16 +64,16 @@ impl MessageEvent {
     }
     pub fn from_uin(&self) -> i64 {
         match self {
-            MessageEvent::GroupMessage(message) => message.message.from_uin,
-            MessageEvent::FriendMessage(message) => message.message.from_uin,
-            MessageEvent::GroupTempMessage(message) => message.message.from_uin,
+            MessageEvent::GroupMessage(message) => message.inner.from_uin,
+            MessageEvent::FriendMessage(message) => message.inner.from_uin,
+            MessageEvent::GroupTempMessage(message) => message.inner.from_uin,
         }
     }
     pub fn elements(&self) -> MessageChain {
         match self {
-            MessageEvent::GroupMessage(message) => &message.message.elements,
-            MessageEvent::FriendMessage(message) => &message.message.elements,
-            MessageEvent::GroupTempMessage(message) => &message.message.elements,
+            MessageEvent::GroupMessage(message) => &message.inner.elements,
+            MessageEvent::FriendMessage(message) => &message.inner.elements,
+            MessageEvent::GroupTempMessage(message) => &message.inner.elements,
         }
         .clone()
     }

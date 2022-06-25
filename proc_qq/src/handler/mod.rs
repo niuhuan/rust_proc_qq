@@ -123,9 +123,9 @@ impl Handler for ClientHandler {
                 tracing::debug!(
                     target = "proc_qq",
                     "(GROUP={}, UIN={}) MESSAGE : {}",
-                    event.message.group_code,
-                    event.message.from_uin,
-                    event.message.elements.to_string()
+                    event.inner.group_code,
+                    event.inner.from_uin,
+                    event.inner.elements.to_string()
                 );
                 let me = MessageEvent::GroupMessage(event.clone());
                 let _ = map_handlers!(
@@ -142,8 +142,8 @@ impl Handler for ClientHandler {
                 tracing::debug!(
                     target = "proc_qq",
                     "(UIN={}) MESSAGE : {}",
-                    event.message.from_uin,
-                    event.message.elements.to_string()
+                    event.inner.from_uin,
+                    event.inner.elements.to_string()
                 );
                 let me = MessageEvent::FriendMessage(event.clone());
                 let _ = map_handlers!(
@@ -160,8 +160,8 @@ impl Handler for ClientHandler {
                 tracing::debug!(
                     target = "proc_qq",
                     "(UIN={}) MESSAGE : {}",
-                    event.message.from_uin,
-                    event.message.elements.to_string()
+                    event.inner.from_uin,
+                    event.inner.elements.to_string()
                 );
                 let me = MessageEvent::GroupTempMessage(event.clone());
                 let _ = map_handlers!(
@@ -178,29 +178,29 @@ impl Handler for ClientHandler {
                 tracing::debug!(
                     target = "proc_qq",
                     "REQUEST (GROUP={}, UIN={}): {}",
-                    event.request.group_code,
-                    event.request.req_uin,
-                    event.request.message,
+                    event.inner.group_code,
+                    event.inner.req_uin,
+                    event.inner.message,
                 );
                 let _ = map_handlers!(
                     &self,
                     &event,
-                    ModuleEventProcess::GroupRequest,
-                    ResultProcess::GroupRequest,
+                    ModuleEventProcess::JoinGroupRequest,
+                    ResultProcess::JoinGroupRequest,
                 );
             }
-            QEvent::FriendRequest(event) => {
+            QEvent::NewFriendRequest(event) => {
                 tracing::debug!(
                     target = "proc_qq",
                     "REQUEST (UIN={}): {}",
-                    event.request.req_uin,
-                    event.request.message
+                    event.inner.req_uin,
+                    event.inner.message
                 );
                 let _ = map_handlers!(
                     &self,
                     &event,
-                    ModuleEventProcess::FriendRequest,
-                    ResultProcess::FriendRequest,
+                    ModuleEventProcess::NewFriendRequest,
+                    ResultProcess::NewFriendRequest,
                 );
             }
             QEvent::NewFriend(event) => {

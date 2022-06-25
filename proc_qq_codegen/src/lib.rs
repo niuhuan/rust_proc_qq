@@ -61,13 +61,13 @@ pub fn event(_: TokenStream, input: TokenStream) -> TokenStream {
             quote! {::proc_qq::GroupTempMessageEventProcess},
             quote! {::proc_qq::ModuleEventProcess::GroupTempMessage},
         ),
-        "& GroupRequestEvent" => (
-            quote! {::proc_qq::GroupRequestEventProcess},
-            quote! {::proc_qq::ModuleEventProcess::GroupRequest},
+        "& JoinGroupRequestEvent" => (
+            quote! {::proc_qq::JoinGroupRequestEventProcess},
+            quote! {::proc_qq::ModuleEventProcess::JoinGroupRequest},
         ),
-        "& FriendRequestEvent" => (
-            quote! {::proc_qq::FriendRequestEventProcess},
-            quote! {::proc_qq::ModuleEventProcess::FriendRequest},
+        "& NewFriendRequestEvent" => (
+            quote! {::proc_qq::NewFriendRequestEventProcess},
+            quote! {::proc_qq::ModuleEventProcess::NewFriendRequest},
         ),
         "& NewFriendEvent" => (
             quote! {::proc_qq::NewFriendEventProcess},

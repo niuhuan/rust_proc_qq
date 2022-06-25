@@ -114,13 +114,13 @@ impl MessageContentTrait for GroupMessage {
 
 impl MessageTargetTrait for GroupMessageEvent {
     fn target(&self) -> MessageTarget {
-        self.message.target()
+        self.inner.target()
     }
 }
 
 impl MessageChainPointTrait for GroupMessageEvent {
     fn message_chain(&self) -> &MessageChain {
-        self.message.message_chain()
+        self.inner.message_chain()
     }
 }
 
@@ -164,7 +164,7 @@ impl MessageSendToSourceTrait for GroupMessageEvent {
     ) -> RQResult<UploadImage> {
         Ok(UploadImage::GroupImage(
             self.client
-                .upload_group_image(self.message.group_code, data.into())
+                .upload_group_image(self.inner.group_code, data.into())
                 .await?,
         ))
     }
@@ -175,7 +175,7 @@ impl MessageSendToSourceTrait for GroupMessageEvent {
         thumb: S,
     ) -> RQResult<VideoFile> {
         self.client
-            .upload_group_short_video(self.message.group_code, data.into(), thumb.into())
+            .upload_group_short_video(self.inner.group_code, data.into(), thumb.into())
             .await
     }
 
@@ -187,15 +187,15 @@ impl MessageSendToSourceTrait for GroupMessageEvent {
     ) -> RQResult<MessageReceipt> {
         let group_audio = self
             .client
-            .upload_group_audio(self.message.group_code, data.into(), codec)
+            .upload_group_audio(self.inner.group_code, data.into(), codec)
             .await?;
         self.client
-            .send_group_audio(self.message.group_code, group_audio)
+            .send_group_audio(self.inner.group_code, group_audio)
             .await
     }
 
     fn from_uin(&self) -> i64 {
-        self.message.from_uin
+        self.inner.from_uin
     }
 }
 
@@ -219,13 +219,13 @@ impl MessageContentTrait for FriendMessage {
 
 impl MessageTargetTrait for FriendMessageEvent {
     fn target(&self) -> MessageTarget {
-        self.message.target()
+        self.inner.target()
     }
 }
 
 impl MessageChainPointTrait for FriendMessageEvent {
     fn message_chain(&self) -> &MessageChain {
-        self.message.message_chain()
+        self.inner.message_chain()
     }
 }
 
@@ -269,7 +269,7 @@ impl MessageSendToSourceTrait for FriendMessageEvent {
     ) -> RQResult<UploadImage> {
         Ok(UploadImage::FriendImage(
             self.client
-                .upload_friend_image(self.message.from_uin, data.into())
+                .upload_friend_image(self.inner.from_uin, data.into())
                 .await?,
         ))
     }
@@ -281,7 +281,7 @@ impl MessageSendToSourceTrait for FriendMessageEvent {
     ) -> RQResult<VideoFile> {
         // todo RICQ 并没有区分
         self.client
-            .upload_group_short_video(self.message.from_uin, data.into(), thumb.into())
+            .upload_group_short_video(self.inner.from_uin, data.into(), thumb.into())
             .await
     }
 
@@ -293,15 +293,15 @@ impl MessageSendToSourceTrait for FriendMessageEvent {
     ) -> RQResult<MessageReceipt> {
         let friend_audio = self
             .client
-            .upload_friend_audio(self.message.from_uin, data.into(), audio_duration)
+            .upload_friend_audio(self.inner.from_uin, data.into(), audio_duration)
             .await?;
         self.client
-            .send_friend_audio(self.message.from_uin, friend_audio)
+            .send_friend_audio(self.inner.from_uin, friend_audio)
             .await
     }
 
     fn from_uin(&self) -> i64 {
-        self.message.from_uin
+        self.inner.from_uin
     }
 }
 
@@ -325,13 +325,13 @@ impl MessageContentTrait for GroupTempMessage {
 
 impl MessageTargetTrait for GroupTempMessageEvent {
     fn target(&self) -> MessageTarget {
-        self.message.target()
+        self.inner.target()
     }
 }
 
 impl MessageChainPointTrait for GroupTempMessageEvent {
     fn message_chain(&self) -> &MessageChain {
-        self.message.message_chain()
+        self.inner.message_chain()
     }
 }
 
@@ -400,7 +400,7 @@ impl MessageSendToSourceTrait for GroupTempMessageEvent {
     }
 
     fn from_uin(&self) -> i64 {
-        self.message.from_uin
+        self.inner.from_uin
     }
 }
 

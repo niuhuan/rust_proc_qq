@@ -53,7 +53,7 @@ async fn on_message(event: &MessageEvent) -> anyhow::Result<bool> {
     if BAN_REGEXP.is_match(&content) {
         // todo 缓存?
         let group = event
-            .must_find_group(group_message.message.group_code)
+            .must_find_group(group_message.inner.group_code)
             .await?;
         let list = group_message
             .client
@@ -85,13 +85,13 @@ async fn on_message(event: &MessageEvent) -> anyhow::Result<bool> {
             group_message.reply_text("最多禁言29天").await?;
             return Ok(true);
         }
-        for x in group_message.message.elements.clone().into_iter() {
+        for x in group_message.inner.elements.clone().into_iter() {
             match x {
                 RQElem::At(id) => {
                     event
                         .client()
                         .group_mute(
-                            group_message.message.group_code,
+                            group_message.inner.group_code,
                             id.target,
                             Duration::from_secs(time),
                         )
