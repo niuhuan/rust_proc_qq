@@ -115,6 +115,7 @@ async fn test_qr_login() {
         .device(JsonFile("device.json")) // 设备默认值 
         .authentication(QRCode)                 // 若不成功则使用二维码登录
         .modules(vec![hello_module::module()])    // 您可以注册多个模块
+        .show_rq(Some(ShowQR::OpenBySystem))  // 自动打开二维码 在macos/linux/windows中, 不支持安卓
         .build()
         .await
         .unwrap()

@@ -1,5 +1,8 @@
-use crate::DeviceSource::{JsonFile, JsonString};
-use crate::{Authentication, ClientHandler, DeviceSource, EventResultHandler, Module};
+use std::path::Path;
+use std::process::exit;
+use std::sync::Arc;
+use std::time::Duration;
+
 use anyhow::{Context, Result};
 use bytes::{Buf, BufMut, Bytes, BytesMut};
 use ricq::ext::common::after_login;
@@ -11,12 +14,12 @@ use ricq_core::command::wtlogin::{
 use ricq_core::protocol::device::Device;
 use ricq_core::protocol::version::{Version, ANDROID_PHONE};
 use ricq_core::{RQError, RQResult, Token};
-use std::path::Path;
-use std::sync::Arc;
-use std::time::Duration;
 use tokio::net::TcpStream;
 use tokio::task::JoinHandle;
 use tokio::time::sleep;
+
+use crate::DeviceSource::{JsonFile, JsonString};
+use crate::{Authentication, ClientHandler, DeviceSource, EventResultHandler, Module};
 
 pub struct Client {
     pub rq_client: Arc<ricq::Client>,
@@ -24,6 +27,7 @@ pub struct Client {
     pub priority_session: Option<String>,
     pub(crate) modules: Arc<Vec<Module>>,
     pub(crate) result_handlers: Arc<Vec<EventResultHandler>>,
+    pub show_qr: Option<ShowQR>,
 }
 
 impl Client {
@@ -38,7 +42,6 @@ pub async fn run_client(client: Client) -> Result<()> {
         result_handlers: client.result_handlers.clone(),
     };
     // todo // max try count
-    // todo // not retry qr
     loop {
         // connect to server
         let stream = match TcpStream::connect(client.rq_client.get_address())
@@ -81,6 +84,14 @@ pub async fn run_client(client: Client) -> Result<()> {
             Err(err) => tracing::info!("{:?}", err),
         };
         let _ = event_sender.send_disconnected_and_offline().await;
+        match client.authentication {
+            Authentication::QRCode => {
+                // todo test once token
+                tracing::info!("连接已断开, QR验证模式下不进行重新登录");
+                exit(1);
+            }
+            _ => {}
+        }
         tracing::info!("连接已断开, 五秒钟之后重试");
         sleep(Duration::from_secs(5)).await;
     }
@@ -125,7 +136,7 @@ async fn token_login(client: &Client) -> bool {
 async fn login_authentication(client: &Client) -> Result<()> {
     let rq_client = client.rq_client.clone();
     match &client.authentication {
-        Authentication::QRCode => qr_login(rq_client).await,
+        Authentication::QRCode => qr_login(rq_client, client.show_qr.clone()).await,
         Authentication::UinPassword(uin, password) => {
             let first = rq_client.password_login(uin.clone(), password).await;
             loop_login(rq_client, first).await
@@ -137,7 +148,7 @@ async fn login_authentication(client: &Client) -> Result<()> {
     }
 }
 
-async fn qr_login(rq_client: Arc<ricq::Client>) -> Result<()> {
+async fn qr_login(rq_client: Arc<ricq::Client>, show_qr: Option<ShowQR>) -> Result<()> {
     let mut image_sig = Bytes::new();
     let mut resp = rq_client
         .fetch_qrcode()
@@ -154,7 +165,27 @@ async fn qr_login(rq_client: Arc<ricq::Client>) -> Result<()> {
                     .with_context(|| "failed to write file")?;
                 image_sig = sig.clone();
                 // todo 桌面环境直接打开, 服务器使用文字渲染
-                tracing::info!("二维码: qrcode.png");
+                tracing::info!("二维码被写入文件: qrcode.png, 请扫码");
+                match show_qr {
+                    Some(ShowQR::OpenBySystem) => {
+                        #[cfg(any(
+                            target_os = "windows",
+                            target_os = "linux",
+                            target_os = "macos"
+                        ))]
+                        match opener::open("qrcode.png") {
+                            Ok(_) => tracing::info!("已打开二维码图片, 请扫码"),
+                            Err(_) => tracing::warn!("未能打开二维码图片, 请手动扫码"),
+                        }
+                        #[cfg(not(any(
+                            target_os = "windows",
+                            target_os = "linux",
+                            target_os = "macos"
+                        )))]
+                        tracing::info!("当前环境不支持打开图片, 请手动扫码");
+                    }
+                    _ => tracing::info!("未设置显示二维码功能, 请手动扫码"),
+                }
             }
             QRCodeState::WaitingForScan => {
                 // tracing::info!("二维码待扫描")
@@ -320,6 +351,7 @@ pub struct ClientBuilder {
     priority_session: Option<String>,
     modules_vec: Arc<Vec<Module>>,
     result_handlers_vec: Arc<Vec<EventResultHandler>>,
+    show_qr: Option<ShowQR>,
 }
 
 impl ClientBuilder {
@@ -331,6 +363,7 @@ impl ClientBuilder {
             priority_session: None,
             modules_vec: Arc::new(vec![]),
             result_handlers_vec: Arc::new(vec![]),
+            show_qr: None,
         }
     }
 
@@ -341,6 +374,11 @@ impl ClientBuilder {
 
     pub fn result_handlers<E: Into<Arc<Vec<EventResultHandler>>>>(mut self, e: E) -> Self {
         self.result_handlers_vec = e.into();
+        self
+    }
+
+    pub fn show_rq(mut self, show_qr: Option<ShowQR>) -> Self {
+        self.show_qr = show_qr;
         self
     }
 
@@ -378,6 +416,7 @@ impl ClientBuilder {
             priority_session: self.priority_session.clone(),
             modules: self.modules_vec.clone(),
             result_handlers: self.result_handlers_vec.clone(),
+            show_qr: self.show_qr.clone(),
         })
     }
 
@@ -404,4 +443,9 @@ impl ClientBuilder {
 
 fn parse_device_json(json: &str) -> Result<Device, anyhow::Error> {
     Ok(serde_json::from_str(json).with_context(|| format!("DeviceJson解析失败"))?)
+}
+
+#[derive(Clone, Debug)]
+pub enum ShowQR {
+    OpenBySystem,
 }

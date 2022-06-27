@@ -4,7 +4,7 @@ use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 
 use proc_qq::re_exports::ricq::version::ANDROID_WATCH;
 use proc_qq::Authentication::{QRCode, UinPassword};
-use proc_qq::{ClientBuilder, DeviceSource};
+use proc_qq::{ClientBuilder, DeviceSource, ShowQR};
 
 use crate::hello_module;
 use crate::result_handlers;
@@ -18,6 +18,7 @@ async fn test_qr_login() {
         // .priority_session("session.token")
         .authentication(QRCode)
         .modules(vec![hello_module::module()])
+        .show_rq(Some(ShowQR::OpenBySystem))
         .build()
         .await
         .unwrap()
