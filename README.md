@@ -352,3 +352,10 @@ event.reply_text("你好").await?;
 - 本仓库开源协议与RICQ保持一致.
     - AGPL: 现阶段协议, 您无论以任何方法使用这个库, 都需要将您的代码开源并使用AGPL协议.
     - 如RICQ更换协议, 请以最新协议为准
+
+#### 鸣谢
+
+- RICQ commiters 
+- JetBrains IDEs
+
+![](images/JetBrains.png)
