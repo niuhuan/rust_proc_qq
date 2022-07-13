@@ -409,11 +409,14 @@ impl ClientBuilder {
         self
     }
 
+    #[cfg(all(any(target_os = "windows"), feature = "pop_window_slider"))]
     pub fn show_slider_pop_menu_if_possible(mut self) -> Self {
-        #[cfg(all(any(target_os = "windows"), feature = "pop_window_slider"))]
-        return self.show_slider(ShowSlider::PopWindow);
-        #[cfg(not(all(any(target_os = "windows"), feature = "pop_window_slider")))]
-        return self;
+        self.show_slider(ShowSlider::PopWindow)
+    }
+
+    #[cfg(not(all(any(target_os = "windows"), feature = "pop_window_slider")))]
+    pub fn show_slider_pop_menu_if_possible(self) -> Self {
+        self
     }
 
     pub async fn build(&self) -> Result<Client, anyhow::Error> {
