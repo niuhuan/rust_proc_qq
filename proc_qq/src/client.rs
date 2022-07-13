@@ -284,7 +284,7 @@ async fn loop_login(client: &Client, first: RQResult<LoginResponse>) -> Result<(
                     tracing::info!("获取到ticket : {}", txt);
                     resp = rq_client.submit_ticket(&txt).await.expect("发送ticket失败");
                 }
-                #[cfg(any(target_os = "windows"))]
+                #[cfg(all(any(target_os = "windows"), feature = "pop_window_slider"))]
                 ShowSlider::PopWindow => {
                     if let Some(ticket) =
                         crate::captcha_window::ticket(verify_url.as_ref().unwrap())
@@ -399,13 +399,13 @@ impl ClientBuilder {
         self
     }
 
-    pub fn show_rq(mut self, show_qr: Option<ShowQR>) -> Self {
-        self.show_qr = show_qr;
+    pub fn show_rq<E: Into<Option<ShowQR>>>(mut self, show_qr: E) -> Self {
+        self.show_qr = show_qr.into();
         self
     }
 
-    pub fn show_slider(mut self, show_slider: Option<ShowSlider>) -> Self {
-        self.show_slider = show_slider;
+    pub fn show_slider<E: Into<Option<ShowSlider>>>(mut self, show_slider: E) -> Self {
+        self.show_slider = show_slider.into();
         self
     }
 
@@ -486,6 +486,7 @@ pub enum ShowQR {
 #[derive(Clone, Debug)]
 pub enum ShowSlider {
     AndroidHelper,
-    #[cfg(any(target_os = "windows"))]
+
+    #[cfg(all(any(target_os = "windows"), feature = "pop_window_slider"))]
     PopWindow,
 }

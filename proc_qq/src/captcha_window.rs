@@ -1,5 +1,6 @@
 use std::collections::HashMap;
 
+use wry::application::platform::windows::EventLoopExtWindows;
 use wry::{
     application::{
         dpi::LogicalSize,
@@ -12,13 +13,14 @@ use wry::{
     webview::WebViewBuilder,
 };
 
-pub fn ticket(url: &str) -> Option<String> {
-    #[derive(Debug)]
-    enum UserEvents {
-        CloseWindow(String),
-    }
+#[derive(Debug)]
+enum UserEvents {
+    CloseWindow(String),
+}
+
+pub(crate) fn ticket(url: &str) -> Option<String> {
     let mut ticket = None;
-    let mut event_loop = EventLoop::<UserEvents>::with_user_event();
+    let mut event_loop = EventLoop::<UserEvents>::new_any_thread();
     let proxy = event_loop.create_proxy();
     let ipcproxy = proxy.clone();
     let mut windows = HashMap::new();

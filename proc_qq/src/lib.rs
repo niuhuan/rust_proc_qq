@@ -5,8 +5,8 @@ pub use handler::*;
 pub use proc_qq_codegen::*;
 pub use traits::*;
 
-#[cfg(any(target_os = "windows"))]
-mod captcha_window;
+#[cfg(all(any(target_os = "windows"), feature = "pop_window_slider"))]
+pub mod captcha_window;
 mod client;
 mod entities;
 mod handler;

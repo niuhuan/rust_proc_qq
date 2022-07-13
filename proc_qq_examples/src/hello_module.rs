@@ -62,6 +62,6 @@ async fn handle(event: &MessageEvent) -> anyhow::Result<bool> {
     Ok(true)
 }
 
-pub(crate) fn module() -> Module {
+pub fn module() -> Module {
     module!("hello", "你好", login, print, group_hello, handle,)
 }

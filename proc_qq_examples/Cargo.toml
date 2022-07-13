@@ -3,11 +3,26 @@ name = "proc_qq_examples"
 version = "0.1.0"
 edition = "2021"
 
+[[bin]]
+name = "password-login"
+path = "src/password_login/main.rs"
+
+[[bin]]
+name = "qr-login"
+path = "src/qr_login/main.rs"
+
+[[bin]]
+name = "pop-window"
+path = "src/pop_window/main.rs"
+
 [dependencies]
 proc_qq = { path = "../proc_qq" }
 anyhow = "1.0"
 tokio = { version = "1", features = ["full"] }
 tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["fmt"] }
+
+[target."pop-window".dependencies]
+proc_qq = { path = "../proc_qq", features = ["pop_window_slider"] }
 
 [lib]
