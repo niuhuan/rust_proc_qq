@@ -1,9 +1,4 @@
-use std::path::Path;
-use std::process::exit;
-use std::sync::Arc;
-use std::time::Duration;
-
-use anyhow::{Context, Result};
+use anyhow::{anyhow, Context, Result};
 use bytes::{Buf, BufMut, Bytes, BytesMut};
 use ricq::ext::common::after_login;
 use ricq_core::binary::{BinaryReader, BinaryWriter};
@@ -14,6 +9,9 @@ use ricq_core::command::wtlogin::{
 use ricq_core::protocol::device::Device;
 use ricq_core::protocol::version::{Version, ANDROID_PHONE};
 use ricq_core::{RQError, RQResult, Token};
+use std::path::Path;
+use std::sync::Arc;
+use std::time::Duration;
 use tokio::net::TcpStream;
 use tokio::task::JoinHandle;
 use tokio::time::sleep;
@@ -28,6 +26,8 @@ pub struct Client {
     pub(crate) modules: Arc<Vec<Module>>,
     pub(crate) result_handlers: Arc<Vec<EventResultHandler>>,
     pub show_qr: Option<ShowQR>,
+    pub show_slider: ShowSlider,
+    pub shutting: bool,
 }
 
 impl Client {
@@ -83,12 +83,15 @@ pub async fn run_client(client: Client) -> Result<()> {
             Ok(_) => {}
             Err(err) => tracing::info!("{:?}", err),
         };
+        if client.shutting {
+            return Ok(());
+        }
         let _ = event_sender.send_disconnected_and_offline().await;
         match client.authentication {
             Authentication::QRCode => {
                 // todo test once token
                 tracing::info!("连接已断开, QR验证模式下不进行重新登录");
-                exit(1);
+                return Err(anyhow!("exit disconnect"));
             }
             _ => {}
         }
@@ -136,19 +139,20 @@ async fn token_login(client: &Client) -> bool {
 async fn login_authentication(client: &Client) -> Result<()> {
     let rq_client = client.rq_client.clone();
     match &client.authentication {
-        Authentication::QRCode => qr_login(rq_client, client.show_qr.clone()).await,
+        Authentication::QRCode => qr_login(client, client.show_qr.clone()).await,
         Authentication::UinPassword(uin, password) => {
             let first = rq_client.password_login(uin.clone(), password).await;
-            loop_login(rq_client, first).await
+            loop_login(client, first).await
         }
         Authentication::UinPasswordMd5(uin, password) => {
             let first = rq_client.password_md5_login(uin.clone(), password).await;
-            loop_login(rq_client, first).await
+            loop_login(client, first).await
         }
     }
 }
 
-async fn qr_login(rq_client: Arc<ricq::Client>, show_qr: Option<ShowQR>) -> Result<()> {
+async fn qr_login(client: &Client, show_qr: Option<ShowQR>) -> Result<()> {
+    let rq_client = client.rq_client.clone();
     let mut image_sig = Bytes::new();
     let mut resp = rq_client
         .fetch_qrcode()
@@ -211,7 +215,7 @@ async fn qr_login(rq_client: Arc<ricq::Client>, show_qr: Option<ShowQR>) -> Resu
                 let first = rq_client
                     .qrcode_login(tmp_pwd, tmp_no_pic_sig, tgt_qr)
                     .await;
-                return loop_login(rq_client, first).await;
+                return loop_login(client, first).await;
             }
             QRCodeState::Canceled => {
                 return Err(anyhow::Error::msg("二维码已取消"));
@@ -225,7 +229,8 @@ async fn qr_login(rq_client: Arc<ricq::Client>, show_qr: Option<ShowQR>) -> Resu
     }
 }
 
-async fn loop_login(client: Arc<ricq::Client>, first: RQResult<LoginResponse>) -> Result<()> {
+async fn loop_login(client: &Client, first: RQResult<LoginResponse>) -> Result<()> {
+    let rq_client = client.rq_client.clone();
     let mut resp = first.unwrap();
     loop {
         match resp {
@@ -254,32 +259,47 @@ async fn loop_login(client: Arc<ricq::Client>, first: RQResult<LoginResponse>) -
                 // 图片应该没了
                 image_captcha: ref _image_captcha,
                 ..
-            }) => {
-                tracing::info!("滑动条 (原URL) : {:?}", verify_url);
-                let helper_url = verify_url
-                    .clone()
-                    .unwrap()
-                    .replace("ssl.captcha.qq.com", "txhelper.glitch.me");
-                tracing::info!("滑动条 (改URL) : {:?}", helper_url);
-                let mut txt = http_get(&helper_url)
-                    .await
-                    .with_context(|| "http请求失败")?;
-                tracing::info!("您需要使用该仓库 提供的APP进行滑动 , 滑动后请等待, https://github.com/mzdluo123/TxCaptchaHelper : {}", txt);
-                loop {
-                    sleep(Duration::from_secs(5)).await;
-                    let rsp = http_get(&helper_url)
+            }) => match client.show_slider {
+                ShowSlider::AndroidHelper => {
+                    tracing::info!("滑动条 (原URL) : {:?}", verify_url);
+                    let helper_url = verify_url
+                        .clone()
+                        .unwrap()
+                        .replace("ssl.captcha.qq.com", "txhelper.glitch.me");
+                    tracing::info!("滑动条 (改URL) : {:?}", helper_url);
+                    let mut txt = http_get(&helper_url)
                         .await
                         .with_context(|| "http请求失败")?;
-                    if !rsp.eq(&txt) {
-                        txt = rsp;
-                        break;
+                    tracing::info!("您需要使用该仓库 提供的APP进行滑动 , 滑动后请等待, https://github.com/mzdluo123/TxCaptchaHelper : {}", txt);
+                    loop {
+                        sleep(Duration::from_secs(5)).await;
+                        let rsp = http_get(&helper_url)
+                            .await
+                            .with_context(|| "http请求失败")?;
+                        if !rsp.eq(&txt) {
+                            txt = rsp;
+                            break;
+                        }
+                    }
+                    tracing::info!("获取到ticket : {}", txt);
+                    resp = rq_client.submit_ticket(&txt).await.expect("发送ticket失败");
+                }
+                #[cfg(any(target_os = "windows"))]
+                ShowSlider::PopWindow => {
+                    if let Some(ticket) =
+                        crate::captcha_window::ticket(verify_url.as_ref().unwrap())
+                    {
+                        resp = rq_client
+                            .submit_ticket(&ticket)
+                            .await
+                            .expect("failed to submit ticket");
+                    } else {
+                        panic!("not slide");
                     }
                 }
-                tracing::info!("获取到ticket : {}", txt);
-                resp = client.submit_ticket(&txt).await.expect("发送ticket失败");
-            }
+            },
             LoginResponse::DeviceLockLogin { .. } => {
-                resp = client
+                resp = rq_client
                     .device_lock_login()
                     .await
                     .with_context(|| "设备锁登录失败")?;
@@ -352,6 +372,7 @@ pub struct ClientBuilder {
     modules_vec: Arc<Vec<Module>>,
     result_handlers_vec: Arc<Vec<EventResultHandler>>,
     show_qr: Option<ShowQR>,
+    show_slider: Option<ShowSlider>,
 }
 
 impl ClientBuilder {
@@ -364,6 +385,7 @@ impl ClientBuilder {
             modules_vec: Arc::new(vec![]),
             result_handlers_vec: Arc::new(vec![]),
             show_qr: None,
+            show_slider: None,
         }
     }
 
@@ -379,6 +401,11 @@ impl ClientBuilder {
 
     pub fn show_rq(mut self, show_qr: Option<ShowQR>) -> Self {
         self.show_qr = show_qr;
+        self
+    }
+
+    pub fn show_slider(mut self, show_slider: Option<ShowSlider>) -> Self {
+        self.show_slider = show_slider;
         self
     }
 
@@ -417,6 +444,12 @@ impl ClientBuilder {
             modules: self.modules_vec.clone(),
             result_handlers: self.result_handlers_vec.clone(),
             show_qr: self.show_qr.clone(),
+            show_slider: if self.show_slider.is_some() {
+                self.show_slider.clone().unwrap()
+            } else {
+                ShowSlider::AndroidHelper
+            },
+            shutting: false,
         })
     }
 
@@ -448,4 +481,11 @@ fn parse_device_json(json: &str) -> Result<Device, anyhow::Error> {
 #[derive(Clone, Debug)]
 pub enum ShowQR {
     OpenBySystem,
+}
+
+#[derive(Clone, Debug)]
+pub enum ShowSlider {
+    AndroidHelper,
+    #[cfg(any(target_os = "windows"))]
+    PopWindow,
 }

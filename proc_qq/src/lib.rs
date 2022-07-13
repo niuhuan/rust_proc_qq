@@ -5,6 +5,8 @@ pub use handler::*;
 pub use proc_qq_codegen::*;
 pub use traits::*;
 
+#[cfg(any(target_os = "windows"))]
+mod captcha_window;
 mod client;
 mod entities;
 mod handler;

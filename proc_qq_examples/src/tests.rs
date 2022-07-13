@@ -1,9 +1,12 @@
 use std::sync::Arc;
+
 use tracing::Level;
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 
 use proc_qq::re_exports::ricq::version::ANDROID_WATCH;
 use proc_qq::Authentication::{QRCode, UinPassword};
+#[cfg(any(target_os = "windows"))]
+use proc_qq::ShowSlider;
 use proc_qq::{ClientBuilder, DeviceSource, ShowQR};
 
 use crate::hello_module;
@@ -31,11 +34,15 @@ async fn test_qr_login() {
 #[tokio::test]
 async fn test_password_login() {
     init_tracing_subscriber();
-    ClientBuilder::new()
+    let cb = ClientBuilder::new()
         .device(DeviceSource::JsonFile("device.json".to_owned()))
         .version(&ANDROID_WATCH)
         // .priority_session("session.token")
-        .authentication(UinPassword(123456, "password".to_owned()))
+        ;
+    // windows桌面gui滑块
+    #[cfg(any(target_os = "windows"))]
+    let cb = cb.show_slider(Some(ShowSlider::PopWindow)); // 从桌面弹出窗口进行滑块, 只支持windows
+    cb.authentication(UinPassword(123456, "password".to_owned()))
         .modules(Arc::new(vec![hello_module::module()]))
         .result_handlers(vec![result_handlers::on_result {}.into()])
         .build()
