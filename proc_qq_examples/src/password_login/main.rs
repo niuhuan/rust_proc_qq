@@ -10,6 +10,7 @@ async fn main() {
     init_tracing_subscriber();
     ClientBuilder::new()
         .authentication(Authentication::UinPasswordMd5(123456, [0; 16]))
+        .show_slider_pop_menu_if_possible()
         .device(DeviceSource::JsonFile("device.json".to_owned()))
         .version(&ANDROID_WATCH)
         .modules(vec![hello_module::module()])

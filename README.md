@@ -115,7 +115,7 @@ async fn test_qr_login() {
         .authentication(QRCode)                 // 若不成功则使用二维码登录
          // .authentication(UinPasswordMd5(config.account.uin, password)) // 账号密码登录
         .device(JsonFile("device.json")) // 设备默认值 
-         // .show_slider(Some(ShowSlider::PopWindow)) // 仅支持windows, 具体使用方法请查看example弹窗滑块
+        // .show_slider_pop_menu_if_possible() // 密码登录时, 如果是windows, 弹出一个窗口代替手机滑块 (需要启用feature=pop_window_slider)
         .modules(vec![hello_module::module()])    // 您可以注册多个模块
         .show_rq(Some(ShowQR::OpenBySystem))  // 自动打开二维码 在macos/linux/windows中, 不支持安卓
         .build()

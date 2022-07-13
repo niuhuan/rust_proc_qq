@@ -31,6 +31,7 @@ async fn main() -> anyhow::Result<()> {
         .version(&ANDROID_WATCH)
         .priority_session("session.token")
         .authentication(UinPasswordMd5(config.account.uin, password))
+        .show_slider_pop_menu_if_possible()
         .modules(modules::all_modules())
         .build()
         .await
