@@ -3,13 +3,13 @@ extern crate core;
 use tracing::Level;
 use tracing_subscriber::layer::SubscriberExt;
 use tracing_subscriber::util::SubscriberInitExt;
-
+use std::sync::Arc;
 use crate::config::load_config;
 use crate::database::mongo::init_mongo;
 use crate::database::redis::init_redis;
 use proc_qq::re_exports::ricq::version::ANDROID_WATCH;
 use proc_qq::Authentication::UinPasswordMd5;
-use proc_qq::{ClientBuilder, DeviceSource};
+use proc_qq::{ClientBuilder, DeviceSource, run_client};
 
 mod config;
 mod database;
@@ -26,7 +26,7 @@ async fn main() -> anyhow::Result<()> {
     let password_vec = hex::decode(config.account.password_md5)?;
     let mut password = [0 as u8; 16];
     password[..16].clone_from_slice(password_vec.as_slice());
-    ClientBuilder::new()
+    let client = ClientBuilder::new()
         .device(DeviceSource::JsonFile("device.json".to_owned()))
         .version(&ANDROID_WATCH)
         .priority_session("session.token")
@@ -35,11 +35,14 @@ async fn main() -> anyhow::Result<()> {
         .modules(modules::all_modules())
         .build()
         .await
-        .unwrap()
-        .start()
-        .await
-        .unwrap()
         .unwrap();
+    // 可以做一些定时任务, rq_client在一开始可能没有登录好
+    let client = Arc::new(client);
+    let copy = client.clone();
+    tokio::spawn(async move {
+        println!("{}", copy.rq_client.start_time);
+    });
+    run_client(client).await?;
     Ok(())
 }
 

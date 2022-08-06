@@ -36,7 +36,8 @@ impl Client {
     }
 }
 
-pub async fn run_client(client: Client) -> Result<()> {
+pub async fn run_client<C : Into<Arc<Client>>>(i: C) -> Result<()> {
+    let client = i.into();
     let event_sender = crate::handler::EventSender {
         modules: client.modules.clone(),
         result_handlers: client.result_handlers.clone(),
@@ -410,7 +411,7 @@ impl ClientBuilder {
     }
 
     #[cfg(all(any(target_os = "windows"), feature = "pop_window_slider"))]
-    pub fn show_slider_pop_menu_if_possible(mut self) -> Self {
+    pub fn show_slider_pop_menu_if_possible(self) -> Self {
         self.show_slider(ShowSlider::PopWindow)
     }
 
