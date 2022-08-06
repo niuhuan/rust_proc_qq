@@ -36,7 +36,7 @@ impl Client {
     }
 }
 
-pub async fn run_client<C : Into<Arc<Client>>>(i: C) -> Result<()> {
+pub async fn run_client<C: Into<Arc<Client>>>(i: C) -> Result<()> {
     let client = i.into();
     let event_sender = crate::handler::EventSender {
         modules: client.modules.clone(),
