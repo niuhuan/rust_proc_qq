@@ -251,7 +251,7 @@ ClientBuilder::new()
 
 ## 定时任务或客户端事件发送消息
 
-参考template, 使用run_client(Arc<Client>), 使得机器人与定时任务并行, 并使用rc_client发送消息
+参考template, 使用run_client(Arc\<Client\>), 使得机器人与定时任务并行, 并使用rc_client发送消息
 
 ## 手动实现handler和原理
 
