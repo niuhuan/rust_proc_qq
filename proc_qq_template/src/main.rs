@@ -1,15 +1,15 @@
 extern crate core;
 
-use tracing::Level;
-use tracing_subscriber::layer::SubscriberExt;
-use tracing_subscriber::util::SubscriberInitExt;
-use std::sync::Arc;
 use crate::config::load_config;
 use crate::database::mongo::init_mongo;
 use crate::database::redis::init_redis;
 use proc_qq::re_exports::ricq::version::ANDROID_WATCH;
 use proc_qq::Authentication::UinPasswordMd5;
-use proc_qq::{ClientBuilder, DeviceSource, run_client};
+use proc_qq::{run_client, ClientBuilder, DeviceSource};
+use std::sync::Arc;
+use tracing::Level;
+use tracing_subscriber::layer::SubscriberExt;
+use tracing_subscriber::util::SubscriberInitExt;
 
 mod config;
 mod database;
