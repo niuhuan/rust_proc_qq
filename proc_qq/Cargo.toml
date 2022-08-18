@@ -1,6 +1,6 @@
 [package]
 name = "proc_qq"
-version = "0.1.14"
+version = "0.1.15"
 edition = "2021"
 description = "QQ client framework"
 license = "MIT"
@@ -14,12 +14,13 @@ proc_qq_codegen = { path = "../proc_qq_codegen" }
 bytes = "1"
 tokio = { version = "1", features = ["full"] }
 tracing = "0"
-ricq = "0.1.16"
-ricq-core = "0.1.16"
+ricq = "0.1.17"
+ricq-core = "0.1.17"
 anyhow = "1"
 serde = "1"
 serde_json = "1"
 serde_derive = "1"
+rand = "0.8.5"
 
 [target.'cfg(any(target_os = "windows",target_os = "linux",target_os = "macos"))'.dependencies]
 opener = "0.5.0"

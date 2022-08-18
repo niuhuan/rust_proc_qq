@@ -1,5 +1,6 @@
 use anyhow::{anyhow, Context, Result};
 use bytes::{Buf, BufMut, Bytes, BytesMut};
+use rand::prelude::IteratorRandom;
 use ricq::ext::common::after_login;
 use ricq_core::binary::{BinaryReader, BinaryWriter};
 use ricq_core::command::wtlogin::{
@@ -45,7 +46,12 @@ pub async fn run_client<C: Into<Arc<Client>>>(i: C) -> Result<()> {
     // todo // max try count
     loop {
         // connect to server
-        let stream = match TcpStream::connect(client.rq_client.get_address())
+        let addresses = client.rq_client.get_address_list().await;
+        let address = addresses
+            .into_iter()
+            .choose_stable(&mut rand::thread_rng())
+            .unwrap();
+        let stream = match TcpStream::connect(address)
             .await
             .with_context(|| "连接到服务器失败")
         {
@@ -392,7 +398,7 @@ impl ClientBuilder {
     pub fn new() -> Self {
         Self {
             device_source: DeviceSource::default(),
-            version: ANDROID_PHONE,
+            version: &ANDROID_PHONE,
             authentication: None,
             priority_session: None,
             modules_vec: Arc::new(vec![]),
@@ -453,7 +459,7 @@ impl ClientBuilder {
                     }
                     JsonString(json_string) => parse_device_json(json_string)?,
                 },
-                self.version,
+                self.version.clone(),
                 ClientHandler {
                     modules: self.modules_vec.clone(),
                     result_handlers: self.result_handlers_vec.clone(),
