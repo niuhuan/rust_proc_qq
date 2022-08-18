@@ -149,6 +149,18 @@ async fn login_authentication(client: &Client) -> Result<()> {
             let first = rq_client.password_md5_login(uin.clone(), password).await;
             loop_login(client, first).await
         }
+        Authentication::CustomUinPassword(cup) => {
+            let uin = (cup.input_uin)().await?;
+            let password = (cup.input_password)().await?;
+            let first = rq_client.password_login(uin, &password).await;
+            loop_login(client, first).await
+        }
+        Authentication::CustomUinPasswordMd5(cup) => {
+            let uin = (cup.input_uin)().await?;
+            let password = (cup.input_password_md5)().await?;
+            let first = rq_client.password_md5_login(uin, &password).await;
+            loop_login(client, first).await
+        }
     }
 }
 
