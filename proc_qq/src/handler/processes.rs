@@ -8,17 +8,6 @@ use ricq::client::event::{
     SelfInvitedEvent,
 };
 
-#[macro_export]
-macro_rules! module {
-    ($id:expr,$name:expr $(, $x:tt)* $(,)?) => (
-        ::proc_qq::Module {
-            id: $id.to_owned(),
-            name: $name.to_owned(),
-            handles: vec![$($x {}.into(),)*],
-        }
-    );
-}
-
 pub struct ModuleEventHandler {
     pub name: String,
     pub process: ModuleEventProcess,
