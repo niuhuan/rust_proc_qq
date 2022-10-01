@@ -236,6 +236,42 @@ impl MessageContentTrait for FriendMessageEvent {
 }
 
 #[async_trait]
+pub trait MessageRecallTrait {
+    async fn recall(&self, receipt: MessageReceipt) -> RQResult<()>;
+}
+
+#[async_trait]
+impl MessageRecallTrait for MessageEvent {
+    async fn recall(&self, receipt: MessageReceipt) -> RQResult<()> {
+        match self {
+            MessageEvent::GroupMessage(event) => {
+                <GroupMessageEvent as MessageRecallTrait>::recall(event, receipt).await
+            }
+            MessageEvent::GroupTempMessage(_) => {
+                unimplemented!("recall for group temp message is not supported yet")
+            }
+            MessageEvent::FriendMessage(event) => {
+                <FriendMessageEvent as MessageRecallTrait>::recall(event, receipt).await
+            }
+        }
+    }
+}
+
+#[async_trait]
+impl MessageRecallTrait for GroupMessageEvent {
+    async fn recall(&self, receipt: MessageReceipt) -> RQResult<()> {
+        self.client.recall_group_message(self.inner.group_code, receipt.seqs, receipt.rands).await
+    }
+}
+
+#[async_trait]
+impl MessageRecallTrait for FriendMessageEvent {
+    async fn recall(&self, receipt: MessageReceipt) -> RQResult<()> {
+        self.client.recall_group_message(self.client.bot_uin().await, receipt.seqs, receipt.rands).await
+    }
+}
+
+#[async_trait]
 impl ClientTrait for FriendMessageEvent {
     async fn send_message_to_target<S: Into<MessageChain> + Send + Sync>(
         &self,
@@ -460,7 +496,7 @@ impl MessageSendToSourceTrait for MessageEvent {
             MessageEvent::FriendMessage(event) => event.send_message_to_source(message),
             MessageEvent::GroupTempMessage(event) => event.send_message_to_source(message),
         }
-        .await
+            .await
     }
 
     async fn upload_image_to_source<S: Into<Vec<u8>> + Send + Sync>(
@@ -472,7 +508,7 @@ impl MessageSendToSourceTrait for MessageEvent {
             MessageEvent::FriendMessage(event) => event.upload_image_to_source(data),
             MessageEvent::GroupTempMessage(event) => event.upload_image_to_source(data),
         }
-        .await
+            .await
     }
 
     async fn upload_short_video_buff_to_source<S: Into<Vec<u8>> + Send + Sync>(
@@ -491,7 +527,7 @@ impl MessageSendToSourceTrait for MessageEvent {
                 event.upload_short_video_buff_to_source(data, thumb)
             }
         }
-        .await
+            .await
     }
 
     async fn send_audio_to_source<S: Into<Vec<u8>> + Send + Sync>(
@@ -511,7 +547,7 @@ impl MessageSendToSourceTrait for MessageEvent {
                 event.send_audio_to_source(data, codec, audio_duration)
             }
         }
-        .await
+            .await
     }
 
     fn from_uin(&self) -> i64 {
