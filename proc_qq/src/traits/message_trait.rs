@@ -236,6 +236,46 @@ impl MessageContentTrait for FriendMessageEvent {
 }
 
 #[async_trait]
+pub trait MessageRecallTrait {
+    async fn recall(&self, receipt: MessageReceipt) -> RQResult<()>;
+}
+
+#[async_trait]
+impl MessageRecallTrait for MessageEvent {
+    async fn recall(&self, receipt: MessageReceipt) -> RQResult<()> {
+        match self {
+            MessageEvent::GroupMessage(event) => {
+                <GroupMessageEvent as MessageRecallTrait>::recall(event, receipt).await
+            }
+            MessageEvent::GroupTempMessage(_) => {
+                unimplemented!("recall for group temp message is not supported yet")
+            }
+            MessageEvent::FriendMessage(event) => {
+                <FriendMessageEvent as MessageRecallTrait>::recall(event, receipt).await
+            }
+        }
+    }
+}
+
+#[async_trait]
+impl MessageRecallTrait for GroupMessageEvent {
+    async fn recall(&self, receipt: MessageReceipt) -> RQResult<()> {
+        self.client
+            .recall_group_message(self.inner.group_code, receipt.seqs, receipt.rands)
+            .await
+    }
+}
+
+#[async_trait]
+impl MessageRecallTrait for FriendMessageEvent {
+    async fn recall(&self, receipt: MessageReceipt) -> RQResult<()> {
+        self.client
+            .recall_group_message(self.client.bot_uin().await, receipt.seqs, receipt.rands)
+            .await
+    }
+}
+
+#[async_trait]
 impl ClientTrait for FriendMessageEvent {
     async fn send_message_to_target<S: Into<MessageChain> + Send + Sync>(
         &self,
@@ -373,7 +413,7 @@ impl MessageSendToSourceTrait for GroupTempMessageEvent {
         &self,
         _: S,
     ) -> RQResult<UploadImage> {
-        RQResult::Err(RQError::Other(
+        Err(RQError::Other(
             "tmp message not supported upload image".to_owned(),
         ))
     }
@@ -383,7 +423,7 @@ impl MessageSendToSourceTrait for GroupTempMessageEvent {
         _data: S,
         _thumb: S,
     ) -> RQResult<VideoFile> {
-        RQResult::Err(RQError::Other(
+        Err(RQError::Other(
             "tmp message not supported upload short video".to_owned(),
         ))
     }
@@ -394,7 +434,7 @@ impl MessageSendToSourceTrait for GroupTempMessageEvent {
         _codec: u32,
         _audio_duration: Duration,
     ) -> RQResult<MessageReceipt> {
-        RQResult::Err(RQError::Other(
+        Err(RQError::Other(
             "tmp message not supported upload audio".to_owned(),
         ))
     }
