@@ -1,9 +1,12 @@
 use proc_macro::TokenStream;
 
+use proc_macro2::Span;
 use proc_macro_error::{abort, proc_macro_error};
-use quote::quote;
+use quote::{quote, ToTokens};
+use syn::parse::{Parse, ParseStream};
+use syn::punctuated::Punctuated;
 use syn::spanned::Spanned;
-use syn::{parse_macro_input, FnArg};
+use syn::{parse_macro_input, Expr, FnArg, Token};
 
 /// debug = note expanded codes if env PROC_QQ_CODEGEN_DEBUG exists
 macro_rules! emit {
@@ -222,4 +225,47 @@ pub fn result(_: TokenStream, input: TokenStream) -> TokenStream {
         });
     }
     abort!(method.span(), "现在只支持一个参数");
+}
+
+struct ModuleParams {
+    span: Span,
+    expressions: Vec<String>,
+}
+
+impl Parse for ModuleParams {
+    fn parse(input: ParseStream) -> syn::Result<Self> {
+        let span = input.span();
+        let params = Punctuated::<Expr, Token![,]>::parse_terminated(input)?;
+        Ok(ModuleParams {
+            span,
+            expressions: params
+                .into_iter()
+                .map(|param| param.to_token_stream().to_string())
+                .collect(),
+        })
+    }
+}
+
+#[proc_macro_error]
+#[proc_macro]
+pub fn module(input: TokenStream) -> TokenStream {
+    let params = parse_macro_input!(input as ModuleParams);
+    if params.expressions.len() < 2 {
+        abort!(params.span, "参数数量不足")
+    }
+    let id = &params.expressions[0];
+    let name = &params.expressions[1];
+    let mut handle_builder = String::new();
+    for i in 2..params.expressions.len() {
+        handle_builder.push_str(&format!("{} {{}}.into(),", params.expressions[i]));
+    }
+    let handle_invoker =
+        syn::parse_str::<Expr>(&format!("vec![{handle_builder}]")).expect("handle invoker解析错误");
+    TokenStream::from(quote! {
+        ::proc_qq::Module {
+            id: #id.to_owned(),
+            name: #name.to_owned(),
+            handles: #handle_invoker,
+        }
+    })
 }
