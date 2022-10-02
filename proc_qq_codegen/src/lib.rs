@@ -253,8 +253,8 @@ pub fn module(input: TokenStream) -> TokenStream {
     if params.expressions.len() < 2 {
         abort!(params.span, "参数数量不足")
     }
-    let id = &params.expressions[0];
-    let name = &params.expressions[1];
+    let id = syn::parse_str::<Expr>(&params.expressions[0]).expect("id 解析错误");
+    let name = syn::parse_str::<Expr>(&params.expressions[1]).expect("name 解析错误");
     let mut handle_builder = String::new();
     for i in 2..params.expressions.len() {
         handle_builder.push_str(&format!("{} {{}}.into(),", params.expressions[i]));
