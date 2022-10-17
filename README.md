@@ -7,6 +7,9 @@ RUST_PROC_QQ
 - Rust语言的QQ机器人框架. (基于[RICQ](https://github.com/lz1998/ricq))
 - 开箱即用, 操作简单, 代码极简
 
+
+QQ机器人框架 | [Telegram(电报)机器人框架](https://github.com/niuhuan/teleser-rs)
+
 ## 框架目的
 
 - 简单化 : 让程序员写更少的代码
