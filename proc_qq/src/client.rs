@@ -27,9 +27,10 @@ pub struct Client {
     pub priority_session: Option<String>,
     pub(crate) modules: Arc<Vec<Module>>,
     pub(crate) result_handlers: Arc<Vec<EventResultHandler>>,
-    pub show_qr: Option<ShowQR>,
+    pub show_qr: ShowQR,
     pub show_slider: ShowSlider,
     pub shutting: bool,
+    pub device_lock_verification: DeviceLockVerification,
 }
 
 impl Client {
@@ -171,7 +172,7 @@ async fn login_authentication(client: &Client) -> Result<()> {
     }
 }
 
-async fn qr_login(client: &Client, show_qr: Option<ShowQR>) -> Result<()> {
+async fn qr_login(client: &Client, show_qr: ShowQR) -> Result<()> {
     let rq_client = client.rq_client.clone();
     let mut image_sig = Bytes::new();
     let mut resp = rq_client
@@ -187,11 +188,11 @@ async fn qr_login(client: &Client, show_qr: Option<ShowQR>) -> Result<()> {
                 image_sig = sig.clone();
                 // todo 桌面环境直接打开, 服务器使用文字渲染
                 match show_qr {
-                    Some(ShowQR::OpenBySystem) => {
+                    ShowQR::OpenBySystem => {
                         tokio::fs::write("qrcode.png", &image_data)
                             .await
                             .with_context(|| "failed to write file")?;
-                        tracing::info!("二维码被写入文件: qrcode.png, 请扫码");
+                        tracing::info!("二维码被写入文件: qrcode.png");
                         #[cfg(any(
                             target_os = "windows",
                             target_os = "linux",
@@ -209,22 +210,21 @@ async fn qr_login(client: &Client, show_qr: Option<ShowQR>) -> Result<()> {
                         tracing::info!("当前环境不支持打开图片, 请手动扫码");
                     }
                     #[cfg(feature = "console_qr")]
-                    Some(ShowQR::PrintToConsole) => {
+                    ShowQR::PrintToConsole => {
                         if let Err(err) = print_qr_to_console(image_data) {
                             return Err(anyhow!("二维码打印到控制台时出现误 : {}", err));
                         }
                         tracing::info!("请扫码");
                     }
-                    Some(ShowQR::Custom(ref func)) => {
+                    ShowQR::Custom(ref func) => {
                         tracing::info!("使用自定义二维码打印");
                         func(image_data.clone()).await?;
                     }
-                    _ => {
+                    ShowQR::SaveToFile => {
                         tokio::fs::write("qrcode.png", &image_data)
                             .await
                             .with_context(|| "failed to write file")?;
                         tracing::info!("二维码被写入文件: qrcode.png, 请扫码");
-                        tracing::info!("未设置显示二维码功能, 请手动扫码");
                     }
                 }
             }
@@ -286,10 +286,20 @@ async fn loop_login(client: &Client, first: RQResult<LoginResponse>) -> Result<(
                 tracing::info!("设备锁 : {:?}", message);
                 tracing::info!("密保手机 : {:?}", sms_phone);
                 tracing::info!("验证地址 : {:?}", verify_url);
-                tracing::info!("手机打开url，处理完成后重启程序");
-                std::process::exit(0);
-                //也可以走短信验证
-                // resp = client.request_sms().await.expect("failed to request sms");
+                match &client.device_lock_verification {
+                    &DeviceLockVerification::Url => {
+                        qr2term::print_qr(
+                            verify_url
+                                .clone()
+                                .with_context(|| "未能取得设备锁验证地址")?
+                                .as_str(),
+                        )?;
+                        tracing::info!("验证地址 : {:?}", verify_url);
+                        tracing::info!("手机扫码或者打开url，处理完成后重启程序");
+                        std::process::exit(0);
+                    }
+                    &DeviceLockVerification::Sms => resp = rq_client.request_sms().await?,
+                }
             }
             LoginResponse::NeedCaptcha(LoginNeedCaptcha {
                 ref verify_url,
@@ -410,6 +420,7 @@ pub struct ClientBuilder {
     result_handlers_vec: Arc<Vec<EventResultHandler>>,
     show_qr: Option<ShowQR>,
     show_slider: Option<ShowSlider>,
+    device_lock_verification: Option<DeviceLockVerification>,
 }
 
 impl ClientBuilder {
@@ -423,6 +434,7 @@ impl ClientBuilder {
             result_handlers_vec: Arc::new(vec![]),
             show_qr: None,
             show_slider: None,
+            device_lock_verification: None,
         }
     }
 
@@ -436,23 +448,36 @@ impl ClientBuilder {
         self
     }
 
+    /// 设置显示二维码的方式
     pub fn show_rq<E: Into<Option<ShowQR>>>(mut self, show_qr: E) -> Self {
         self.show_qr = show_qr.into();
         self
     }
 
+    /// 设置显示滑动条的方式
     pub fn show_slider<E: Into<Option<ShowSlider>>>(mut self, show_slider: E) -> Self {
         self.show_slider = show_slider.into();
         self
     }
 
+    /// 设置显示滑动条的方式（如果是windows可以直接在桌面滑动）
     #[cfg(all(any(target_os = "windows"), feature = "pop_window_slider"))]
     pub fn show_slider_pop_menu_if_possible(self) -> Self {
         self.show_slider(ShowSlider::PopWindow)
     }
 
+    /// 设置显示滑动条的方式（如果是windows可以直接在桌面滑动）
     #[cfg(not(all(any(target_os = "windows"), feature = "pop_window_slider")))]
     pub fn show_slider_pop_menu_if_possible(self) -> Self {
+        self
+    }
+
+    /// 设置解锁设备所的方式
+    pub fn device_lock_verification<E: Into<Option<DeviceLockVerification>>>(
+        mut self,
+        device_lock_verification: E,
+    ) -> Self {
+        self.device_lock_verification = device_lock_verification.into();
         self
     }
 
@@ -490,11 +515,24 @@ impl ClientBuilder {
             priority_session: self.priority_session.clone(),
             modules: self.modules_vec.clone(),
             result_handlers: self.result_handlers_vec.clone(),
-            show_qr: self.show_qr.clone(),
+            show_qr: if self.show_qr.is_some() {
+                self.show_qr.clone().unwrap()
+            } else {
+                #[cfg(feature = "console_qr")]
+                let show_qr = ShowQR::PrintToConsole;
+                #[cfg(not(feature = "console_qr"))]
+                let show_qr = ShowQR::SaveToFile;
+                show_qr
+            },
             show_slider: if self.show_slider.is_some() {
                 self.show_slider.clone().unwrap()
             } else {
                 ShowSlider::AndroidHelper
+            },
+            device_lock_verification: if self.device_lock_verification.is_some() {
+                self.device_lock_verification.clone().unwrap()
+            } else {
+                DeviceLockVerification::Url
             },
             shutting: false,
         })
@@ -530,7 +568,8 @@ pub enum ShowQR {
     OpenBySystem,
     #[cfg(feature = "console_qr")]
     PrintToConsole,
-    Custom(Pin<Box<fn(bytes::Bytes) -> Pin<Box<dyn Future<Output = Result<()>> + Send>>>>),
+    Custom(Pin<Box<fn(Bytes) -> Pin<Box<dyn Future<Output = Result<()>> + Send>>>>),
+    SaveToFile,
 }
 
 #[cfg(feature = "console_qr")]
@@ -549,4 +588,10 @@ pub enum ShowSlider {
 
     #[cfg(all(any(target_os = "windows"), feature = "pop_window_slider"))]
     PopWindow,
+}
+
+#[derive(Clone, Debug)]
+pub enum DeviceLockVerification {
+    Url,
+    Sms,
 }

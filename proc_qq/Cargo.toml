@@ -1,6 +1,6 @@
 [package]
 name = "proc_qq"
-version = "0.1.18"
+version = "0.1.19"
 edition = "2021"
 description = "QQ client framework"
 license = "MIT"
@@ -21,7 +21,7 @@ serde = "1"
 serde_json = "1"
 serde_derive = "1"
 rand = "0.8.5"
-qr2term = { version = "0.3.1", optional = true }
+qr2term = { version = "0.3.1" }
 rqrr = { version = "0.5.2", optional = true }
 image = { version = "0.24.0", features = ["png", "jpeg", "bmp", "gif", "webp"], optional = true }
 
@@ -37,4 +37,4 @@ wry = { version = "0.19.0", optional = true }
 [features]
 default = ["pop_window_slider", "console_qr"]
 pop_window_slider = ["dep:wry"]
-console_qr = ["dep:qr2term", "dep:rqrr", "dep:image"]
+console_qr = ["dep:rqrr", "dep:image"]

@@ -3,7 +3,6 @@ pub mod async_trait;
 pub mod bytes;
 #[cfg(feature = "console_qr")]
 pub mod image;
-#[cfg(feature = "console_qr")]
 pub mod qr2term;
 pub mod reqwest;
 pub mod ricq;
