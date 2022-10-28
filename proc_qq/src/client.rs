@@ -183,14 +183,14 @@ async fn qr_login(client: &Client, show_qr: Option<ShowQR>) -> Result<()> {
                 ref image_data,
                 ref sig,
             }) => {
-                tokio::fs::write("qrcode.png", &image_data)
-                    .await
-                    .with_context(|| "failed to write file")?;
                 image_sig = sig.clone();
                 // todo 桌面环境直接打开, 服务器使用文字渲染
-                tracing::info!("二维码被写入文件: qrcode.png, 请扫码");
                 match show_qr {
                     Some(ShowQR::OpenBySystem) => {
+                        tokio::fs::write("qrcode.png", &image_data)
+                            .await
+                            .with_context(|| "failed to write file")?;
+                        tracing::info!("二维码被写入文件: qrcode.png, 请扫码");
                         #[cfg(any(
                             target_os = "windows",
                             target_os = "linux",
@@ -207,7 +207,20 @@ async fn qr_login(client: &Client, show_qr: Option<ShowQR>) -> Result<()> {
                         )))]
                         tracing::info!("当前环境不支持打开图片, 请手动扫码");
                     }
-                    _ => tracing::info!("未设置显示二维码功能, 请手动扫码"),
+                    #[cfg(feature = "console_qr")]
+                    Some(ShowQR::PrintToConsole) => {
+                        if let Err(err) = print_qr_to_console(image_data) {
+                            return Err(anyhow!("二维码打印到控制台时出现误 : {}", err));
+                        }
+                        tracing::info!("请扫码");
+                    }
+                    _ => {
+                        tokio::fs::write("qrcode.png", &image_data)
+                            .await
+                            .with_context(|| "failed to write file")?;
+                        tracing::info!("二维码被写入文件: qrcode.png, 请扫码");
+                        tracing::info!("未设置显示二维码功能, 请手动扫码");
+                    }
                 }
             }
             QRCodeState::WaitingForScan => {
@@ -510,6 +523,18 @@ fn parse_device_json(json: &str) -> Result<Device, anyhow::Error> {
 #[derive(Clone, Debug)]
 pub enum ShowQR {
     OpenBySystem,
+    #[cfg(feature = "console_qr")]
+    PrintToConsole,
+}
+
+#[cfg(feature = "console_qr")]
+fn print_qr_to_console(buff: &Bytes) -> Result<()> {
+    let img = image::load_from_memory(buff)?.into_luma8();
+    let mut img = rqrr::PreparedImage::prepare(img);
+    let grids = img.detect_grids();
+    let (_, content) = grids.get(0).with_context(|| "未能识别出二维码")?.decode()?;
+    qr2term::print_qr(content.as_str())?;
+    Ok(())
 }
 
 #[derive(Clone, Debug)]

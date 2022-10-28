@@ -1,9 +1,15 @@
 pub mod anyhow;
 pub mod async_trait;
 pub mod bytes;
+#[cfg(feature = "console_qr")]
+pub mod image;
+#[cfg(feature = "console_qr")]
+pub mod qr2term;
 pub mod reqwest;
 pub mod ricq;
 pub mod ricq_core;
+#[cfg(feature = "console_qr")]
+pub mod rqrr;
 pub mod serde;
 pub mod serde_derive;
 pub mod serde_json;
