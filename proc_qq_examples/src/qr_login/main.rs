@@ -10,7 +10,7 @@ async fn main() {
     init_tracing_subscriber();
     ClientBuilder::new()
         .authentication(Authentication::QRCode)
-        .show_rq(ShowQR::PrintToConsole)
+        .show_rq(ShowQR::OpenBySystem)
         .device(DeviceSource::JsonFile("device.json".to_owned()))
         .version(&ANDROID_WATCH)
         .modules(vec![hello_module::module()])

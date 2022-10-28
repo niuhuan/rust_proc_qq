@@ -108,8 +108,6 @@ use proc_qq::ClientBuilder;
 mod hello_module;
 
 /// 启动并使用为二维码登录
-/// 注意，这里使用的设备必须支持二维码登录，例如安卓手表
-/// 如果您使用为不支持的协议协议，则会登录失败，例如安卓QQ
 #[tokio::test]
 async fn test_qr_login() {
     // 初始化日志打印
@@ -117,14 +115,15 @@ async fn test_qr_login() {
     // 使用builder创建
     ClientBuilder::new()
         // .priority_session("session.token")      // 使用session.token登录
-        .authentication(QRCode)                 // 若不成功则使用二维码登录
-         // .authentication(UinPasswordMd5(config.account.uin, password)) // 账号密码登录
+        .authentication(QRCode)                    // 若不成功则使用二维码登录
+        // 注意，这里使用的设备必须支持二维码登录，例如安卓手表
+        // 如果您使用为不支持的协议协议，则会登录失败，例如安卓QQ 
+        // .authentication(UinPasswordMd5(config.account.uin, password)) // 账号密码登录
         .device(JsonFile("device.json")) // 设备默认值 
         .version(&ANDROID_WATCH)  // 安卓手表支持扫码登录
         // .show_slider_pop_menu_if_possible() // 密码登录时, 如果是windows, 弹出一个窗口代替手机滑块 (需要启用feature=pop_window_slider)
         .modules(vec![hello_module::module()])    // 您可以注册多个模块
         .show_rq(Some(ShowQR::OpenBySystem))  // 自动打开二维码 在macos/linux/windows中, 不支持安卓
-        // .show_rq(Some(ShowQR::PrintToConsole))  // 打印二维码到控制台
         .build()
         .await
         .unwrap()
@@ -158,6 +157,18 @@ fn init_tracing_subscriber() {
 ![demo](images/demo_01.jpg)
 
 ## 功能
+
+### 登录
+
+```rust
+    // .show_rq(Some(ShowQR::PrintToConsole))  // 打印二维码到控制台
+    // .show_rq(ShowQR::Custom(Box::pin(|buff| {  // 自定义显示二维码
+    //   Box::pin(async move {
+    //     println!("buff : {:?}", buff.to_vec());
+    //     Ok(())
+    //   })
+    // })))
+```
 
 ### 支持的事件
 

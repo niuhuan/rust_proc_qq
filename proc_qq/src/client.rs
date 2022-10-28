@@ -1,5 +1,8 @@
+use crate::DeviceSource::{JsonFile, JsonString};
+use crate::{Authentication, ClientHandler, DeviceSource, EventResultHandler, Module};
 use anyhow::{anyhow, Context, Result};
 use bytes::{Buf, BufMut, Bytes, BytesMut};
+use core::future::Future;
 use rand::prelude::IteratorRandom;
 use ricq::ext::common::after_login;
 use ricq_core::binary::{BinaryReader, BinaryWriter};
@@ -11,14 +14,12 @@ use ricq_core::protocol::device::Device;
 use ricq_core::protocol::version::{Version, ANDROID_PHONE};
 use ricq_core::{RQError, RQResult, Token};
 use std::path::Path;
+use std::pin::Pin;
 use std::sync::Arc;
 use std::time::Duration;
 use tokio::net::TcpStream;
 use tokio::task::JoinHandle;
 use tokio::time::sleep;
-
-use crate::DeviceSource::{JsonFile, JsonString};
-use crate::{Authentication, ClientHandler, DeviceSource, EventResultHandler, Module};
 
 pub struct Client {
     pub rq_client: Arc<ricq::Client>,
@@ -213,6 +214,10 @@ async fn qr_login(client: &Client, show_qr: Option<ShowQR>) -> Result<()> {
                             return Err(anyhow!("二维码打印到控制台时出现误 : {}", err));
                         }
                         tracing::info!("请扫码");
+                    }
+                    Some(ShowQR::Custom(ref func)) => {
+                        tracing::info!("使用自定义二维码打印");
+                        func(image_data.clone()).await?;
                     }
                     _ => {
                         tokio::fs::write("qrcode.png", &image_data)
@@ -525,6 +530,7 @@ pub enum ShowQR {
     OpenBySystem,
     #[cfg(feature = "console_qr")]
     PrintToConsole,
+    Custom(Pin<Box<fn(bytes::Bytes) -> Pin<Box<dyn Future<Output = Result<()>> + Send>>>>),
 }
 
 #[cfg(feature = "console_qr")]
