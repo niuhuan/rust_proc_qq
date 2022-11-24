@@ -30,7 +30,7 @@ pub enum Authentication {
 
 #[derive(Clone)]
 pub struct CallBackWrapper {
-    pub callback: Pin<Box<fn(Arc<ricq::Client>) -> Authentication>>,
+    pub callback: Pin<Box<fn(Arc<ricq::Client>) -> Option<Authentication>>>,
     recursive_times: Rc<RefCell<u8>>,
 }
 
@@ -44,7 +44,10 @@ impl Debug for CallBackWrapper {
 }
 
 impl CallBackWrapper {
-    pub fn new(callback: fn(Arc<ricq::Client>) -> Authentication, recursive_times: u8) -> Self {
+    pub fn new(
+        callback: fn(Arc<ricq::Client>) -> Option<Authentication>,
+        recursive_times: u8,
+    ) -> Self {
         CallBackWrapper {
             callback: Pin::new(Box::new(callback)),
             recursive_times: Rc::new(RefCell::new(recursive_times)),
