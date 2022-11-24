@@ -3,6 +3,8 @@ use crate::{Authentication, ClientHandler, DeviceSource, EventResultHandler, Mod
 use anyhow::{anyhow, Context, Result};
 use bytes::{Buf, BufMut, Bytes, BytesMut};
 use core::future::Future;
+use futures::future::BoxFuture;
+use futures::FutureExt;
 use rand::prelude::IteratorRandom;
 use ricq::ext::common::after_login;
 use ricq_core::binary::{BinaryReader, BinaryWriter};
@@ -146,30 +148,54 @@ async fn token_login(client: &Client) -> bool {
 }
 
 async fn login_authentication(client: &Client) -> Result<()> {
-    let rq_client = client.rq_client.clone();
-    match &client.authentication {
-        Authentication::QRCode => qr_login(client, client.show_qr.clone()).await,
-        Authentication::UinPassword(uin, password) => {
-            let first = rq_client.password_login(uin.clone(), password).await;
-            loop_login(client, first).await
-        }
-        Authentication::UinPasswordMd5(uin, password) => {
-            let first = rq_client.password_md5_login(uin.clone(), password).await;
-            loop_login(client, first).await
-        }
-        Authentication::CustomUinPassword(cup) => {
-            let uin = (cup.input_uin)().await?;
-            let password = (cup.input_password)().await?;
-            let first = rq_client.password_login(uin, &password).await;
-            loop_login(client, first).await
-        }
-        Authentication::CustomUinPasswordMd5(cup) => {
-            let uin = (cup.input_uin)().await?;
-            let password = (cup.input_password_md5)().await?;
-            let first = rq_client.password_md5_login(uin, &password).await;
-            loop_login(client, first).await
+    authenticate(&client.authentication, client).await
+}
+
+fn authenticate<'a>(
+    authentication: &'a Authentication,
+    client: &'a Client,
+) -> BoxFuture<'a, Result<()>> {
+    async move {
+        let rq_client = client.rq_client.clone();
+        match authentication {
+            Authentication::QRCode => qr_login(client, client.show_qr.clone()).await,
+            Authentication::UinPassword(uin, password) => {
+                let first = rq_client.password_login(uin.clone(), password).await;
+                loop_login(client, first).await
+            }
+            Authentication::UinPasswordMd5(uin, password) => {
+                let first = rq_client.password_md5_login(uin.clone(), password).await;
+                loop_login(client, first).await
+            }
+            Authentication::CustomUinPassword(cup) => {
+                let uin = (cup.input_uin)().await?;
+                let password = (cup.input_password)().await?;
+                let first = rq_client.password_login(uin, &password).await;
+                loop_login(client, first).await
+            }
+            Authentication::CustomUinPasswordMd5(cup) => {
+                let uin = (cup.input_uin)().await?;
+                let password = (cup.input_password_md5)().await?;
+                let first = rq_client.password_md5_login(uin, &password).await;
+                loop_login(client, first).await
+            }
+            Authentication::CallBack(wrapper) => {
+                let callback_authentication = (wrapper.clone().callback)(rq_client);
+                match callback_authentication {
+                    Authentication::CallBack(_) => {
+                        if wrapper.can_recursive() {
+                            authenticate(&callback_authentication, client)
+                        } else {
+                            panic!("回调超出次数限制！")
+                        }
+                    }
+                    _ => authenticate(&callback_authentication, client),
+                }
+                .await
+            }
         }
     }
+    .boxed()
 }
 
 async fn qr_login(client: &Client, show_qr: ShowQR) -> Result<()> {
