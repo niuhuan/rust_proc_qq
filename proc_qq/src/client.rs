@@ -182,15 +182,14 @@ fn authenticate<'a>(
             Authentication::CallBack(wrapper) => {
                 let callback_authentication = (wrapper.clone().callback)(rq_client);
                 match callback_authentication {
-                    Some(authentication) => match authentication {
-                        Authentication::CallBack(_) => {
-                            Err(anyhow::Error::msg("登录失败: 嵌套的回调函数"))
-                        }
-                        _ => authenticate(&authentication, client).await,
-                    },
-                    None => Err(anyhow::Error::msg("放弃登录")),
+                    Authentication::CallBack(_) => {
+                        Err(anyhow::Error::msg("登录失败: 嵌套的回调函数"))
+                    }
+                    Authentication::Abandon => Err(anyhow::Error::msg("放弃登录")),
+                    _ => authenticate(&authentication, client).await,
                 }
             }
+            Authentication::Abandon => Err(anyhow::Error::msg("放弃登录")),
         }
     }
     .boxed()

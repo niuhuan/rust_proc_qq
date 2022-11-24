@@ -24,11 +24,12 @@ pub enum Authentication {
     CustomUinPassword(CustomUinPassword),
     CustomUinPasswordMd5(CustomUinPasswordMd5),
     CallBack(CallBackWrapper),
+    Abandon,
 }
 
 #[derive(Clone)]
 pub struct CallBackWrapper {
-    pub callback: Pin<Box<fn(Arc<ricq::Client>) -> Option<Authentication>>>,
+    pub callback: Pin<Box<fn(Arc<ricq::Client>) -> Authentication>>,
 }
 
 unsafe impl Send for CallBackWrapper {}
@@ -41,7 +42,7 @@ impl Debug for CallBackWrapper {
 }
 
 impl CallBackWrapper {
-    pub fn new(callback: fn(Arc<ricq::Client>) -> Option<Authentication>) -> Self {
+    pub fn new(callback: fn(Arc<ricq::Client>) -> Authentication) -> Self {
         CallBackWrapper {
             callback: Pin::new(Box::new(callback)),
         }
