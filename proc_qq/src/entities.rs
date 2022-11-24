@@ -1,9 +1,7 @@
 use crate::DeviceSource::JsonFile;
-use std::cell::RefCell;
 use std::fmt::{Debug, Formatter};
 use std::future::Future;
 use std::pin::Pin;
-use std::rc::Rc;
 use std::sync::Arc;
 
 #[derive(Debug, Clone)]
@@ -31,7 +29,6 @@ pub enum Authentication {
 #[derive(Clone)]
 pub struct CallBackWrapper {
     pub callback: Pin<Box<fn(Arc<ricq::Client>) -> Option<Authentication>>>,
-    recursive_times: Rc<RefCell<u8>>,
 }
 
 unsafe impl Send for CallBackWrapper {}
@@ -44,19 +41,10 @@ impl Debug for CallBackWrapper {
 }
 
 impl CallBackWrapper {
-    pub fn new(
-        callback: fn(Arc<ricq::Client>) -> Option<Authentication>,
-        recursive_times: u8,
-    ) -> Self {
+    pub fn new(callback: fn(Arc<ricq::Client>) -> Option<Authentication>) -> Self {
         CallBackWrapper {
             callback: Pin::new(Box::new(callback)),
-            recursive_times: Rc::new(RefCell::new(recursive_times)),
         }
-    }
-
-    pub fn can_recursive(&self) -> bool {
-        *self.recursive_times.borrow_mut() -= 1;
-        *self.recursive_times.borrow() > 0
     }
 }
 
