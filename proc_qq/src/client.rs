@@ -182,16 +182,21 @@ fn authenticate<'a>(
             Authentication::CallBack(wrapper) => {
                 let callback_authentication = (wrapper.clone().callback)(rq_client);
                 match callback_authentication {
-                    Authentication::CallBack(_) => {
-                        if wrapper.can_recursive() {
-                            authenticate(&callback_authentication, client)
-                        } else {
-                            panic!("回调超出次数限制！")
+                    Some(authentication) => {
+                        match authentication {
+                            Authentication::CallBack(_) => {
+                                if wrapper.can_recursive() {
+                                    authenticate(&authentication, client)
+                                } else {
+                                    panic!("回调超出次数限制！")
+                                }
+                            }
+                            _ => authenticate(&authentication, client),
                         }
+                        .await
                     }
-                    _ => authenticate(&callback_authentication, client),
+                    None => Err(anyhow::Error::msg("放弃登录")),
                 }
-                .await
             }
         }
     }
