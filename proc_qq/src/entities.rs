@@ -1,6 +1,10 @@
 use crate::DeviceSource::JsonFile;
+use std::cell::RefCell;
+use std::fmt::{Debug, Formatter};
 use std::future::Future;
 use std::pin::Pin;
+use std::rc::Rc;
+use std::sync::Arc;
 
 #[derive(Debug, Clone)]
 pub enum DeviceSource {
@@ -21,6 +25,36 @@ pub enum Authentication {
     UinPasswordMd5(i64, [u8; 16]),
     CustomUinPassword(CustomUinPassword),
     CustomUinPasswordMd5(CustomUinPasswordMd5),
+    CallBack(CallBackWrapper),
+}
+
+#[derive(Clone)]
+pub struct CallBackWrapper {
+    pub callback: Pin<Box<fn(Arc<ricq::Client>) -> Authentication>>,
+    recursive_times: Rc<RefCell<u8>>,
+}
+
+unsafe impl Send for CallBackWrapper {}
+unsafe impl Sync for CallBackWrapper {}
+
+impl Debug for CallBackWrapper {
+    fn fmt(&self, mut f: &mut Formatter<'_>) -> std::fmt::Result {
+        write!(&mut f, "回调函数决定返回决定是放弃登录, 还是扫码, 还是密码")
+    }
+}
+
+impl CallBackWrapper {
+    pub fn new(callback: fn(Arc<ricq::Client>) -> Authentication, recursive_times: u8) -> Self {
+        CallBackWrapper {
+            callback: Pin::new(Box::new(callback)),
+            recursive_times: Rc::new(RefCell::new(recursive_times)),
+        }
+    }
+
+    pub fn can_recursive(&self) -> bool {
+        *self.recursive_times.borrow_mut() -= 1;
+        *self.recursive_times.borrow() > 0
+    }
 }
 
 #[derive(Debug, Clone)]
