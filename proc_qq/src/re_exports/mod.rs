@@ -4,6 +4,7 @@ pub mod bytes;
 #[cfg(feature = "console_qr")]
 pub mod image;
 pub mod qr2term;
+pub mod regex;
 pub mod reqwest;
 pub mod ricq;
 pub mod ricq_core;
