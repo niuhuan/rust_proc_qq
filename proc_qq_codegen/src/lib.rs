@@ -1,12 +1,16 @@
 use proc_macro::TokenStream;
 
+use crate::Arg::Regexp;
 use proc_macro2::Span;
 use proc_macro_error::{abort, proc_macro_error};
 use quote::{quote, ToTokens};
 use syn::parse::{Parse, ParseStream};
 use syn::punctuated::Punctuated;
 use syn::spanned::Spanned;
-use syn::{parse_macro_input, Expr, FnArg, Token};
+use syn::Lit::Str;
+use syn::Meta::{List, NameValue, Path};
+use syn::NestedMeta::{Lit, Meta};
+use syn::{parse_macro_input, Expr, FnArg, NestedMeta, Token};
 
 /// debug = note expanded codes if env PROC_QQ_CODEGEN_DEBUG exists
 macro_rules! emit {
@@ -25,10 +29,51 @@ macro_rules! emit {
     }};
 }
 
+#[derive(Clone, Debug)]
+enum Arg {
+    All(Vec<Arg>),
+    Any(Vec<Arg>),
+    Not(Vec<Arg>),
+    Regexp(String),
+    Eq(String),
+}
+
+// todo 递归匹配表达式
+fn parse_children(children: Vec<NestedMeta>) -> Vec<Arg> {
+    let mut children_args = vec![];
+    for nm in children {
+        match nm {
+            Meta(meta) => match meta {
+                Path(_) => {}
+                List(_) => {}
+                NameValue(nv) => {
+                    if nv.path.segments.len() != 1 {
+                        abort!(&nv.span(), "表达式有且只能有一个片段");
+                    }
+                    let indent = nv.path.segments.first().unwrap().ident.to_string();
+                    match indent.as_str() {
+                        "regexp" => match nv.lit {
+                            Str(value) => {
+                                children_args.push(Regexp(value.value()));
+                            }
+                            _ => abort!(&indent.span(), "regexp只支持字符串类型参数值"),
+                        },
+                        _ => abort!(&indent.span(), "不支持的参数名称"),
+                    }
+                }
+            },
+            Lit(_) => (),
+        }
+    }
+    children_args
+}
+
 /// event proc
 #[proc_macro_error]
 #[proc_macro_attribute]
-pub fn event(_: TokenStream, input: TokenStream) -> TokenStream {
+pub fn event(args: TokenStream, input: TokenStream) -> TokenStream {
+    let attrs = parse_macro_input!(args as syn::AttributeArgs);
+    let all = parse_children(attrs);
     // must append to async fn
     let method = parse_macro_input!(input as syn::ItemFn);
     if method.sig.asyncness.is_none() {
@@ -154,13 +199,29 @@ pub fn event(_: TokenStream, input: TokenStream) -> TokenStream {
         #[allow(non_camel_case_types)]
         pub struct #ident {}
     };
+    // gen trait
     let block = &method.block;
-    let build_trait = quote! {
-        #[::proc_qq::re_exports::async_trait::async_trait]
-        impl #trait_name for #ident {
-            async fn handle(&self, #param_pat: #param_ty) -> ::proc_qq::re_exports::anyhow::Result<bool> #block
+    let build_trait = if all.is_empty() {
+        quote! {
+            #[::proc_qq::re_exports::async_trait::async_trait]
+            impl #trait_name for #ident {
+                async fn handle(&self, #param_pat: #param_ty) -> ::proc_qq::re_exports::anyhow::Result<bool> #block
+            }
+        }
+    } else {
+        // todo 生成规则代码
+        quote! {
+            #[::proc_qq::re_exports::async_trait::async_trait]
+            impl #trait_name for #ident {
+                async fn handle(&self, #param_pat: #param_ty) -> ::proc_qq::re_exports::anyhow::Result<bool> {
+                    // todo 这里进行判断是否命中， enum Arg 需要复制到proc_qq一份，并且调用proc_qq种的一个函数去处理
+                    raw(#param_pat).await
+                }
+                async fn raw(&self, #param_pat: #param_ty) -> ::proc_qq::re_exports::anyhow::Result<bool> #block
+            }
         }
     };
+    // gen into
     let build_into = quote! {
         impl Into<::proc_qq::ModuleEventHandler> for #ident {
             fn into(self) -> ::proc_qq::ModuleEventHandler {
@@ -171,6 +232,7 @@ pub fn event(_: TokenStream, input: TokenStream) -> TokenStream {
             }
         }
     };
+    // emit
     emit!(quote! {
         #build_struct
         #build_trait
