@@ -1,3 +1,4 @@
+use crate::MessageContentTrait;
 use async_trait::async_trait;
 pub use events::*;
 pub use processes::*;
@@ -345,5 +346,81 @@ impl EventSender {
             MapResult::Exception(_, _) => Err(anyhow::Error::msg("err")),
             _ => Ok(()),
         }
+    }
+}
+
+#[derive(Clone, Debug)]
+pub enum EventArg {
+    All(Vec<EventArg>),
+    Any(Vec<EventArg>),
+    Not(Vec<EventArg>),
+    Regexp(String),
+    Eq(String),
+}
+
+#[derive(Clone, Debug)]
+pub enum HandEvent {
+    MessageEvent(String),
+}
+
+impl HandEvent {
+    fn content(&self) -> ::anyhow::Result<String> {
+        Ok(match self {
+            HandEvent::MessageEvent(c) => c.clone(),
+        })
+    }
+}
+
+impl From<&MessageEvent> for HandEvent {
+    fn from(value: &MessageEvent) -> Self {
+        Self::MessageEvent(value.message_content())
+    }
+}
+
+pub fn match_event_args_all(args: Vec<EventArg>, event: HandEvent) -> ::anyhow::Result<bool> {
+    for x in args {
+        if !match_event_item(x, event.clone())? {
+            return Ok(false);
+        }
+    }
+    // 一个条件都没有认为是true
+    Ok(true)
+}
+
+fn match_event_args_any(args: Vec<EventArg>, event: HandEvent) -> ::anyhow::Result<bool> {
+    for x in args {
+        if match_event_item(x, event.clone())? {
+            return Ok(true);
+        }
+    }
+    // 一个条件都没有认为是false
+    Ok(false)
+}
+
+fn match_event_args_not(args: Vec<EventArg>, event: HandEvent) -> ::anyhow::Result<bool> {
+    for x in args {
+        if match_event_item(x, event.clone())? {
+            return Ok(false);
+        }
+    }
+    // 一个条件都没有认为是true
+    Ok(true)
+}
+
+fn match_event_args_regexp(args: String, event: HandEvent) -> ::anyhow::Result<bool> {
+    Ok(regex::Regex::new(args.as_str())?.is_match(event.content()?.as_str()))
+}
+
+fn match_event_args_eq(args: String, event: HandEvent) -> ::anyhow::Result<bool> {
+    Ok(args.eq(event.content()?.as_str()))
+}
+
+fn match_event_item(arg: EventArg, event: HandEvent) -> ::anyhow::Result<bool> {
+    match arg {
+        EventArg::All(v) => match_event_args_all(v, event.clone()),
+        EventArg::Any(v) => match_event_args_any(v, event.clone()),
+        EventArg::Not(v) => match_event_args_not(v, event.clone()),
+        EventArg::Regexp(v) => match_event_args_regexp(v, event.clone()),
+        EventArg::Eq(v) => match_event_args_eq(v, event.clone()),
     }
 }

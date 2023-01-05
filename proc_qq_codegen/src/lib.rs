@@ -1,9 +1,9 @@
 use proc_macro::TokenStream;
 
-use crate::Arg::Regexp;
+use crate::EventArg::{All, Any, Eq, Not, Regexp};
 use proc_macro2::Span;
 use proc_macro_error::{abort, proc_macro_error};
-use quote::{quote, ToTokens};
+use quote::{quote, ToTokens, TokenStreamExt};
 use syn::parse::{Parse, ParseStream};
 use syn::punctuated::Punctuated;
 use syn::spanned::Spanned;
@@ -30,22 +30,51 @@ macro_rules! emit {
 }
 
 #[derive(Clone, Debug)]
-enum Arg {
-    All(Vec<Arg>),
-    Any(Vec<Arg>),
-    Not(Vec<Arg>),
+enum EventArg {
+    All(Vec<EventArg>),
+    Any(Vec<EventArg>),
+    Not(Vec<EventArg>),
     Regexp(String),
     Eq(String),
 }
 
 // todo 递归匹配表达式
-fn parse_children(children: Vec<NestedMeta>) -> Vec<Arg> {
+fn parse_children(children: Vec<NestedMeta>) -> Vec<EventArg> {
     let mut children_args = vec![];
     for nm in children {
         match nm {
             Meta(meta) => match meta {
-                Path(_) => {}
-                List(_) => {}
+                Path(_) => abort!(&meta.span(), "不支持的参数名称"),
+                List(list) => {
+                    if list.path.segments.len() != 1 {
+                        abort!(&list.span(), "表达式有且只能有一个片段");
+                    }
+                    let indent = list.path.segments.first().unwrap().ident.to_string();
+                    match indent.as_str() {
+                        "all" => {
+                            let mut v = vec![];
+                            for x in list.nested {
+                                v.push(x);
+                            }
+                            children_args.push(All(parse_children(v)));
+                        }
+                        "not" => {
+                            let mut v = vec![];
+                            for x in list.nested {
+                                v.push(x);
+                            }
+                            children_args.push(Not(parse_children(v)));
+                        }
+                        "any" => {
+                            let mut v = vec![];
+                            for x in list.nested {
+                                v.push(x);
+                            }
+                            children_args.push(Any(parse_children(v)));
+                        }
+                        _ => abort!(&indent.span(), "不支持的参数名称"),
+                    }
+                }
                 NameValue(nv) => {
                     if nv.path.segments.len() != 1 {
                         abort!(&nv.span(), "表达式有且只能有一个片段");
@@ -54,9 +83,23 @@ fn parse_children(children: Vec<NestedMeta>) -> Vec<Arg> {
                     match indent.as_str() {
                         "regexp" => match nv.lit {
                             Str(value) => {
-                                children_args.push(Regexp(value.value()));
+                                let v = value.value();
+                                match regex::Regex::new(v.as_str()) {
+                                    Ok(_) => {
+                                        children_args.push(Regexp(v));
+                                    }
+                                    Err(_) => {
+                                        abort!(&indent.span(), "正则表达式不正确");
+                                    }
+                                }
                             }
                             _ => abort!(&indent.span(), "regexp只支持字符串类型参数值"),
+                        },
+                        "eq" => match nv.lit {
+                            Str(value) => {
+                                children_args.push(Eq(value.value()));
+                            }
+                            _ => abort!(&indent.span(), "eq只支持字符串类型参数值"),
                         },
                         _ => abort!(&indent.span(), "不支持的参数名称"),
                     }
@@ -66,6 +109,49 @@ fn parse_children(children: Vec<NestedMeta>) -> Vec<Arg> {
         }
     }
     children_args
+}
+
+fn arg_to_token(arg: EventArg) -> proc_macro2::TokenStream {
+    match arg {
+        EventArg::All(v) => {
+            let ts = args_to_token(v);
+            quote! {
+                ::proc_qq::EventArg::All(#ts)
+            }
+        }
+        EventArg::Any(v) => {
+            let ts = args_to_token(v);
+            quote! {
+                ::proc_qq::EventArg::Any(#ts)
+            }
+        }
+        EventArg::Not(v) => {
+            let ts = args_to_token(v);
+            quote! {
+                ::proc_qq::EventArg::Not(#ts)
+            }
+        }
+        EventArg::Eq(string) => {
+            quote! {
+                ::proc_qq::EventArg::Eq(#string .to_string())
+            }
+        }
+        Regexp(string) => {
+            quote! {
+                ::proc_qq::EventArg::Regexp(#string .to_string())
+            }
+        }
+    }
+}
+
+fn args_to_token(all: Vec<EventArg>) -> proc_macro2::TokenStream {
+    let mut args = quote! {};
+    for arg in all {
+        args.append_all(arg_to_token(arg));
+    }
+    quote! {
+        vec![#args]
+    }
 }
 
 /// event proc
@@ -209,14 +295,18 @@ pub fn event(args: TokenStream, input: TokenStream) -> TokenStream {
             }
         }
     } else {
-        // todo 生成规则代码
+        let args_vec = args_to_token(all);
         quote! {
             #[::proc_qq::re_exports::async_trait::async_trait]
             impl #trait_name for #ident {
                 async fn handle(&self, #param_pat: #param_ty) -> ::proc_qq::re_exports::anyhow::Result<bool> {
-                    // todo 这里进行判断是否命中， enum Arg 需要复制到proc_qq一份，并且调用proc_qq种的一个函数去处理
-                    raw(#param_pat).await
+                    if !::proc_qq::match_event_args_all(#args_vec, #param_pat.into())? {
+                        return Ok(false);
+                    }
+                    self.raw(#param_pat).await
                 }
+            }
+            impl #ident {
                 async fn raw(&self, #param_pat: #param_ty) -> ::proc_qq::re_exports::anyhow::Result<bool> #block
             }
         }
