@@ -329,6 +329,31 @@ async fn handle(event: &MessageEvent) -> anyhow::Result<bool> {
 
 总会遇到一些线程不安全的类, 例如*scraper*. 这个时候编译器会反复告诉你 "maybe used later". 您可以尝试使用手创造一个handler解决.
 
+## 其他特性
+
+    event参数
+    MessageEvent / FriendMessageEvent / GroupMessageEvent / GroupTempMessageEvent
+    trim_regexp trim_eq regexp eq all any not
+    为什么会有trim: ricq获取消息会在最后追加空白字符
+ 
+```rust
+#[event(trim_regexp = "^a([\\S\\s]+)?$", trim_regexp = "^([\\S\\s]+)?b$")]
+async fn handle2(event: &MessageEvent) -> anyhow::Result<bool> {
+  event
+          .send_message_to_source("a开头且b结束".parse_message_chain())
+          .await?;
+  Ok(true)
+}
+
+#[event(any(trim_regexp = "^a([\\S\\s]+)?$", trim_regexp = "^([\\S\\s]+)?b$"))]
+async fn handle3(event: &MessageEvent) -> anyhow::Result<bool> {
+  event
+          .send_message_to_source("a开头或b结束".parse_message_chain())
+          .await?;
+  Ok(true)
+}
+```
+
 ## 其他
 
 实现的功能请转到RICQ仓库查看, 本仓库仅为RICQ的框架.

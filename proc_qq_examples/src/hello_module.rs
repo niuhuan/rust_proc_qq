@@ -52,16 +52,22 @@ impl OnMessage {
     }
 }
 
-async fn do_some(_event: &MessageEvent) -> anyhow::Result<()> {
-    Ok(())
+#[event(regexp = "^(\\s+)?你很好(\\s+)?$")]
+async fn handle(event: &MessageEvent) -> anyhow::Result<bool> {
+    event
+        .send_message_to_source("你也很好".parse_message_chain())
+        .await?;
+    Ok(true)
 }
 
-#[event]
-async fn handle(event: &MessageEvent) -> anyhow::Result<bool> {
-    do_some(event).await?;
+#[event(trim_regexp = "^a([\\S\\s]+)?$", trim_regexp = "^([\\S\\s]+)?b$")]
+async fn handle2(event: &MessageEvent) -> anyhow::Result<bool> {
+    event
+        .send_message_to_source("a开头且b结束".parse_message_chain())
+        .await?;
     Ok(true)
 }
 
 pub fn module() -> Module {
-    module!("hello", "你好", login, print, group_hello, handle,)
+    module!("hello", "你好", login, print, group_hello, handle, handle2)
 }

@@ -1,6 +1,4 @@
 use proc_macro::TokenStream;
-
-use crate::EventArg::{All, Any, Eq, Not, Regexp};
 use proc_macro2::Span;
 use proc_macro_error::{abort, proc_macro_error};
 use quote::{quote, ToTokens, TokenStreamExt};
@@ -36,9 +34,11 @@ enum EventArg {
     Not(Vec<EventArg>),
     Regexp(String),
     Eq(String),
+    TrimRegexp(String),
+    TrimEq(String),
 }
 
-// todo 递归匹配表达式
+// 递归匹配表达式
 fn parse_children(children: Vec<NestedMeta>) -> Vec<EventArg> {
     let mut children_args = vec![];
     for nm in children {
@@ -56,21 +56,21 @@ fn parse_children(children: Vec<NestedMeta>) -> Vec<EventArg> {
                             for x in list.nested {
                                 v.push(x);
                             }
-                            children_args.push(All(parse_children(v)));
+                            children_args.push(EventArg::All(parse_children(v)));
                         }
                         "not" => {
                             let mut v = vec![];
                             for x in list.nested {
                                 v.push(x);
                             }
-                            children_args.push(Not(parse_children(v)));
+                            children_args.push(EventArg::Not(parse_children(v)));
                         }
                         "any" => {
                             let mut v = vec![];
                             for x in list.nested {
                                 v.push(x);
                             }
-                            children_args.push(Any(parse_children(v)));
+                            children_args.push(EventArg::Any(parse_children(v)));
                         }
                         _ => abort!(&indent.span(), "不支持的参数名称"),
                     }
@@ -86,7 +86,7 @@ fn parse_children(children: Vec<NestedMeta>) -> Vec<EventArg> {
                                 let v = value.value();
                                 match regex::Regex::new(v.as_str()) {
                                     Ok(_) => {
-                                        children_args.push(Regexp(v));
+                                        children_args.push(EventArg::Regexp(v));
                                     }
                                     Err(_) => {
                                         abort!(&indent.span(), "正则表达式不正确");
@@ -97,15 +97,35 @@ fn parse_children(children: Vec<NestedMeta>) -> Vec<EventArg> {
                         },
                         "eq" => match nv.lit {
                             Str(value) => {
-                                children_args.push(Eq(value.value()));
+                                children_args.push(EventArg::Eq(value.value()));
                             }
                             _ => abort!(&indent.span(), "eq只支持字符串类型参数值"),
+                        },
+                        "trim_regexp" => match nv.lit {
+                            Str(value) => {
+                                let v = value.value();
+                                match regex::Regex::new(v.as_str()) {
+                                    Ok(_) => {
+                                        children_args.push(EventArg::TrimRegexp(v));
+                                    }
+                                    Err(_) => {
+                                        abort!(&indent.span(), "正则表达式不正确");
+                                    }
+                                }
+                            }
+                            _ => abort!(&indent.span(), "trim_regexp只支持字符串类型参数值"),
+                        },
+                        "trim_eq" => match nv.lit {
+                            Str(value) => {
+                                children_args.push(EventArg::TrimEq(value.value()));
+                            }
+                            _ => abort!(&indent.span(), "trim_eq只支持字符串类型参数值"),
                         },
                         _ => abort!(&indent.span(), "不支持的参数名称"),
                     }
                 }
             },
-            Lit(_) => (),
+            Lit(indent) => abort!(&indent.span(), "不支持值类型的参数"),
         }
     }
     children_args
@@ -136,9 +156,19 @@ fn arg_to_token(arg: EventArg) -> proc_macro2::TokenStream {
                 ::proc_qq::EventArg::Eq(#string .to_string())
             }
         }
-        Regexp(string) => {
+        EventArg::Regexp(string) => {
             quote! {
                 ::proc_qq::EventArg::Regexp(#string .to_string())
+            }
+        }
+        EventArg::TrimEq(string) => {
+            quote! {
+                ::proc_qq::EventArg::TrimEq(#string .to_string())
+            }
+        }
+        EventArg::TrimRegexp(string) => {
+            quote! {
+                ::proc_qq::EventArg::TrimRegexp(#string .to_string())
             }
         }
     }
@@ -148,6 +178,7 @@ fn args_to_token(all: Vec<EventArg>) -> proc_macro2::TokenStream {
     let mut args = quote! {};
     for arg in all {
         args.append_all(arg_to_token(arg));
+        args.append_all(quote! {,})
     }
     quote! {
         vec![#args]
@@ -295,6 +326,16 @@ pub fn event(args: TokenStream, input: TokenStream) -> TokenStream {
             }
         }
     } else {
+        match param_ty.to_string().as_str() {
+            "& MessageEvent" => (),
+            "& GroupMessageEvent" => (),
+            "& FriendMessageEvent" => (),
+            "& GroupTempMessageEvent" => (),
+            _ => abort!(
+                &method.sig.span(),
+                "event 的参数只支持消息类型事件 (MessageEvent,*MessageEvent)"
+            ),
+        }
         let args_vec = args_to_token(all);
         quote! {
             #[::proc_qq::re_exports::async_trait::async_trait]

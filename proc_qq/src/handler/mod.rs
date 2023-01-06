@@ -356,24 +356,50 @@ pub enum EventArg {
     Not(Vec<EventArg>),
     Regexp(String),
     Eq(String),
+    TrimRegexp(String),
+    TrimEq(String),
 }
 
-#[derive(Clone, Debug)]
-pub enum HandEvent {
-    MessageEvent(String),
+#[derive(Clone)]
+pub enum HandEvent<'a> {
+    MessageEvent(&'a MessageEvent),
+    FriendMessageEvent(&'a FriendMessageEvent),
+    GroupMessageEvent(&'a GroupMessageEvent),
+    GroupTempMessageEvent(&'a GroupTempMessageEvent),
 }
 
-impl HandEvent {
+impl HandEvent<'_> {
     fn content(&self) -> ::anyhow::Result<String> {
         Ok(match self {
-            HandEvent::MessageEvent(c) => c.clone(),
+            HandEvent::MessageEvent(c) => c.message_content(),
+            HandEvent::FriendMessageEvent(c) => c.message_content(),
+            HandEvent::GroupMessageEvent(c) => c.message_content(),
+            HandEvent::GroupTempMessageEvent(c) => c.message_content(),
         })
     }
 }
 
-impl From<&MessageEvent> for HandEvent {
-    fn from(value: &MessageEvent) -> Self {
-        Self::MessageEvent(value.message_content())
+impl<'a> From<&'a MessageEvent> for HandEvent<'a> {
+    fn from(value: &'a MessageEvent) -> Self {
+        Self::MessageEvent(value)
+    }
+}
+
+impl<'a> From<&'a FriendMessageEvent> for HandEvent<'a> {
+    fn from(value: &'a FriendMessageEvent) -> Self {
+        Self::FriendMessageEvent(value)
+    }
+}
+
+impl<'a> From<&'a GroupMessageEvent> for HandEvent<'a> {
+    fn from(value: &'a GroupMessageEvent) -> Self {
+        Self::GroupMessageEvent(value)
+    }
+}
+
+impl<'a> From<&'a GroupTempMessageEvent> for HandEvent<'a> {
+    fn from(value: &'a GroupTempMessageEvent) -> Self {
+        Self::GroupTempMessageEvent(value)
     }
 }
 
@@ -415,6 +441,14 @@ fn match_event_args_eq(args: String, event: HandEvent) -> ::anyhow::Result<bool>
     Ok(args.eq(event.content()?.as_str()))
 }
 
+fn match_event_args_trim_regexp(args: String, event: HandEvent) -> ::anyhow::Result<bool> {
+    Ok(regex::Regex::new(args.as_str())?.is_match(event.content()?.trim()))
+}
+
+fn match_event_args_trim_eq(args: String, event: HandEvent) -> ::anyhow::Result<bool> {
+    Ok(args.eq(event.content()?.trim()))
+}
+
 fn match_event_item(arg: EventArg, event: HandEvent) -> ::anyhow::Result<bool> {
     match arg {
         EventArg::All(v) => match_event_args_all(v, event.clone()),
@@ -422,5 +456,7 @@ fn match_event_item(arg: EventArg, event: HandEvent) -> ::anyhow::Result<bool> {
         EventArg::Not(v) => match_event_args_not(v, event.clone()),
         EventArg::Regexp(v) => match_event_args_regexp(v, event.clone()),
         EventArg::Eq(v) => match_event_args_eq(v, event.clone()),
+        EventArg::TrimRegexp(v) => match_event_args_trim_regexp(v, event.clone()),
+        EventArg::TrimEq(v) => match_event_args_trim_eq(v, event.clone()),
     }
 }

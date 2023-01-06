@@ -2,7 +2,6 @@ use tracing::Level;
 use tracing_subscriber::layer::SubscriberExt;
 use tracing_subscriber::util::SubscriberInitExt;
 
-pub mod hello2_module;
 pub mod hello_module;
 pub mod result_handlers;
 
