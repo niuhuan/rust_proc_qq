@@ -1,16 +1,18 @@
 pub use proc_qq::re_exports::async_trait::async_trait;
 use proc_qq::re_exports::ricq::client::event::GroupMessageEvent;
 use proc_qq::{
-    event, module, LoginEvent, MessageChainParseTrait, MessageContentTrait, MessageEvent,
+    event, event_fn, module, LoginEvent, MessageChainParseTrait, MessageContentTrait, MessageEvent,
     MessageEventProcess, MessageSendToSourceTrait, Module,
 };
 
+/// 登录成功的时候调用
 #[event]
 async fn login(event: &LoginEvent) -> anyhow::Result<bool> {
     tracing::info!("登录成功了 : {}", event.uin);
     Ok(false)
 }
 
+/// 任何消息都调用
 #[event]
 async fn print(event: &MessageEvent) -> anyhow::Result<bool> {
     let content = event.message_content();
@@ -31,10 +33,13 @@ async fn print(event: &MessageEvent) -> anyhow::Result<bool> {
     }
 }
 
+/// 群消息时调用
 #[event]
 async fn group_hello(_: &GroupMessageEvent) -> anyhow::Result<bool> {
     Ok(false)
 }
+
+/// 自定义Handler
 
 struct OnMessage;
 
@@ -52,6 +57,7 @@ impl OnMessage {
     }
 }
 
+/// 使用正则
 #[event(regexp = "^(\\s+)?你很好(\\s+)?$")]
 async fn handle(event: &MessageEvent) -> anyhow::Result<bool> {
     event
@@ -60,6 +66,8 @@ async fn handle(event: &MessageEvent) -> anyhow::Result<bool> {
     Ok(true)
 }
 
+/// 多个规则, 支持 trim_regexp trim_eq all any not regexp eq
+/// 支持嵌套使用 all(not(any(),eq = ""))
 #[event(trim_regexp = "^a([\\S\\s]+)?$", trim_regexp = "^([\\S\\s]+)?b$")]
 async fn handle2(event: &MessageEvent) -> anyhow::Result<bool> {
     event
@@ -68,6 +76,37 @@ async fn handle2(event: &MessageEvent) -> anyhow::Result<bool> {
     Ok(true)
 }
 
+/// 解决调用函数生命周期问题, 使用self调用 event_fn
+
+#[event]
+async fn handle3(message: &MessageEvent) -> anyhow::Result<bool> {
+    self.handle3_add(message).await;
+    Ok(false)
+}
+
+#[event]
+async fn handle4(message: &MessageEvent) -> anyhow::Result<bool> {
+    self.handle3_add(message).await;
+    Ok(false)
+}
+
+#[event_fn(handle3, handle4)]
+async fn handle3_add(message: &MessageEvent) {
+    println!("{}", message.message_content());
+}
+
+/// module
+
 pub fn module() -> Module {
-    module!("hello", "你好", login, print, group_hello, handle, handle2)
+    module!(
+        "hello",
+        "你好",
+        login,
+        print,
+        group_hello,
+        handle,
+        handle2,
+        handle3,
+        handle4,
+    )
 }
