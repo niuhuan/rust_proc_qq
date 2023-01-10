@@ -329,6 +329,21 @@ async fn handle(event: &MessageEvent) -> anyhow::Result<bool> {
 
 总会遇到一些线程不安全的类, 例如*scraper*. 这个时候编译器会反复告诉你 "maybe used later". 您可以尝试使用手创造一个handler解决.
 
+### 使用event_fn解决生命周期问题
+
+```rust
+#[event]
+async fn handle4(message: &MessageEvent) -> anyhow::Result<bool> {
+  self.handle3_add(message).await;
+  Ok(false)
+}
+
+#[event_fn(handle3, handle4)]
+async fn handle3_add(message: &MessageEvent) {
+  println!("{}", message.message_content());
+}
+```
+
 ## 其他特性
 
     event参数
