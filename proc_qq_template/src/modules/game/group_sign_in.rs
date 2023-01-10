@@ -34,7 +34,7 @@ async fn on_message(message: &MessageEvent) -> anyhow::Result<bool> {
         let uin = message.from_uin();
         let signs_coll: Collection<GroupSignIn> = collection("group_sign_in").await;
         if content.eq("签到") {
-            let today = chrono::Local::today();
+            let today = chrono::Local::now();
             let yesterday = today.sub(Duration::days(1));
             let today = today.format("%Y-%m-%d").to_string();
             let yesterday = yesterday.format("%Y-%m-%d").to_string();

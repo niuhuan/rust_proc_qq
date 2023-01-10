@@ -32,7 +32,7 @@ async fn on_message(message: &MessageEvent) -> anyhow::Result<bool> {
 }
 
 async fn reply_daily_english(message: &MessageEvent) -> anyhow::Result<()> {
-    let today = chrono::Local::today();
+    let today = chrono::Local::now();
     let today = today.format("%Y-%m-%d").to_string();
     let key = format!("DAILY_ENGLISH::{}", today);
     let mut daily: Option<DailyEnglish> = match redis_get::<String>(&key).await? {
