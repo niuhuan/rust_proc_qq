@@ -113,8 +113,11 @@ async fn test_qr_login() {
     // 初始化日志打印
     init_tracing_subscriber();
     // 使用builder创建
-    ClientBuilder::new()
-        // .priority_session("session.token")      // 使用session.token登录
+    let client = ClientBuilder::new()
+        // 使用session.token登录
+        //    .session_store(Box::new(FileSessionStore {
+        //      path: "session.token".to_string(),
+        //    }))
         .authentication(QRCode)                    // 若不成功则使用二维码登录
         // 注意，这里使用的设备必须支持二维码登录，例如安卓手表
         // 如果您使用为不支持的协议协议，则会登录失败，例如安卓QQ 
@@ -126,11 +129,8 @@ async fn test_qr_login() {
         .show_rq(Some(ShowQR::OpenBySystem))  // 自动打开二维码 在macos/linux/windows中, 不支持安卓
         .build()
         .await
-        .unwrap()
-        .start()
-        .await
-        .unwrap()
         .unwrap();
+    run_client(client).await?;
 }
 
 fn init_tracing_subscriber() {

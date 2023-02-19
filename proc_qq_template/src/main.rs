@@ -5,7 +5,7 @@ use crate::database::mongo::init_mongo;
 use crate::database::redis::init_redis;
 use proc_qq::re_exports::ricq::version::ANDROID_WATCH;
 use proc_qq::Authentication::UinPasswordMd5;
-use proc_qq::{run_client, ClientBuilder, DeviceSource};
+use proc_qq::{run_client, ClientBuilder, DeviceSource, FileSessionStore};
 use std::sync::Arc;
 use tracing::Level;
 use tracing_subscriber::layer::SubscriberExt;
@@ -29,7 +29,9 @@ async fn main() -> anyhow::Result<()> {
     let client = ClientBuilder::new()
         .device(DeviceSource::JsonFile("device.json".to_owned()))
         .version(&ANDROID_WATCH)
-        .priority_session("session.token")
+        .session_store(Box::new(FileSessionStore {
+            path: "session.token".to_string(),
+        }))
         .authentication(UinPasswordMd5(config.account.uin, password))
         .show_slider_pop_menu_if_possible()
         .modules(modules::all_modules())

@@ -1,6 +1,7 @@
 use crate::DeviceSource::{JsonFile, JsonString};
 use crate::{Authentication, ClientHandler, DeviceSource, EventResultHandler, Module};
 use anyhow::{anyhow, Context, Result};
+use async_trait::async_trait;
 use bytes::{Buf, BufMut, Bytes, BytesMut};
 use core::future::Future;
 use futures::future::BoxFuture;
@@ -20,13 +21,12 @@ use std::pin::Pin;
 use std::sync::Arc;
 use std::time::Duration;
 use tokio::net::TcpStream;
-use tokio::task::JoinHandle;
 use tokio::time::sleep;
 
 pub struct Client {
     pub rq_client: Arc<ricq::Client>,
     pub authentication: Authentication,
-    pub priority_session: Option<String>,
+    pub session_store: Arc<Option<Box<dyn SessionStore + Sync + Send>>>,
     pub(crate) modules: Arc<Vec<Module>>,
     pub(crate) result_handlers: Arc<Vec<EventResultHandler>>,
     pub show_qr: ShowQR,
@@ -36,8 +36,14 @@ pub struct Client {
 }
 
 impl Client {
-    pub fn start(self) -> JoinHandle<Result<()>> {
-        tokio::spawn(run_client(self))
+    pub async fn write_token_to_store(&self) -> Result<()> {
+        if let Some(session_store) = self.session_store.as_deref() {
+            session_store
+                .save_session(token_to_bytes(&self.rq_client.gen_token().await).to_vec())
+                .await
+        } else {
+            Ok(())
+        }
     }
 }
 
@@ -79,14 +85,7 @@ pub async fn run_client<C: Into<Arc<Client>>>(i: C) -> Result<()> {
         // Reference RICQ docs, this function must be called after login is completed, maybe it's to register the device.
         after_login(&client.rq_client.clone()).await;
         // save session, IO errors are fatal.
-        if let Some(session_file) = &client.priority_session {
-            tokio::fs::write(
-                session_file,
-                token_to_bytes(&client.rq_client.gen_token().await),
-            )
-            .await
-            .with_context(|| "写入session出错")?;
-        }
+        client.write_token_to_store().await?;
         //
         let _ = event_sender.send_connected_and_online().await;
         // hold handle
@@ -112,18 +111,15 @@ pub async fn run_client<C: Into<Arc<Client>>>(i: C) -> Result<()> {
 }
 
 async fn token_login(client: &Client) -> bool {
-    if let Some(session_file) = &client.priority_session {
-        if Path::new(session_file).exists() {
-            let session_data = match tokio::fs::read(session_file)
-                .await
-                .with_context(|| format!("文件读取失败 : {}", session_file))
-            {
-                Ok(data) => data,
-                Err(err) => {
-                    tracing::info!("{:?}", err);
-                    return false;
-                }
-            };
+    if let Some(session_file) = client.session_store.as_deref() {
+        let session_data = match session_file.load_session().await {
+            Ok(data) => data,
+            Err(err) => {
+                tracing::info!("{:?}", err);
+                return false;
+            }
+        };
+        if let Some(session_data) = session_data {
             let result = client
                 .rq_client
                 .token_login(bytes_to_token(session_data))
@@ -133,7 +129,7 @@ async fn token_login(client: &Client) -> bool {
                 Err(err) => match err {
                     RQError::TokenLoginFailed => {
                         // token error (KickedOffline)
-                        let _ = tokio::fs::remove_file(session_file).await;
+                        let _ = session_file.remove_session().await;
                         false
                     }
                     _ => false,
@@ -438,7 +434,7 @@ pub struct ClientBuilder {
     device_source: DeviceSource,
     version: &'static Version,
     authentication: Option<Authentication>,
-    priority_session: Option<String>,
+    session_store: Arc<Option<Box<dyn SessionStore + Sync + Send>>>,
     modules_vec: Arc<Vec<Module>>,
     result_handlers_vec: Arc<Vec<EventResultHandler>>,
     show_qr: Option<ShowQR>,
@@ -452,7 +448,7 @@ impl ClientBuilder {
             device_source: DeviceSource::default(),
             version: &ANDROID_PHONE,
             authentication: None,
-            priority_session: None,
+            session_store: Arc::new(None),
             modules_vec: Arc::new(vec![]),
             result_handlers_vec: Arc::new(vec![]),
             show_qr: None,
@@ -535,7 +531,7 @@ impl ClientBuilder {
                 .authentication
                 .clone()
                 .with_context(|| "您必须设置验证方式 (调用authentication)")?,
-            priority_session: self.priority_session.clone(),
+            session_store: self.session_store.clone(),
             modules: self.modules_vec.clone(),
             result_handlers: self.result_handlers_vec.clone(),
             show_qr: if self.show_qr.is_some() {
@@ -571,8 +567,8 @@ impl ClientBuilder {
         self
     }
 
-    pub fn priority_session<S: Into<String>>(mut self, session_file: S) -> Self {
-        self.priority_session = Some(session_file.into());
+    pub fn session_store(mut self, session_store: Box<dyn SessionStore + Sync + Send>) -> Self {
+        self.session_store = Arc::new(Some(session_store));
         self
     }
 
@@ -617,4 +613,34 @@ pub enum ShowSlider {
 pub enum DeviceLockVerification {
     Url,
     Sms,
+}
+
+#[async_trait]
+pub trait SessionStore {
+    async fn save_session(&self, data: Vec<u8>) -> Result<()>;
+    async fn load_session(&self) -> Result<Option<Vec<u8>>>;
+    async fn remove_session(&self) -> Result<()>;
+}
+
+pub struct FileSessionStore {
+    pub path: String,
+}
+
+#[async_trait]
+impl SessionStore for FileSessionStore {
+    async fn save_session(&self, data: Vec<u8>) -> Result<()> {
+        tokio::fs::write(self.path.as_str(), data).await?;
+        Ok(())
+    }
+    async fn load_session(&self) -> Result<Option<Vec<u8>>> {
+        if Path::new(self.path.as_str()).exists() {
+            Ok(Some(tokio::fs::read(self.path.as_str()).await?))
+        } else {
+            Ok(None)
+        }
+    }
+    async fn remove_session(&self) -> Result<()> {
+        let _ = tokio::fs::remove_file(self.path.as_str()).await;
+        Ok(())
+    }
 }
