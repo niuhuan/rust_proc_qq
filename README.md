@@ -130,7 +130,7 @@ async fn test_qr_login() {
         .build()
         .await
         .unwrap();
-    run_client(client).await?;
+    run_client(client.into()).await?;
 }
 
 fn init_tracing_subscriber() {

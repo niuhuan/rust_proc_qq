@@ -16,10 +16,13 @@ use ricq_core::command::wtlogin::{
 use ricq_core::protocol::device::Device;
 use ricq_core::protocol::version::{Version, ANDROID_PHONE};
 use ricq_core::{RQError, RQResult, Token};
+use std::net::SocketAddr;
+use std::ops::Deref;
 use std::path::Path;
 use std::pin::Pin;
 use std::sync::Arc;
 use std::time::Duration;
+use tokio::io::{AsyncRead, AsyncWrite};
 use tokio::net::TcpStream;
 use tokio::time::sleep;
 
@@ -33,6 +36,7 @@ pub struct Client {
     pub show_slider: ShowSlider,
     pub shutting: bool,
     pub device_lock_verification: DeviceLockVerification,
+    pub connection_handler: Arc<Option<Box<dyn ConnectionHandler + Sync + Send>>>,
 }
 
 impl Client {
@@ -47,67 +51,68 @@ impl Client {
     }
 }
 
-pub async fn run_client<C: Into<Arc<Client>>>(i: C) -> Result<()> {
-    let client = i.into();
-    let event_sender = crate::handler::EventSender {
-        modules: client.modules.clone(),
-        result_handlers: client.result_handlers.clone(),
-    };
+pub async fn run_client(c: Arc<Client>) -> Result<()> {
     // todo // max try count
     loop {
-        // connect to server
-        let addresses = client.rq_client.get_address_list().await;
-        let address = addresses
-            .into_iter()
-            .choose_stable(&mut rand::thread_rng())
-            .unwrap();
-        let stream = match TcpStream::connect(address)
-            .await
-            .with_context(|| "连接到服务器失败")
-        {
-            Ok(stream) => stream,
-            Err(err) => {
-                tracing::info!("{:?}", err);
-                tracing::info!("五秒钟之后重试");
-                sleep(Duration::from_secs(5)).await;
-                continue;
-            }
-        };
-        let rq_client = client.rq_client.clone();
-        let handle = tokio::spawn(async move { rq_client.start(stream).await });
-        tokio::task::yield_now().await;
-        // token login if allow and file exists
-        if !token_login(&client).await {
-            // authentication if token login failed or not set
-            // The error of login failure is fatal
-            login_authentication(&client).await?;
-        }
-        // Reference RICQ docs, this function must be called after login is completed, maybe it's to register the device.
-        after_login(&client.rq_client.clone()).await;
-        // save session, IO errors are fatal.
-        client.write_token_to_store().await?;
-        //
-        let _ = event_sender.send_connected_and_online().await;
-        // hold handle
-        match handle.await {
+        match run_client_once(c.clone()).await {
             Ok(_) => {}
-            Err(err) => tracing::info!("{:?}", err),
+            Err(err) => tracing::warn!("连接已断开 {:?}", err),
         };
-        if client.shutting {
-            return Ok(());
-        }
-        let _ = event_sender.send_disconnected_and_offline().await;
-        match client.authentication {
+        match c.authentication {
             Authentication::QRCode => {
                 // todo test once token
-                tracing::info!("连接已断开, QR验证模式下不进行重新登录");
+                tracing::info!("QR验证模式下不进行重新登录");
                 return Err(anyhow!("exit disconnect"));
             }
             _ => {}
         }
-        tracing::info!("连接已断开, 五秒钟之后重试");
+        tracing::info!("五秒钟之后重试");
         sleep(Duration::from_secs(5)).await;
     }
+}
+
+pub async fn run_client_once(client: Arc<Client>) -> Result<()> {
+    let event_sender = crate::handler::EventSender {
+        modules: client.modules.clone(),
+        result_handlers: client.result_handlers.clone(),
+    };
+    // connect to server
+    let addresses = client.rq_client.get_address_list().await;
+    let address = addresses
+        .into_iter()
+        .choose_stable(&mut rand::thread_rng())
+        .unwrap();
+    let rq_client = client.rq_client.clone();
+    let handle = if let Some(handler) = client.connection_handler.deref() {
+        let stream = handler
+            .connect(address)
+            .await
+            .with_context(|| "failed connect to server")?;
+        tokio::spawn(async move { rq_client.start(Pin::new(stream)).await })
+    } else {
+        let stream = TcpStream::connect(address)
+            .await
+            .with_context(|| "failed connect to server")?;
+        tokio::spawn(async move { rq_client.start(stream).await })
+    };
+    tokio::task::yield_now().await;
+    // token login if allow and file exists
+    if !token_login(&client).await {
+        // authentication if token login failed or not set
+        // The error of login failure is fatal
+        login_authentication(&client).await?;
+    }
+    // Reference RICQ docs, this function must be called after login is completed, maybe it's to register the device.
+    after_login(&client.rq_client.clone()).await;
+    // save session, IO errors are fatal.
+    client.write_token_to_store().await?;
+    //
+    let _ = event_sender.send_connected_and_online().await;
+    // hold handle
+    let result = handle.await;
+    let _ = event_sender.send_disconnected_and_offline().await;
+    result.with_context(|| "handle await error")?;
+    Ok(())
 }
 
 async fn token_login(client: &Client) -> bool {
@@ -440,6 +445,7 @@ pub struct ClientBuilder {
     show_qr: Option<ShowQR>,
     show_slider: Option<ShowSlider>,
     device_lock_verification: Option<DeviceLockVerification>,
+    connect_handler_arc: Arc<Option<Box<dyn ConnectionHandler + Sync + Send>>>,
 }
 
 impl ClientBuilder {
@@ -454,6 +460,7 @@ impl ClientBuilder {
             show_qr: None,
             show_slider: None,
             device_lock_verification: None,
+            connect_handler_arc: None.into(),
         }
     }
 
@@ -554,6 +561,7 @@ impl ClientBuilder {
                 DeviceLockVerification::Url
             },
             shutting: false,
+            connection_handler: self.connect_handler_arc.clone(),
         })
     }
 
@@ -574,6 +582,14 @@ impl ClientBuilder {
 
     pub fn authentication(mut self, authentication: Authentication) -> Self {
         self.authentication = Some(authentication);
+        self
+    }
+
+    pub fn connect_handler(
+        mut self,
+        connect_handler: Box<dyn ConnectionHandler + Sync + Send>,
+    ) -> Self {
+        self.connect_handler_arc = Arc::new(Some(connect_handler));
         self
     }
 }
@@ -643,4 +659,11 @@ impl SessionStore for FileSessionStore {
         let _ = tokio::fs::remove_file(self.path.as_str()).await;
         Ok(())
     }
+}
+
+pub trait Connection: AsyncRead + AsyncWrite + Unpin + Send + Sync {}
+
+#[async_trait]
+pub trait ConnectionHandler {
+    async fn connect(&self, address: SocketAddr) -> Result<Box<dyn Connection>>;
 }

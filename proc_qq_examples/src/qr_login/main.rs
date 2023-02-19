@@ -1,5 +1,6 @@
 use proc_qq::re_exports::ricq::version::ANDROID_WATCH;
 use proc_qq::*;
+use std::sync::Arc;
 
 use proc_qq_examples::hello_module;
 use proc_qq_examples::init_tracing_subscriber;
@@ -21,5 +22,5 @@ async fn main() {
         .build()
         .await
         .unwrap();
-    run_client(client).await.unwrap();
+    run_client(Arc::new(client)).await.unwrap();
 }
