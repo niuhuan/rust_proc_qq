@@ -17,6 +17,7 @@ use ricq_core::command::wtlogin::{
 use ricq_core::protocol::device::Device;
 use ricq_core::protocol::version::{Version, ANDROID_PHONE};
 use ricq_core::{RQError, RQResult, Token};
+use std::cmp::min;
 use std::path::Path;
 use std::pin::Pin;
 use std::sync::Arc;
@@ -58,52 +59,46 @@ impl Client {
 }
 
 pub async fn run_client(c: Arc<Client>) -> Result<()> {
-    // todo // max try count
+    // 连接到服务器
+    let mut handle = connection(c.clone()).await?;
+    // 优先使用token登录
+    if !token_login(c.as_ref()).await {
+        login_authentication(&c).await?;
+    }
+    let event_sender = crate::handler::EventSender {
+        modules: c.modules.clone(),
+        result_handlers: c.result_handlers.clone(),
+    };
+    // todo: max try count
     loop {
-        match run_client_once(c.clone()).await {
-            Ok(_) => {}
-            Err(err) => tracing::warn!("连接已断开 {:?}", err),
-        };
-        match c.authentication {
-            Authentication::QRCode => {
-                tracing::info!("QR验证模式下不进行重新登录");
-                return Err(anyhow!("exit disconnect"));
+        // 每次轮询d
+        after_login(&c.rq_client.clone()).await;
+        // 直到连接断开
+        let err = match loop_events(handle, &event_sender).await {
+            Ok(_) => {
+                tracing::warn!("连接已断开");
+                anyhow::Error::msg("what's up")
             }
-            _ => {}
+            Err(err) => {
+                tracing::warn!("连接已断开 {:?}", err);
+                err.into()
+            }
+        };
+        handle = re_connection(c.clone()).await?;
+        if !token_login(c.as_ref()).await {
+            let login = match c.authentication {
+                Authentication::UinPassword(_, _) => login_authentication(&c),
+                Authentication::UinPasswordMd5(_, _) => login_authentication(&c),
+                _ => return Err(err),
+            };
+            login.await?;
         }
-        tracing::info!("五秒钟之后重试");
-        sleep(c.reconnect_duration).await;
     }
 }
 
 pub async fn run_client_once(client: Arc<Client>) -> Result<()> {
     // connect to server
-    let addresses = client.rq_client.get_address_list().await;
-    let address = addresses
-        .into_iter()
-        .choose_stable(&mut rand::thread_rng())
-        .unwrap();
-    let rq_client = client.rq_client.clone();
-    #[cfg(feature = "connect_handler")]
-    let handle = if let Some(handler) = client.connection_handler.deref() {
-        let stream = handler
-            .connect(address)
-            .await
-            .with_context(|| "failed connect to server")?;
-        tokio::spawn(async move { rq_client.start(Pin::new(stream)).await })
-    } else {
-        let stream = TcpStream::connect(address)
-            .await
-            .with_context(|| "failed connect to server")?;
-        tokio::spawn(async move { rq_client.start(stream).await })
-    };
-    #[cfg(not(feature = "connect_handler"))]
-    let handle = {
-        let stream = TcpStream::connect(address)
-            .await
-            .with_context(|| "failed connect to server")?;
-        tokio::spawn(async move { rq_client.start(stream).await })
-    };
+    let handle = connection(client.clone()).await?;
     tokio::task::yield_now().await;
     // token login if allow and file exists
     if !token_login(&client).await {
@@ -119,14 +114,58 @@ pub async fn run_client_once(client: Arc<Client>) -> Result<()> {
         modules: client.modules.clone(),
         result_handlers: client.result_handlers.clone(),
     };
-    loop_events(handle, event_sender).await
+    loop_events(handle, &event_sender).await
 }
 
-async fn loop_events(handle: JoinHandle<()>, event_sender: EventSender) -> Result<()> {
+async fn re_connection(client: Arc<Client>) -> Result<JoinHandle<()>> {
+    let mut times = 0;
+    loop {
+        times += 1;
+        let d = client.reconnect_duration + Duration::from_secs(min(5, times - 1));
+        tracing::info!("{}秒后进行{}次重连", d.as_secs(), times);
+        sleep(d).await;
+        let res = connection(client.clone()).await;
+        match res {
+            Ok(jh) => return Ok(jh),
+            Err(_) => (),
+        }
+    }
+}
+
+async fn connection(client: Arc<Client>) -> Result<JoinHandle<()>> {
+    let addresses = client.rq_client.get_address_list().await;
+    let address = addresses
+        .into_iter()
+        .choose_stable(&mut rand::thread_rng())
+        .unwrap();
+    #[cfg(not(feature = "connect_handler"))]
+    let handle = {
+        let stream = TcpStream::connect(address)
+            .await
+            .with_context(|| "连接到服务器出错")?;
+        tokio::spawn(async move { client.rq_client.start(stream).await })
+    };
+    #[cfg(feature = "connect_handler")]
+    let handle = if let Some(handler) = client.connection_handler.deref() {
+        let stream = handler
+            .connect(address)
+            .await
+            .with_context(|| "连接到服务器出错")?;
+        tokio::spawn(async move { client.rq_client.start(Pin::new(stream)).await })
+    } else {
+        let stream = TcpStream::connect(address)
+            .await
+            .with_context(|| "连接到服务器出错")?;
+        tokio::spawn(async move { client.rq_client.start(stream).await })
+    };
+    Ok(handle)
+}
+
+async fn loop_events(handle: JoinHandle<()>, event_sender: &EventSender) -> Result<()> {
     let _ = event_sender.send_connected_and_online().await;
     let result = handle.await;
     let _ = event_sender.send_disconnected_and_offline().await;
-    result.with_context(|| "handle await error")?;
+    result.with_context(|| "事件轮询中断")?;
     Ok(())
 }
 
@@ -230,7 +269,7 @@ async fn qr_login(client: &Client, show_qr: ShowQR) -> Result<()> {
                     ShowQR::OpenBySystem => {
                         tokio::fs::write("qrcode.png", &image_data)
                             .await
-                            .with_context(|| "failed to write file")?;
+                            .with_context(|| "文件写入出错 qrcode.png")?;
                         tracing::info!("二维码被写入文件: qrcode.png");
                         #[cfg(any(
                             target_os = "windows",
@@ -262,7 +301,7 @@ async fn qr_login(client: &Client, show_qr: ShowQR) -> Result<()> {
                     ShowQR::SaveToFile => {
                         tokio::fs::write("qrcode.png", &image_data)
                             .await
-                            .with_context(|| "failed to write file")?;
+                            .with_context(|| "文件写入出错 qrcode.png")?;
                         tracing::info!("二维码被写入文件: qrcode.png, 请扫码");
                     }
                 }
@@ -307,7 +346,8 @@ async fn qr_login(client: &Client, show_qr: ShowQR) -> Result<()> {
 
 async fn loop_login(client: &Client, first: RQResult<LoginResponse>) -> Result<()> {
     let rq_client = client.rq_client.clone();
-    let mut resp = first.unwrap();
+    // netwotrk error
+    let mut resp = first?;
     loop {
         match resp {
             LoginResponse::Success(LoginSuccess {

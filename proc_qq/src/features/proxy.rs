@@ -13,7 +13,7 @@ use trust_dns_resolver::config::{ResolverConfig, ResolverOpts};
 use trust_dns_resolver::AsyncResolver;
 use url::Host;
 
-pub fn proxy_by_url(url: String) -> Result<Box<dyn ConnectionHandler>> {
+pub fn proxy_by_url(url: String) -> Result<Box<dyn ConnectionHandler + Send + Sync>> {
     Ok(Box::new(ProxyConnectHandler { proxy: url }))
 }
 
