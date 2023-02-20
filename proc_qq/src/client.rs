@@ -1,3 +1,4 @@
+use crate::handler::EventSender;
 use crate::DeviceSource::{JsonFile, JsonString};
 use crate::{Authentication, ClientHandler, DeviceSource, EventResultHandler, Module};
 use anyhow::{anyhow, Context, Result};
@@ -16,15 +17,18 @@ use ricq_core::command::wtlogin::{
 use ricq_core::protocol::device::Device;
 use ricq_core::protocol::version::{Version, ANDROID_PHONE};
 use ricq_core::{RQError, RQResult, Token};
-use std::net::SocketAddr;
-use std::ops::Deref;
 use std::path::Path;
 use std::pin::Pin;
 use std::sync::Arc;
 use std::time::Duration;
-use tokio::io::{AsyncRead, AsyncWrite};
 use tokio::net::TcpStream;
+use tokio::task::JoinHandle;
 use tokio::time::sleep;
+
+#[cfg(feature = "connect_handler")]
+use crate::features::connect_handler::ConnectionHandler;
+#[cfg(feature = "connect_handler")]
+use std::ops::Deref;
 
 pub struct Client {
     pub rq_client: Arc<ricq::Client>,
@@ -36,7 +40,9 @@ pub struct Client {
     pub show_slider: ShowSlider,
     pub shutting: bool,
     pub device_lock_verification: DeviceLockVerification,
+    #[cfg(feature = "connect_handler")]
     pub connection_handler: Arc<Option<Box<dyn ConnectionHandler + Sync + Send>>>,
+    pub reconnect_duration: Duration,
 }
 
 impl Client {
@@ -60,22 +66,17 @@ pub async fn run_client(c: Arc<Client>) -> Result<()> {
         };
         match c.authentication {
             Authentication::QRCode => {
-                // todo test once token
                 tracing::info!("QR验证模式下不进行重新登录");
                 return Err(anyhow!("exit disconnect"));
             }
             _ => {}
         }
         tracing::info!("五秒钟之后重试");
-        sleep(Duration::from_secs(5)).await;
+        sleep(c.reconnect_duration).await;
     }
 }
 
 pub async fn run_client_once(client: Arc<Client>) -> Result<()> {
-    let event_sender = crate::handler::EventSender {
-        modules: client.modules.clone(),
-        result_handlers: client.result_handlers.clone(),
-    };
     // connect to server
     let addresses = client.rq_client.get_address_list().await;
     let address = addresses
@@ -83,6 +84,7 @@ pub async fn run_client_once(client: Arc<Client>) -> Result<()> {
         .choose_stable(&mut rand::thread_rng())
         .unwrap();
     let rq_client = client.rq_client.clone();
+    #[cfg(feature = "connect_handler")]
     let handle = if let Some(handler) = client.connection_handler.deref() {
         let stream = handler
             .connect(address)
@@ -90,6 +92,13 @@ pub async fn run_client_once(client: Arc<Client>) -> Result<()> {
             .with_context(|| "failed connect to server")?;
         tokio::spawn(async move { rq_client.start(Pin::new(stream)).await })
     } else {
+        let stream = TcpStream::connect(address)
+            .await
+            .with_context(|| "failed connect to server")?;
+        tokio::spawn(async move { rq_client.start(stream).await })
+    };
+    #[cfg(not(feature = "connect_handler"))]
+    let handle = {
         let stream = TcpStream::connect(address)
             .await
             .with_context(|| "failed connect to server")?;
@@ -106,9 +115,15 @@ pub async fn run_client_once(client: Arc<Client>) -> Result<()> {
     after_login(&client.rq_client.clone()).await;
     // save session, IO errors are fatal.
     client.write_token_to_store().await?;
-    //
+    let event_sender = crate::handler::EventSender {
+        modules: client.modules.clone(),
+        result_handlers: client.result_handlers.clone(),
+    };
+    loop_events(handle, event_sender).await
+}
+
+async fn loop_events(handle: JoinHandle<()>, event_sender: EventSender) -> Result<()> {
     let _ = event_sender.send_connected_and_online().await;
-    // hold handle
     let result = handle.await;
     let _ = event_sender.send_disconnected_and_offline().await;
     result.with_context(|| "handle await error")?;
@@ -445,7 +460,9 @@ pub struct ClientBuilder {
     show_qr: Option<ShowQR>,
     show_slider: Option<ShowSlider>,
     device_lock_verification: Option<DeviceLockVerification>,
+    #[cfg(feature = "connect_handler")]
     connect_handler_arc: Arc<Option<Box<dyn ConnectionHandler + Sync + Send>>>,
+    reconnect_duration: Duration,
 }
 
 impl ClientBuilder {
@@ -460,7 +477,9 @@ impl ClientBuilder {
             show_qr: None,
             show_slider: None,
             device_lock_verification: None,
+            #[cfg(feature = "connect_handler")]
             connect_handler_arc: None.into(),
+            reconnect_duration: Duration::from_millis(100),
         }
     }
 
@@ -561,7 +580,9 @@ impl ClientBuilder {
                 DeviceLockVerification::Url
             },
             shutting: false,
+            #[cfg(feature = "connect_handler")]
             connection_handler: self.connect_handler_arc.clone(),
+            reconnect_duration: self.reconnect_duration,
         })
     }
 
@@ -585,11 +606,17 @@ impl ClientBuilder {
         self
     }
 
+    #[cfg(feature = "connect_handler")]
     pub fn connect_handler(
         mut self,
         connect_handler: Box<dyn ConnectionHandler + Sync + Send>,
     ) -> Self {
         self.connect_handler_arc = Arc::new(Some(connect_handler));
+        self
+    }
+
+    pub fn reconnect_duration(mut self, reconnect_duration: Duration) -> Self {
+        self.reconnect_duration = reconnect_duration;
         self
     }
 }
@@ -659,11 +686,4 @@ impl SessionStore for FileSessionStore {
         let _ = tokio::fs::remove_file(self.path.as_str()).await;
         Ok(())
     }
-}
-
-pub trait Connection: AsyncRead + AsyncWrite + Unpin + Send + Sync {}
-
-#[async_trait]
-pub trait ConnectionHandler {
-    async fn connect(&self, address: SocketAddr) -> Result<Box<dyn Connection>>;
 }
