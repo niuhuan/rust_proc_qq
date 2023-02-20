@@ -1,6 +1,6 @@
 [package]
 name = "proc_qq"
-version = "0.1.24"
+version = "0.1.25"
 edition = "2021"
 description = "QQ client framework"
 license = "MIT"
