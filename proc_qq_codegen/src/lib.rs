@@ -152,6 +152,18 @@ pub fn event(args: TokenStream, input: TokenStream) -> TokenStream {
             quote! {::proc_qq::SelfInvitedEventEventProcess},
             quote! {::proc_qq::ModuleEventProcess::SelfInvitedEvent},
         ),
+        "& GroupAudioMessageEvent" => (
+            quote! {::proc_qq::GroupAudioMessageEventProcess},
+            quote! {::proc_qq::ModuleEventProcess::GroupAudioMessageEvent},
+        ),
+        "& FriendAudioMessageEvent" => (
+            quote! {::proc_qq::FriendAudioMessageEventProcess},
+            quote! {::proc_qq::ModuleEventProcess::FriendAudioMessageEvent},
+        ),
+        "& ClientDisconnect" => (
+            quote! {::proc_qq::ClientDisconnectProcess},
+            quote! {::proc_qq::ModuleEventProcess::ClientDisconnect},
+        ),
         t => abort!(
             param.span(),
             format!("未知的参数类型 {}, 请在文档中查看兼容的事件以及参数类型 https://github.com/niuhuan/rust_proc_qq", t),

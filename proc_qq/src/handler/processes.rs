@@ -1,8 +1,9 @@
 use super::events::*;
 use async_trait::async_trait;
 use ricq::client::event::{
-    DeleteFriendEvent, FriendMessageEvent, FriendMessageRecallEvent, FriendPokeEvent,
-    GroupDisbandEvent, GroupLeaveEvent, GroupMessageEvent, GroupMessageRecallEvent, GroupMuteEvent,
+    ClientDisconnect, DeleteFriendEvent, FriendAudioMessageEvent, FriendMessageEvent,
+    FriendMessageRecallEvent, FriendPokeEvent, GroupAudioMessageEvent, GroupDisbandEvent,
+    GroupLeaveEvent, GroupMessageEvent, GroupMessageRecallEvent, GroupMuteEvent,
     GroupNameUpdateEvent, GroupTempMessageEvent, JoinGroupRequestEvent,
     MemberPermissionChangeEvent, NewFriendEvent, NewFriendRequestEvent, NewMemberEvent,
     SelfInvitedEvent,
@@ -43,6 +44,10 @@ pub enum ModuleEventProcess {
     MemberPermissionChange(Box<dyn MemberPermissionChangeEventProcess>),
     NewMember(Box<dyn NewMemberEventProcess>),
     SelfInvited(Box<dyn SelfInvitedEventProcess>),
+
+    GroupAudioMessage(Box<dyn GroupAudioMessageEventProcess>),
+    FriendAudioMessage(Box<dyn FriendAudioMessageEventProcess>),
+    ClientDisconnect(Box<dyn ClientDisconnectProcess>),
 }
 
 macro_rules! process_trait {
@@ -91,3 +96,6 @@ process_trait!(
 );
 process_trait!(NewMemberEventProcess, NewMemberEvent);
 process_trait!(SelfInvitedEventProcess, SelfInvitedEvent);
+process_trait!(GroupAudioMessageEventProcess, GroupAudioMessageEvent);
+process_trait!(FriendAudioMessageEventProcess, FriendAudioMessageEvent);
+process_trait!(ClientDisconnectProcess, ClientDisconnect);

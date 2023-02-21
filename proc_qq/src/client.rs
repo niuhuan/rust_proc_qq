@@ -69,11 +69,11 @@ pub async fn run_client(c: Arc<Client>) -> Result<()> {
         modules: c.modules.clone(),
         result_handlers: c.result_handlers.clone(),
     };
-    // todo: max try count
     loop {
         // 每次轮询d
         after_login(&c.rq_client.clone()).await;
         // 直到连接断开
+        tracing::info!("开始接收消息");
         let err = match loop_events(handle, &event_sender).await {
             Ok(_) => {
                 tracing::warn!("连接已断开");
@@ -85,11 +85,24 @@ pub async fn run_client(c: Arc<Client>) -> Result<()> {
             }
         };
         handle = re_connection(c.clone()).await?;
+        tracing::info!("恢复连接");
         if !token_login(c.as_ref()).await {
+            tracing::info!("恢复会话");
+        } else {
+            tracing::warn!("未能恢复会话");
             let login = match c.authentication {
-                Authentication::UinPassword(_, _) => login_authentication(&c),
-                Authentication::UinPasswordMd5(_, _) => login_authentication(&c),
-                _ => return Err(err),
+                Authentication::UinPassword(_, _) => {
+                    tracing::info!("使用账号密码重新登录");
+                    login_authentication(&c)
+                }
+                Authentication::UinPasswordMd5(_, _) => {
+                    tracing::info!("使用账号密码重新登录");
+                    login_authentication(&c)
+                }
+                _ => {
+                    tracing::error!("当前登录方式不支持重新登录");
+                    return Err(err);
+                }
             };
             login.await?;
         }

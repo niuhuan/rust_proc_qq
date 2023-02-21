@@ -308,7 +308,38 @@ impl Handler for ClientHandler {
                     ResultProcess::SelfInvited
                 );
             }
-            _ => tracing::debug!(target = "proc_qq", "{:?}", e),
+            QEvent::GroupAudioMessage(event) => {
+                let _ = map_handlers!(
+                    &self,
+                    &event,
+                    ModuleEventProcess::GroupAudioMessage,
+                    ResultProcess::GroupAudioMessage
+                );
+            }
+            QEvent::FriendAudioMessage(event) => {
+                let _ = map_handlers!(
+                    &self,
+                    &event,
+                    ModuleEventProcess::FriendAudioMessage,
+                    ResultProcess::FriendAudioMessage
+                );
+            }
+            QEvent::NewMember(event) => {
+                let _ = map_handlers!(
+                    &self,
+                    &event,
+                    ModuleEventProcess::NewMember,
+                    ResultProcess::NewMember
+                );
+            }
+            QEvent::ClientDisconnect(event) => {
+                let _ = map_handlers!(
+                    &self,
+                    &event,
+                    ModuleEventProcess::ClientDisconnect,
+                    ResultProcess::ClientDisconnect
+                );
+            }
         }
     }
 }
