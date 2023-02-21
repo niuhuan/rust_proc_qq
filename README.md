@@ -180,12 +180,12 @@ use ricq::client::event::{
     NewFriendEvent, GroupTempMessageEvent,
 };
 use ricq::client::event::{
-  GroupDisbandEvent,
-  MemberPermissionChangeEvent,
-  NewMemberEvent,
-  SelfInvitedEvent,
+  GroupDisbandEvent, MemberPermissionChangeEvent, NewMemberEvent, SelfInvitedEvent,
+  GroupAudioMessageEvent, FriendAudioMessageEvent, ClientDisconnect,
 };
-use proc_qq::{MessageEvent, LoginEvent, ConnectedAndOnlineEvent, DisconnectedAndOfflineEvent, };
+use proc_qq::{
+  MessageEvent, LoginEvent, ConnectedAndOnlineEvent, DisconnectedAndOfflineEvent, 
+};
 ```
 
 - MessageEvent: 同时适配多种消息
