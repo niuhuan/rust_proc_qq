@@ -86,7 +86,7 @@ pub async fn run_client(c: Arc<Client>) -> Result<()> {
         };
         handle = re_connection(c.clone()).await?;
         tracing::info!("恢复连接");
-        if !token_login(c.as_ref()).await {
+        if token_login(c.as_ref()).await {
             tracing::info!("恢复会话");
         } else {
             tracing::warn!("未能恢复会话");
