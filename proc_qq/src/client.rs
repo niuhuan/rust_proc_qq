@@ -64,6 +64,7 @@ pub async fn run_client(c: Arc<Client>) -> Result<()> {
     // 优先使用token登录
     if !token_login(c.as_ref()).await {
         login_authentication(&c).await?;
+        c.write_token_to_store().await?;
     }
     let event_sender = crate::handler::EventSender {
         modules: c.modules.clone(),
@@ -277,7 +278,7 @@ async fn qr_login(client: &Client, show_qr: ShowQR) -> Result<()> {
                 ref sig,
             }) => {
                 image_sig = sig.clone();
-                // todo 桌面环境直接打开, 服务器使用文字渲染
+                // 桌面环境直接打开, 服务器使用文字渲染
                 match show_qr {
                     ShowQR::OpenBySystem => {
                         tokio::fs::write("qrcode.png", &image_data)
