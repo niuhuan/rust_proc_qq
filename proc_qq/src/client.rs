@@ -723,6 +723,12 @@ pub struct FileSessionStore {
     pub path: String,
 }
 
+impl FileSessionStore {
+    pub fn boxed(path: impl Into<String>) -> Box<dyn SessionStore + Send + Sync> {
+        return Box::new(Self { path: path.into() });
+    }
+}
+
 #[async_trait]
 impl SessionStore for FileSessionStore {
     async fn save_session(&self, data: Vec<u8>) -> Result<()> {

@@ -14,9 +14,7 @@ async fn main() {
         .show_rq(ShowQR::OpenBySystem)
         .device(DeviceSource::JsonFile("device.json".to_owned()))
         .version(&ANDROID_WATCH)
-        .session_store(Box::new(FileSessionStore {
-            path: "session.token".to_string(),
-        }))
+        .session_store(FileSessionStore::boxed("session.token"))
         .modules(vec![hello_module::module()])
         .result_handlers(vec![result_handlers::on_result {}.into()])
         .build()

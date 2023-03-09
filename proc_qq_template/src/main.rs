@@ -29,9 +29,7 @@ async fn main() -> anyhow::Result<()> {
     let client = ClientBuilder::new()
         .device(DeviceSource::JsonFile("device.json".to_owned()))
         .version(&ANDROID_WATCH)
-        .session_store(Box::new(FileSessionStore {
-            path: "session.token".to_string(),
-        }))
+        .session_store(FileSessionStore::boxed("session.token"))
         .authentication(UinPasswordMd5(config.account.uin, password))
         .show_slider_pop_menu_if_possible()
         .modules(modules::all_modules())
