@@ -1,10 +1,11 @@
 use crate::handler::EventSender;
 use crate::DeviceSource::{JsonFile, JsonString};
-use crate::{Authentication, ClientHandler, DeviceSource, EventResultHandler, Module};
+use crate::{
+    Authentication, ClientHandler, DeviceLockVerification, DeviceSource, EventResultHandler,
+    Module, SessionStore, ShowQR, ShowSlider,
+};
 use anyhow::{anyhow, Context, Result};
-use async_trait::async_trait;
 use bytes::{Buf, BufMut, Bytes, BytesMut};
-use core::future::Future;
 use futures::future::BoxFuture;
 use futures::FutureExt;
 use rand::prelude::IteratorRandom;
@@ -18,8 +19,6 @@ use ricq_core::protocol::device::Device;
 use ricq_core::protocol::version::{Version, ANDROID_PHONE};
 use ricq_core::{RQError, RQResult, Token};
 use std::cmp::min;
-use std::path::Path;
-use std::pin::Pin;
 use std::sync::Arc;
 use std::time::Duration;
 use tokio::net::TcpStream;
@@ -30,6 +29,7 @@ use tokio::time::sleep;
 use crate::features::connect_handler::ConnectionHandler;
 #[cfg(feature = "connect_handler")]
 use std::ops::Deref;
+use std::path::Path;
 
 pub struct Client {
     pub rq_client: Arc<ricq::Client>,
@@ -66,7 +66,7 @@ pub async fn run_client(c: Arc<Client>) -> Result<()> {
         login_authentication(&c).await?;
         c.write_token_to_store().await?;
     }
-    let event_sender = crate::handler::EventSender {
+    let event_sender = EventSender {
         modules: c.modules.clone(),
         result_handlers: c.result_handlers.clone(),
     };
@@ -124,7 +124,7 @@ pub async fn run_client_once(client: Arc<Client>) -> Result<()> {
     after_login(&client.rq_client.clone()).await;
     // save session, IO errors are fatal.
     client.write_token_to_store().await?;
-    let event_sender = crate::handler::EventSender {
+    let event_sender = EventSender {
         modules: client.modules.clone(),
         result_handlers: client.result_handlers.clone(),
     };
@@ -226,25 +226,25 @@ fn authenticate<'a>(
 ) -> BoxFuture<'a, Result<()>> {
     async move {
         let rq_client = client.rq_client.clone();
-        match authentication {
+        match authentication.clone() {
             Authentication::QRCode => qr_login(client, client.show_qr.clone()).await,
             Authentication::UinPassword(uin, password) => {
-                let first = rq_client.password_login(uin.clone(), password).await;
+                let first = rq_client.password_login(uin, &password).await;
                 loop_login(client, first).await
             }
             Authentication::UinPasswordMd5(uin, password) => {
-                let first = rq_client.password_md5_login(uin.clone(), password).await;
+                let first = rq_client.password_md5_login(uin, &password).await;
                 loop_login(client, first).await
             }
             Authentication::CustomUinPassword(cup) => {
-                let uin = (cup.input_uin)().await?;
-                let password = (cup.input_password)().await?;
+                let uin = cup.input_uin().await?;
+                let password = cup.input_password().await?;
                 let first = rq_client.password_login(uin, &password).await;
                 loop_login(client, first).await
             }
             Authentication::CustomUinPasswordMd5(cup) => {
-                let uin = (cup.input_uin)().await?;
-                let password = (cup.input_password_md5)().await?;
+                let uin = cup.input_uin().await?;
+                let password = cup.input_password_md5().await?;
                 let first = rq_client.password_md5_login(uin, &password).await;
                 loop_login(client, first).await
             }
@@ -379,8 +379,8 @@ async fn loop_login(client: &Client, first: RQResult<LoginResponse>) -> Result<(
                 tracing::info!("设备锁 : {:?}", message);
                 tracing::info!("密保手机 : {:?}", sms_phone);
                 tracing::info!("验证地址 : {:?}", verify_url);
-                match &client.device_lock_verification {
-                    &DeviceLockVerification::Url => {
+                match client.device_lock_verification.clone() {
+                    DeviceLockVerification::Url => {
                         qr2term::print_qr(
                             verify_url
                                 .clone()
@@ -391,7 +391,12 @@ async fn loop_login(client: &Client, first: RQResult<LoginResponse>) -> Result<(
                         tracing::info!("手机扫码或者打开url，处理完成后重启程序");
                         std::process::exit(0);
                     }
-                    &DeviceLockVerification::Sms => resp = rq_client.request_sms().await?,
+                    DeviceLockVerification::Sms(st) => {
+                        rq_client.request_sms().await?;
+                        resp = rq_client
+                            .submit_sms_code(st.clone().get().await?.as_str())
+                            .await?;
+                    }
                 }
             }
             LoginResponse::NeedCaptcha(LoginNeedCaptcha {
@@ -679,15 +684,6 @@ fn parse_device_json(json: &str) -> Result<Device, anyhow::Error> {
     Ok(serde_json::from_str(json).with_context(|| format!("DeviceJson解析失败"))?)
 }
 
-#[derive(Clone, Debug)]
-pub enum ShowQR {
-    OpenBySystem,
-    #[cfg(feature = "console_qr")]
-    PrintToConsole,
-    Custom(Pin<Box<fn(Bytes) -> Pin<Box<dyn Future<Output = Result<()>> + Send>>>>),
-    SaveToFile,
-}
-
 #[cfg(feature = "console_qr")]
 fn print_qr_to_console(buff: &Bytes) -> Result<()> {
     let img = image::load_from_memory(buff)?.into_luma8();
@@ -696,54 +692,4 @@ fn print_qr_to_console(buff: &Bytes) -> Result<()> {
     let (_, content) = grids.get(0).with_context(|| "未能识别出二维码")?.decode()?;
     qr2term::print_qr(content.as_str())?;
     Ok(())
-}
-
-#[derive(Clone, Debug)]
-pub enum ShowSlider {
-    AndroidHelper,
-
-    #[cfg(all(any(target_os = "windows"), feature = "pop_window_slider"))]
-    PopWindow,
-}
-
-#[derive(Clone, Debug)]
-pub enum DeviceLockVerification {
-    Url,
-    Sms,
-}
-
-#[async_trait]
-pub trait SessionStore {
-    async fn save_session(&self, data: Vec<u8>) -> Result<()>;
-    async fn load_session(&self) -> Result<Option<Vec<u8>>>;
-    async fn remove_session(&self) -> Result<()>;
-}
-
-pub struct FileSessionStore {
-    pub path: String,
-}
-
-impl FileSessionStore {
-    pub fn boxed(path: impl Into<String>) -> Box<dyn SessionStore + Send + Sync> {
-        return Box::new(Self { path: path.into() });
-    }
-}
-
-#[async_trait]
-impl SessionStore for FileSessionStore {
-    async fn save_session(&self, data: Vec<u8>) -> Result<()> {
-        tokio::fs::write(self.path.as_str(), data).await?;
-        Ok(())
-    }
-    async fn load_session(&self) -> Result<Option<Vec<u8>>> {
-        if Path::new(self.path.as_str()).exists() {
-            Ok(Some(tokio::fs::read(self.path.as_str()).await?))
-        } else {
-            Ok(None)
-        }
-    }
-    async fn remove_session(&self) -> Result<()> {
-        let _ = tokio::fs::remove_file(self.path.as_str()).await;
-        Ok(())
-    }
 }

@@ -8,7 +8,7 @@ use proc_qq::{
 /// 登录成功的时候调用
 #[event]
 async fn login(event: &LoginEvent) -> anyhow::Result<bool> {
-    tracing::info!("登录成功了 : {}", event.uin);
+    tracing::info!("正在登录 : {}", event.uin);
     Ok(false)
 }
 
