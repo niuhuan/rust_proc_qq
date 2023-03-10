@@ -7,7 +7,6 @@ RUST_PROC_QQ
 - Rust语言的QQ机器人框架. (基于[RICQ](https://github.com/lz1998/ricq))
 - 开箱即用, 操作简单, 代码极简
 
-
 QQ机器人框架 | [Telegram(电报)机器人框架](https://github.com/niuhuan/teleser-rs)
 
 ## 框架目的
@@ -20,14 +19,18 @@ QQ机器人框架 | [Telegram(电报)机器人框架](https://github.com/niuhuan
 
 # 设计思路
 
-所有的功能都是由插件完成, 事件发生时, 调度器对插件轮训调用, 插件响应是否处理该事件, 直至有插件响应事件, 插件发生异常, 或插件轮训结束, 最后日志结果被记录, 事件响应周期结束。
+所有的功能都是由插件完成, 事件发生时, 调度器对插件轮训调用, 插件响应是否处理该事件, 直至有插件响应事件, 插件发生异常,
+或插件轮训结束, 最后日志结果被记录, 事件响应周期结束。
 
 ![img.png](images/invoke.png)
 
 ## 如何使用 / demo
 
-密码登录第一次需要滑块助手 https://github.com/mzdluo123/TxCaptchaHelper
+如果您使用密码登录，并且不是windows系统，使用安卓设备安装滑块助手，用于第一次登录的验证
 
+https://github.com/mzdluo123/TxCaptchaHelper
+
+### 新建项目
 
 新建一个rust项目, 并将rust环境设置为nightly
 
@@ -87,7 +90,7 @@ async fn group_hello(_: &GroupMessageEvent) -> anyhow::Result<bool> {
     Ok(false)
 }
 
-/// 返回一个模块 (向过程宏改进中)
+/// 返回一个模块
 pub(crate) fn module() -> Module {
     // id, name, [plugins ...]
     module!("hello", "你好", print, group_hello)
@@ -160,15 +163,15 @@ fn init_tracing_subscriber() {
 
 ### 登录
 
-```rust
-    // .show_rq(Some(ShowQR::PrintToConsole))  // 打印二维码到控制台
-    // .show_rq(ShowQR::Custom(Box::pin(|buff| {  // 自定义显示二维码
-    //   Box::pin(async move {
-    //     println!("buff : {:?}", buff.to_vec());
-    //     Ok(())
-    //   })
-    // })))
-```
+- 打印二维码到控制台 `.show_rq(Some(ShowQR::PrintToConsole))`
+- 自定义显示二维码 
+  ```
+  .show_rq(ShowQR::Custom(Box::pin(|buff| {  // 自定义显示二维码
+    Box::pin(async move {
+         println!("buff : {:?}", buff.to_vec());
+         Ok(())
+  })
+  ```
 
 ### 支持的事件
 
@@ -180,16 +183,16 @@ use ricq::client::event::{
     NewFriendEvent, GroupTempMessageEvent,
 };
 use ricq::client::event::{
-  GroupDisbandEvent, MemberPermissionChangeEvent, NewMemberEvent, SelfInvitedEvent,
-  GroupAudioMessageEvent, FriendAudioMessageEvent, ClientDisconnect,
+    GroupDisbandEvent, MemberPermissionChangeEvent, NewMemberEvent, SelfInvitedEvent,
+    GroupAudioMessageEvent, FriendAudioMessageEvent, ClientDisconnect,
 };
 use proc_qq::{
-  MessageEvent, LoginEvent, ConnectedAndOnlineEvent, DisconnectedAndOfflineEvent, 
+    MessageEvent, LoginEvent, ConnectedAndOnlineEvent, DisconnectedAndOfflineEvent,
 };
 ```
 
 - MessageEvent: 同时适配多种消息
-- LoginEvent: 登录成功事件 (RICQ中这个事件类型为i64,这里做了封装)
+- LoginEvent: 登录事件(未登录成功) (RICQ中这个事件类型为i64,这里做了封装)
 - ConnectedAndOnlineEvent: 连接成功, 并且登录后 (proc-qq状态)
 - DisconnectedAndOfflineEvent: 掉线并且断开连接 (proc-qq状态)
 
@@ -222,7 +225,7 @@ client
 .await?;
 ```
 
-####  
+####     
 
 MessageChain链式追加
 
@@ -237,35 +240,9 @@ let chain = chain.append(at).append(text).append(image);
 
 使用result_handlers监听处理结果 (事件参数正在开发)
 
-```rust
-use proc_qq::result;
-use proc_qq::EventResult;
+用来监听message或者其他event的处理结果（有无异常，由哪个模块处理，主要用于日志记录）
 
-#[result]
-async fn on_result(result: &EventResult) -> anyhow::Result<bool> {
-    match result {
-        EventResult::Process(info) => {
-            tracing::info!("{} : {} : 处理了一条消息", info.module_id, info.handle_name);
-        }
-        EventResult::Exception(info, err) => {
-            tracing::info!(
-                "{} : {} : 遇到了错误 : {}",
-                info.module_id,
-                info.handle_name,
-                err
-            );
-        }
-    }
-    Ok(false)
-}
-```
-
-```rust
-ClientBuilder::new()
-.modules(vec![hello_module::module()])
-.result_handlers(vec![result_handlers::on_result {}.into()])
-.build()
-```
+[Example](docs/EventResult.md)
 
 ## 定时任务或客户端事件发送消息
 
@@ -334,15 +311,26 @@ async fn handle(event: &MessageEvent) -> anyhow::Result<bool> {
 ```rust
 #[event]
 async fn handle4(message: &MessageEvent) -> anyhow::Result<bool> {
-  self.handle3_add(message).await;
-  Ok(false)
+    self.handle3_add(message).await;
+    Ok(false)
 }
 
 #[event_fn(handle3, handle4)]
 async fn handle3_add(message: &MessageEvent) {
-  println!("{}", message.message_content());
+    println!("{}", message.message_content());
 }
 ```
+
+## 网络代理
+
+[Example](docs/Proxy.md)
+
+代理功能有助于您使用服务器的ip登录proc_qq, 并有助于部署到非大陆服务器
+
+- 您可以在安卓设备上设置代理（按APP进行分流）并启动手机QQ登录。
+- 在proc_qq设置代理并扫码登录安卓手表（届时proc_qq和手机QQ都处于服务器IP）。
+- 删除session.token, 使用账号密码登录。
+- 登录成功后将session.token和device.json都复制到服务器并启动，本地的文件备份好并且不再使用。
 
 ## 其他特性
 
@@ -350,22 +338,22 @@ async fn handle3_add(message: &MessageEvent) {
     MessageEvent / FriendMessageEvent / GroupMessageEvent / GroupTempMessageEvent
     trim_regexp trim_eq regexp eq all any not
     为什么会有trim: ricq获取消息会在最后追加空白字符
- 
+
 ```rust
 #[event(trim_regexp = "^a([\\S\\s]+)?$", trim_regexp = "^([\\S\\s]+)?b$")]
 async fn handle2(event: &MessageEvent) -> anyhow::Result<bool> {
-  event
-          .send_message_to_source("a开头且b结束".parse_message_chain())
-          .await?;
-  Ok(true)
+    event
+        .send_message_to_source("a开头且b结束".parse_message_chain())
+        .await?;
+    Ok(true)
 }
 
 #[event(any(trim_regexp = "^a([\\S\\s]+)?$", trim_regexp = "^([\\S\\s]+)?b$"))]
 async fn handle3(event: &MessageEvent) -> anyhow::Result<bool> {
-  event
-          .send_message_to_source("a开头或b结束".parse_message_chain())
-          .await?;
-  Ok(true)
+    event
+        .send_message_to_source("a开头或b结束".parse_message_chain())
+        .await?;
+    Ok(true)
 }
 ```
 
@@ -414,13 +402,13 @@ event.reply_text("你好").await?;
 ##### 额外协议的说明
 
 - 暂定本仓库开源协议与RICQ保持一致.
-  - MPL 2.0
-  - 如RICQ更换协议, 请以最新协议为准, 您可以提出ISSUE提醒我进行更新
+    - MPL 2.0
+    - 如RICQ更换协议, 请以最新协议为准, 您可以提出ISSUE提醒我进行更新
 - 仓库持有人在变更仓库协议时无需经过其他代码贡献者的同意, 您在PR时就代表您同意此观点
 
 #### 鸣谢
 
-- RICQ commiters 
+- RICQ commiters
 - JetBrains IDEs
 
 ![](images/JetBrains.png)
