@@ -30,6 +30,8 @@ use crate::features::connect_handler::ConnectionHandler;
 #[cfg(feature = "connect_handler")]
 use std::ops::Deref;
 use std::path::Path;
+#[cfg(feature = "connect_handler")]
+use std::pin::Pin;
 
 /// 客户端
 pub struct Client {
