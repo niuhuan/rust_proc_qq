@@ -19,8 +19,9 @@ jobs:
     runs-on: ubuntu-latest
     needs:
       - style
-      - test
-      - android
+      - test-platforms
+      - test-android
+      - test-features
     steps:
       - run: exit 0
 
@@ -50,8 +51,8 @@ jobs:
       - name: temporary workaround - fmt all files under src
         run: cargo fmt -- --check $(find . -name '*.rs' -print)
 
-  test:
-    name: Test build
+  test-platforms:
+    name: Test platforms
     needs: [style]
     runs-on: ${{ matrix.config.os }}
     strategy:
@@ -101,7 +102,7 @@ jobs:
           command: build
           args: --target ${{ matrix.config.target }} --package proc_qq_template
 
-  android:
+  test-android:
     name: Test android
     needs: [style]
 
@@ -126,3 +127,29 @@ jobs:
           command: build
           # disable default-tls feature since cross-compiling openssl is dragons
           args: --target aarch64-linux-android --package proc_qq
+
+  test-features:
+    name: Test features
+    needs: [style]
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        config:
+          - flags: --all-features
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v1
+
+      - name: Install rust
+        uses: actions-rs/toolchain@v1
+        with:
+          toolchain: nightly
+          profile: minimal
+          override: true
+
+      - name: Build
+        uses: actions-rs/cargo@v1
+        with:
+          command: build
+          args: --package proc_qq ${{ matrix.config.flags }}
