@@ -31,6 +31,7 @@ use crate::features::connect_handler::ConnectionHandler;
 use std::ops::Deref;
 use std::path::Path;
 
+/// 客户端
 pub struct Client {
     pub rq_client: Arc<ricq::Client>,
     pub authentication: Authentication,
@@ -47,6 +48,7 @@ pub struct Client {
 }
 
 impl Client {
+    /// 将session写入Store
     pub async fn write_token_to_store(&self) -> Result<()> {
         if let Some(session_store) = self.session_store.as_deref() {
             session_store
@@ -58,6 +60,14 @@ impl Client {
     }
 }
 
+/// 运行客户端，并尽可能的断线重连
+///
+/// 1. 尝试使用token登录
+/// 2. 如果没有设置token存储则使用账号密码或扫码登录
+/// 3. 登录失败则异常退出
+/// 4. 登录成功则保存token，并开始分发事件
+/// 5. 断开连接时停止分发事件, 并尝试使用token再次登录
+/// 6. 如果token失效则使用密码登录并转到4，未设置密码（例如扫码登录）则程序异常退出
 pub async fn run_client(c: Arc<Client>) -> Result<()> {
     // 连接到服务器
     let mut handle = connection(c.clone()).await?;
@@ -509,6 +519,7 @@ pub fn bytes_to_token(token: Vec<u8>) -> Token {
     }
 }
 
+/// 用于构建客户端
 pub struct ClientBuilder {
     device_source: DeviceSource,
     version: &'static Version,
@@ -525,6 +536,7 @@ pub struct ClientBuilder {
 }
 
 impl ClientBuilder {
+    // 构造
     pub fn new() -> Self {
         Self {
             device_source: DeviceSource::default(),
@@ -542,11 +554,13 @@ impl ClientBuilder {
         }
     }
 
+    /// 设置模块
     pub fn modules<S: Into<Arc<Vec<Module>>>>(mut self, h: S) -> Self {
         self.modules_vec = h.into();
         self
     }
 
+    /// 设置事件结果监听器
     pub fn result_handlers<E: Into<Arc<Vec<EventResultHandler>>>>(mut self, e: E) -> Self {
         self.result_handlers_vec = e.into();
         self
@@ -585,6 +599,7 @@ impl ClientBuilder {
         self
     }
 
+    /// 构造客户端
     pub async fn build(&self) -> Result<Client, anyhow::Error> {
         Ok(Client {
             rq_client: Arc::new(ricq::Client::new(
@@ -645,26 +660,31 @@ impl ClientBuilder {
         })
     }
 
+    /// 设置Device.json的来源
     pub fn device(mut self, device_source: DeviceSource) -> Self {
         self.device_source = device_source;
         self
     }
 
+    /// 设置协议
     pub fn version(mut self, version: &'static Version) -> Self {
         self.version = version;
         self
     }
 
+    /// 设置session存储方式
     pub fn session_store(mut self, session_store: Box<dyn SessionStore + Sync + Send>) -> Self {
         self.session_store = Arc::new(Some(session_store));
         self
     }
 
+    /// 设置登录方式
     pub fn authentication(mut self, authentication: Authentication) -> Self {
         self.authentication = Some(authentication);
         self
     }
 
+    /// 设置链接管理器
     #[cfg(feature = "connect_handler")]
     pub fn connect_handler(
         mut self,
@@ -674,6 +694,7 @@ impl ClientBuilder {
         self
     }
 
+    /// 设置链短线重连的时间
     pub fn reconnect_duration(mut self, reconnect_duration: Duration) -> Self {
         self.reconnect_duration = reconnect_duration;
         self
