@@ -235,6 +235,7 @@ pub fn event(args: TokenStream, input: TokenStream) -> TokenStream {
             format!("未知的参数类型 {}, 事件必须作为&self下一个参数(或第一个参数), 请在文档中查看兼容的事件以及参数类型 https://github.com/niuhuan/rust_proc_qq", t),
         ),
     };
+    let mut command_pats: Vec<(&syn::Pat, &syn::Type)> = vec![];
     let command_params = &params[param_skip..params.len()];
     if command_params.is_empty() && bot_command.is_none() {
     } else if command_params.len() > 0 && bot_command.is_none() {
@@ -244,7 +245,7 @@ pub fn event(args: TokenStream, input: TokenStream) -> TokenStream {
     {
         abort!(
             sig_params.span(),
-            "当您使用了bot_command时，若bot_command有变量，函数需要追加的参数，且个数必须与bot_command的变量相等，且名称的顺序一致。例如 \"/ban {user} {time}\"，您需要追加两个参数，user和time",
+            "当您使用了bot_command时，若bot_command有变量，函数需要追加的参数，且个数必须与bot_command的变量相等，且名称的顺序一致。例如 \"/ban {user} {time}\"，您需要追加两个参数，user和time，且必须user在前，顺序不能打乱",
         );
     } else {
         for i in 0..command_params.len() {
@@ -254,12 +255,36 @@ pub fn event(args: TokenStream, input: TokenStream) -> TokenStream {
                 FnArg::Receiver(_) => abort!(&command_param.span(), "不支持self"),
                 FnArg::Typed(pt) => pt,
             };
-            let command_param_arg_name = format!("{}", quote! {#command_param.pat});
-            if command_param_arg_name.eq(bot_arg_name) {
+            let pat = command_param.pat.as_ref();
+            let command_param_arg_name = format!("{}", quote! {#pat});
+            if !command_param_arg_name.eq(bot_arg_name) {
                 abort!(
                     sig_params.span(),
-                    "函数追加的参数必须与bot_command的变量相等，且名称顺序一致",
+                    "函数追加的参数必须与bot_command的变量相等，且名称顺序一致 : \"{}\" != \"{}\"",
+                    bot_arg_name,
+                    command_param_arg_name,
                 );
+            }
+            let ty = command_param.ty.as_ref();
+            let command_param_arg_type = format!("{}", quote! {#ty});
+            match command_param_arg_type.as_str() {
+                "& str" => {
+                    command_pats.push((pat, ty));
+                }
+                "String" => {
+                    command_pats.push((pat, ty));
+                }
+                "i8" | "u8" | "i16" | "u16" | "i32" | "u32" | "i64" | "u64" | "i128" | "u128"
+                | "isize" | "usize" => {
+                    command_pats.push((pat, ty));
+                }
+                _ => {
+                    abort!(
+                        &command_param.span(),
+                        "不支持的类型 : {}",
+                        command_param_arg_type
+                    );
+                }
             }
         }
     };
@@ -275,7 +300,7 @@ pub fn event(args: TokenStream, input: TokenStream) -> TokenStream {
     };
     // gen trait
     let block = &method.block;
-    let build_trait = if all.is_empty() {
+    let build_trait = if all.is_empty() && bot_command.is_none() {
         quote! {
             #[::proc_qq::re_exports::async_trait::async_trait]
             impl #trait_name for #ident {
@@ -294,18 +319,47 @@ pub fn event(args: TokenStream, input: TokenStream) -> TokenStream {
             ),
         }
         let args_vec = args_to_token(all);
-        quote! {
-            #[::proc_qq::re_exports::async_trait::async_trait]
-            impl #trait_name for #ident {
-                async fn handle(&self, #param_pat: #param_ty) -> ::proc_qq::re_exports::anyhow::Result<bool> {
-                    if !::proc_qq::match_event_args_all(#args_vec, #param_pat.into())? {
-                        return Ok(false);
+        if bot_command.is_none() {
+            quote! {
+                #[::proc_qq::re_exports::async_trait::async_trait]
+                impl #trait_name for #ident {
+                    async fn handle(&self, #param_pat: #param_ty) -> ::proc_qq::re_exports::anyhow::Result<bool> {
+                        if !::proc_qq::match_event_args_all(#args_vec, #param_pat.into())? {
+                            return Ok(false);
+                        }
+                        self.raw(#param_pat).await
                     }
-                    self.raw(#param_pat).await
+                }
+                impl #ident {
+                    async fn raw(&self, #param_pat: #param_ty) -> ::proc_qq::re_exports::anyhow::Result<bool> #block
                 }
             }
-            impl #ident {
-                async fn raw(&self, #param_pat: #param_ty) -> ::proc_qq::re_exports::anyhow::Result<bool> #block
+        } else {
+            let mut command_params_in_raw = quote! {};
+            let mut defaults = quote! {};
+            for x in command_pats {
+                let pat = x.0;
+                let ty = x.1;
+                command_params_in_raw.append_all(quote! {
+                   #pat: #ty,
+                });
+                defaults.append_all(quote! {
+                   #ty::default(),
+                });
+            }
+            quote! {
+                #[::proc_qq::re_exports::async_trait::async_trait]
+                impl #trait_name for #ident {
+                    async fn handle(&self, #param_pat: #param_ty) -> ::proc_qq::re_exports::anyhow::Result<bool> {
+                        if !::proc_qq::match_event_args_all(#args_vec, #param_pat.into())? {
+                            return Ok(false);
+                        }
+                        self.raw(#param_pat, #defaults).await
+                    }
+                }
+                impl #ident {
+                    async fn raw(&self, #param_pat: #param_ty, #command_params_in_raw) -> ::proc_qq::re_exports::anyhow::Result<bool> #block
+                }
             }
         }
     };
