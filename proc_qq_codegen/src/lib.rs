@@ -336,18 +336,35 @@ pub fn event(args: TokenStream, input: TokenStream) -> TokenStream {
                 }
             }
         } else {
+            let mut p_pats = quote! {};
             let mut command_params_in_raw = quote! {};
-            let mut defaults = quote! {};
+            let mut gets = quote! {};
+            let args_number = command_pats.len();
+            let mut idx: usize = 0;
             for x in command_pats {
                 let pat = x.0;
                 let ty = x.1;
+                p_pats.append_all(quote! {
+                   #pat,
+                });
                 command_params_in_raw.append_all(quote! {
                    #pat: #ty,
                 });
-                defaults.append_all(quote! {
-                   #ty::default(),
+                gets.append_all(quote! {
+                    let #pat: #ty = match ::proc_qq::CommandMatcher::new(params.get(#idx).unwrap()).get() {
+                        Ok(value) => value,
+                        Err(_) => return Ok(false),
+                    };
                 });
+                idx += 1;
             }
+            if !gets.is_empty() {
+                gets = quote! {
+                     use ::proc_qq::BlockSupplier;
+                     #gets
+                }
+            }
+            let command_name = bot_command_info.as_ref().unwrap().0.as_str();
             quote! {
                 #[::proc_qq::re_exports::async_trait::async_trait]
                 impl #trait_name for #ident {
@@ -355,7 +372,18 @@ pub fn event(args: TokenStream, input: TokenStream) -> TokenStream {
                         if !::proc_qq::match_event_args_all(#args_vec, #param_pat.into())? {
                             return Ok(false);
                         }
-                        self.raw(#param_pat, #defaults).await
+                        // 匹配指令是否能对应
+                        let hand: ::proc_qq::HandEvent = #param_pat.into();
+                        let content = hand.content()?;
+                        let (matched, params) = ::proc_qq::match_command(
+                            &content,
+                            #command_name,
+                        )?;
+                        if !matched || #args_number != params.len() {
+                            return Ok(false);
+                        }
+                        #gets
+                        self.raw(#param_pat, #p_pats).await
                     }
                 }
                 impl #ident {

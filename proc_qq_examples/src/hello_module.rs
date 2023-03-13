@@ -98,7 +98,7 @@ async fn handle3_add(message: &MessageEvent) {
 /// bot_command
 
 #[event(bot_command = "/ban {user} {time}")]
-async fn handle5(_message: &MessageEvent, user: String, time: String) -> anyhow::Result<bool> {
+async fn handle5(_message: &MessageEvent, user: String, time: i64) -> anyhow::Result<bool> {
     println!("user : {user} , time : {time} ");
     Ok(false)
 }
