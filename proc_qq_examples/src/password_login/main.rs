@@ -1,4 +1,4 @@
-use proc_qq::re_exports::ricq::version::ANDROID_WATCH;
+use proc_qq::re_exports::ricq::version::{ANDROID_PHONE, ANDROID_WATCH};
 use proc_qq::*;
 use std::sync::Arc;
 
@@ -13,7 +13,7 @@ async fn main() {
         .authentication(Authentication::UinPasswordMd5(123456, [0; 16]))
         .show_slider_pop_menu_if_possible()
         .device(DeviceSource::JsonFile("device.json".to_owned()))
-        .version(&ANDROID_WATCH)
+        .version(&ANDROID_PHONE)
         .session_store(Box::new(FileSessionStore {
             path: "session.token".to_string(),
         }))
