@@ -100,7 +100,7 @@ async fn handle3_add(message: &MessageEvent) {
 #[event(bot_command = "/ban {user} {time}")]
 async fn handle5(_message: &MessageEvent, user: String, time: i64) -> anyhow::Result<bool> {
     println!("user : {user} , time : {time} ");
-    Ok(false)
+    Ok(true)
 }
 
 /// module
