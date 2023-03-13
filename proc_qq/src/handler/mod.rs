@@ -1,10 +1,13 @@
-use crate::MessageContentTrait;
+use std::sync::Arc;
+
 use async_trait::async_trait;
+use ricq::handler::{Handler, QEvent};
+
 pub use events::*;
 pub use processes::*;
 pub use results::*;
-use ricq::handler::{Handler, QEvent};
-use std::sync::Arc;
+
+use crate::MessageContentTrait;
 
 mod events;
 mod processes;
@@ -393,44 +396,44 @@ pub enum EventArg {
 
 #[derive(Clone)]
 pub enum HandEvent<'a> {
-    MessageEvent(&'a MessageEvent),
-    FriendMessageEvent(&'a FriendMessageEvent),
-    GroupMessageEvent(&'a GroupMessageEvent),
-    GroupTempMessageEvent(&'a GroupTempMessageEvent),
+    MessageEvent(&'a MessageEvent, String),
+    FriendMessageEvent(&'a FriendMessageEvent, String),
+    GroupMessageEvent(&'a GroupMessageEvent, String),
+    GroupTempMessageEvent(&'a GroupTempMessageEvent, String),
 }
 
 impl HandEvent<'_> {
-    fn content(&self) -> ::anyhow::Result<String> {
+    pub fn content(&self) -> ::anyhow::Result<&'_ String> {
         Ok(match self {
-            HandEvent::MessageEvent(c) => c.message_content(),
-            HandEvent::FriendMessageEvent(c) => c.message_content(),
-            HandEvent::GroupMessageEvent(c) => c.message_content(),
-            HandEvent::GroupTempMessageEvent(c) => c.message_content(),
+            HandEvent::MessageEvent(_, content) => &content,
+            HandEvent::FriendMessageEvent(_, content) => &content,
+            HandEvent::GroupMessageEvent(_, content) => &content,
+            HandEvent::GroupTempMessageEvent(_, content) => &content,
         })
     }
 }
 
 impl<'a> From<&'a MessageEvent> for HandEvent<'a> {
     fn from(value: &'a MessageEvent) -> Self {
-        Self::MessageEvent(value)
+        Self::MessageEvent(value, value.message_content())
     }
 }
 
 impl<'a> From<&'a FriendMessageEvent> for HandEvent<'a> {
     fn from(value: &'a FriendMessageEvent) -> Self {
-        Self::FriendMessageEvent(value)
+        Self::FriendMessageEvent(value, value.message_content())
     }
 }
 
 impl<'a> From<&'a GroupMessageEvent> for HandEvent<'a> {
     fn from(value: &'a GroupMessageEvent) -> Self {
-        Self::GroupMessageEvent(value)
+        Self::GroupMessageEvent(value, value.message_content())
     }
 }
 
 impl<'a> From<&'a GroupTempMessageEvent> for HandEvent<'a> {
     fn from(value: &'a GroupTempMessageEvent) -> Self {
-        Self::GroupTempMessageEvent(value)
+        Self::GroupTempMessageEvent(value, value.message_content())
     }
 }
 
@@ -489,5 +492,70 @@ fn match_event_item(arg: EventArg, event: HandEvent) -> ::anyhow::Result<bool> {
         EventArg::Eq(v) => match_event_args_eq(v, event.clone()),
         EventArg::TrimRegexp(v) => match_event_args_trim_regexp(v, event.clone()),
         EventArg::TrimEq(v) => match_event_args_trim_eq(v, event.clone()),
+    }
+}
+
+//
+
+pub fn match_command<'a>(
+    content: &'a str,
+    command_name: &'a str,
+) -> ::anyhow::Result<(bool, Vec<&'a str>)> {
+    if content.starts_with(command_name) {
+        let sp_regexp = regex::Regex::new("\\s+").expect("proc_qq 正则错误");
+        let params = content.trim_start_matches(command_name).trim();
+        if params.is_empty() {
+            return Ok((true, vec![]));
+        }
+        let params: Vec<&str> = sp_regexp.split(params).collect();
+        return Ok((true, params));
+    }
+    Ok((false, vec![]))
+}
+
+pub trait BlockSupplier<T> {
+    fn get(&self) -> anyhow::Result<T>;
+}
+
+pub struct CommandMatcher<'a>(&'a str);
+
+impl CommandMatcher<'_> {
+    pub fn new(value: &'_ str) -> CommandMatcher<'_> {
+        CommandMatcher(value)
+    }
+}
+
+macro_rules! command_supplier {
+    ($ty:ty) => {
+        impl BlockSupplier<$ty> for CommandMatcher<'_> {
+            fn get(&self) -> anyhow::Result<$ty> {
+                Ok(self.0.parse::<$ty>()?)
+            }
+        }
+    };
+}
+
+command_supplier!(i8);
+command_supplier!(u8);
+command_supplier!(i16);
+command_supplier!(u16);
+command_supplier!(i32);
+command_supplier!(u32);
+command_supplier!(i64);
+command_supplier!(u64);
+command_supplier!(i128);
+command_supplier!(u128);
+command_supplier!(isize);
+command_supplier!(usize);
+
+impl BlockSupplier<String> for CommandMatcher<'_> {
+    fn get(&self) -> anyhow::Result<String> {
+        Ok(self.0.to_string())
+    }
+}
+
+impl<'a> BlockSupplier<&'a str> for CommandMatcher<'a> {
+    fn get(&self) -> anyhow::Result<&'a str> {
+        Ok(self.0)
     }
 }

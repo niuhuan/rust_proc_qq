@@ -5,7 +5,7 @@ RUST_PROC_QQ
 [![crates.io](https://img.shields.io/crates/v/proc_qq.svg)](https://crates.io/crates/proc_qq)
 
 - Rust语言的QQ机器人框架. (基于[RICQ](https://github.com/lz1998/ricq))
-- 开箱即用, 操作简单, 代码极简
+- 开箱即用, 操作简单, 代码简洁
 
 QQ机器人框架 | [Telegram(电报)机器人框架](https://github.com/niuhuan/teleser-rs)
 
@@ -164,14 +164,7 @@ fn init_tracing_subscriber() {
 ### 登录
 
 - 打印二维码到控制台 `.show_rq(Some(ShowQR::PrintToConsole))`
-- 自定义显示二维码 
-  ```
-  .show_rq(ShowQR::Custom(Box::pin(|buff| {  // 自定义显示二维码
-    Box::pin(async move {
-         println!("buff : {:?}", buff.to_vec());
-         Ok(())
-  })
-  ```
+- [自定义显示二维码](docs/CustomShowQR.md)
 
 ### 支持的事件
 
@@ -247,6 +240,49 @@ let chain = chain.append(at).append(text).append(image);
 ## 定时任务或客户端事件发送消息
 
 参考template, 使用run_client(Arc\<Client\>), 使得机器人与定时任务并行, 并使用rc_client发送消息
+
+## 命令匹配
+
+对命令进行匹配（空白字符作为分隔符）
+
+如下所示，当您输入 `ban abc 123` 的时候，控制台将会打印 `user : abc , time : 123`
+
+```rust
+#[event(bot_command = "ban {user} {time}")]
+async fn handle5(_message: &MessageEvent, user: String, time: i64) -> anyhow::Result<bool> {
+    println!("user : {user} , time : {time} ");
+    Ok(true)
+}
+```
+
+目前能匹配的类型 u8~u128, i8~i128, isize, usize, String, &str
+
+目前还在计划种：可以匹配 At, Vec<At>(多个@使用空白字符分割), Vec<number>(尽可能多的匹配数字类型) ,Vec<&str / String>(只能存在于末尾)
+
+## 过滤器
+
+    event参数
+    MessageEvent / FriendMessageEvent / GroupMessageEvent / GroupTempMessageEvent
+    trim_regexp trim_eq regexp eq all any not
+    为什么会有trim: ricq获取消息会在最后追加空白字符
+
+```rust
+#[event(trim_regexp = "^a([\\S\\s]+)?$", trim_regexp = "^([\\S\\s]+)?b$")]
+async fn handle2(event: &MessageEvent) -> anyhow::Result<bool> {
+    event
+        .send_message_to_source("a开头且b结束".parse_message_chain())
+        .await?;
+    Ok(true)
+}
+
+#[event(any(trim_regexp = "^a([\\S\\s]+)?$", trim_regexp = "^([\\S\\s]+)?b$"))]
+async fn handle3(event: &MessageEvent) -> anyhow::Result<bool> {
+    event
+        .send_message_to_source("a开头或b结束".parse_message_chain())
+        .await?;
+    Ok(true)
+}
+```
 
 ## 手动实现handler和原理
 
@@ -331,31 +367,6 @@ async fn handle3_add(message: &MessageEvent) {
 - 在proc_qq设置代理并扫码登录安卓手表（届时proc_qq和手机QQ都处于服务器IP）。
 - 删除session.token, 使用账号密码登录。
 - 登录成功后将session.token和device.json都复制到服务器并启动，本地的文件备份好并且不再使用。
-
-## 其他特性
-
-    event参数
-    MessageEvent / FriendMessageEvent / GroupMessageEvent / GroupTempMessageEvent
-    trim_regexp trim_eq regexp eq all any not
-    为什么会有trim: ricq获取消息会在最后追加空白字符
-
-```rust
-#[event(trim_regexp = "^a([\\S\\s]+)?$", trim_regexp = "^([\\S\\s]+)?b$")]
-async fn handle2(event: &MessageEvent) -> anyhow::Result<bool> {
-    event
-        .send_message_to_source("a开头且b结束".parse_message_chain())
-        .await?;
-    Ok(true)
-}
-
-#[event(any(trim_regexp = "^a([\\S\\s]+)?$", trim_regexp = "^([\\S\\s]+)?b$"))]
-async fn handle3(event: &MessageEvent) -> anyhow::Result<bool> {
-    event
-        .send_message_to_source("a开头或b结束".parse_message_chain())
-        .await?;
-    Ok(true)
-}
-```
 
 ## 其他
 
