@@ -34,8 +34,8 @@ impl MessageEvent {
     }
     pub fn as_group_message(&self) -> RQResult<&'_ GroupMessageEvent> {
         match self {
-            MessageEvent::GroupMessage(group_message) => RQResult::Ok(group_message),
-            _ => RQResult::Err(RQError::Other("Not is a group message".to_owned())),
+            MessageEvent::GroupMessage(group_message) => Ok(group_message),
+            _ => Err(RQError::Other("Not is a group message".to_owned())),
         }
     }
     pub fn is_private_message(&self) -> bool {
@@ -46,8 +46,8 @@ impl MessageEvent {
     }
     pub fn as_private_message(&self) -> RQResult<&'_ FriendMessageEvent> {
         match self {
-            MessageEvent::FriendMessage(private_message) => RQResult::Ok(private_message),
-            _ => RQResult::Err(RQError::Other("Not is a group message".to_owned())),
+            MessageEvent::FriendMessage(private_message) => Ok(private_message),
+            _ => Err(RQError::Other("Not is a group message".to_owned())),
         }
     }
     pub fn is_temp_message(&self) -> bool {
@@ -58,8 +58,8 @@ impl MessageEvent {
     }
     pub fn as_temp_message(&self) -> RQResult<&'_ GroupTempMessageEvent> {
         match self {
-            MessageEvent::GroupTempMessage(temp_message) => RQResult::Ok(temp_message),
-            _ => RQResult::Err(RQError::Other("Not is a group message".to_owned())),
+            MessageEvent::GroupTempMessage(temp_message) => Ok(temp_message),
+            _ => Err(RQError::Other("Not is a group message".to_owned())),
         }
     }
     pub fn from_uin(&self) -> i64 {
@@ -69,13 +69,12 @@ impl MessageEvent {
             MessageEvent::GroupTempMessage(message) => message.inner.from_uin,
         }
     }
-    pub fn elements(&self) -> MessageChain {
+    pub fn elements(&self) -> &'_ MessageChain {
         match self {
             MessageEvent::GroupMessage(message) => &message.inner.elements,
             MessageEvent::FriendMessage(message) => &message.inner.elements,
             MessageEvent::GroupTempMessage(message) => &message.inner.elements,
         }
-        .clone()
     }
 }
 

@@ -255,9 +255,13 @@ async fn handle5(_message: &MessageEvent, user: String, time: i64) -> anyhow::Re
 }
 ```
 
-目前能匹配的类型 u8~u128, i8~i128, isize, usize, String, &str
+目前能匹配的类型 
+```
+u8~u128, i8~i128, isize, usize, String, &str,
+ricq_core::msg::elem::At
+```
 
-目前还在计划种：可以匹配 At, Vec<At>(多个@使用空白字符分割), Vec<number>(尽可能多的匹配数字类型) ,Vec<&str / String>(只能存在于末尾)
+目前还在计划中：可以匹配 At, Vec<At>(多个@使用空白字符分割), Vec<number>(尽可能多的匹配数字类型) ,Vec<&str / String>(只能存在于末尾)
 
 ## 过滤器
 

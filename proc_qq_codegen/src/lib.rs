@@ -269,14 +269,8 @@ pub fn event(args: TokenStream, input: TokenStream) -> TokenStream {
             let ty = command_param.ty.as_ref();
             let command_param_arg_type = format!("{}", quote! {#ty});
             match command_param_arg_type.as_str() {
-                "& str" => {
-                    command_pats.push((pat, ty));
-                }
-                "String" => {
-                    command_pats.push((pat, ty));
-                }
-                "i8" | "u8" | "i16" | "u16" | "i32" | "u32" | "i64" | "u64" | "i128" | "u128"
-                | "isize" | "usize" => {
+                "At" | "String" | "i8" | "u8" | "i16" | "u16" | "i32" | "u32" | "i64" | "u64"
+                | "i128" | "u128" | "isize" | "usize" => {
                     command_pats.push((pat, ty));
                 }
                 _ => {
@@ -339,8 +333,6 @@ pub fn event(args: TokenStream, input: TokenStream) -> TokenStream {
             let mut p_pats = quote! {};
             let mut command_params_in_raw = quote! {};
             let mut gets = quote! {};
-            let args_number = command_pats.len();
-            let mut idx: usize = 0;
             for x in command_pats {
                 let pat = x.0;
                 let ty = x.1;
@@ -351,16 +343,15 @@ pub fn event(args: TokenStream, input: TokenStream) -> TokenStream {
                    #pat: #ty,
                 });
                 gets.append_all(quote! {
-                    let #pat: #ty = match ::proc_qq::CommandMatcher::new(params.get(#idx).unwrap()).get() {
-                        Ok(value) => value,
-                        Err(_) => return Ok(false),
+                    let #pat: #ty = match matcher.get() {
+                        Some(value) => value,
+                        None => return Ok(false),
                     };
                 });
-                idx += 1;
             }
             if !gets.is_empty() {
                 gets = quote! {
-                     use ::proc_qq::BlockSupplier;
+                     use ::proc_qq::MatcherSupplier;
                      #gets
                 }
             }
@@ -373,13 +364,14 @@ pub fn event(args: TokenStream, input: TokenStream) -> TokenStream {
                             return Ok(false);
                         }
                         // 匹配指令是否能对应
-                        let hand: ::proc_qq::HandEvent = #param_pat.into();
-                        let content = hand.content()?;
-                        let (matched, params) = ::proc_qq::match_command(
-                            &content,
-                            #command_name,
-                        )?;
-                        if !matched || #args_number != params.len() {
+                        use ::proc_qq::MessageChainPointTrait;
+                        let m_chan = _message.message_chain().clone();
+                        let mut m_vec = vec![];
+                        for x in m_chan {
+                            m_vec.push(x);
+                        }
+                        let mut matcher = ::proc_qq::CommandMatcher::new(m_vec);
+                        if !matcher.match_command(#command_name) {
                             return Ok(false);
                         }
                         #gets

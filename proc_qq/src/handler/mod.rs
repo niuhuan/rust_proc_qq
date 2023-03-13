@@ -2,6 +2,7 @@ use std::sync::Arc;
 
 use async_trait::async_trait;
 use ricq::handler::{Handler, QEvent};
+use ricq_core::msg::elem::{At, RQElem};
 
 pub use events::*;
 pub use processes::*;
@@ -497,39 +498,92 @@ fn match_event_item(arg: EventArg, event: HandEvent) -> ::anyhow::Result<bool> {
 
 //
 
-pub fn match_command<'a>(
-    content: &'a str,
-    command_name: &'a str,
-) -> ::anyhow::Result<(bool, Vec<&'a str>)> {
-    if content.starts_with(command_name) {
-        let sp_regexp = regex::Regex::new("\\s+").expect("proc_qq 正则错误");
-        let params = content.trim_start_matches(command_name).trim();
-        if params.is_empty() {
-            return Ok((true, vec![]));
-        }
-        let params: Vec<&str> = sp_regexp.split(params).collect();
-        return Ok((true, params));
+pub struct CommandMatcher {
+    pub idx: usize,
+    pub elements: Vec<RQElem>,
+    pub matching: String,
+}
+
+impl CommandMatcher {
+    pub fn new(value: Vec<RQElem>) -> CommandMatcher {
+        let mut matcher = CommandMatcher {
+            idx: 0,
+            elements: value,
+            matching: String::new(),
+        };
+        matcher.push_text();
+        matcher
     }
-    Ok((false, vec![]))
+
+    pub fn push_text(&mut self) {
+        loop {
+            if self.idx >= self.elements.len() {
+                break;
+            }
+            let ele: &RQElem = self.elements.get(self.idx).unwrap();
+            match ele {
+                RQElem::Text(st) => {
+                    self.matching.push_str(st.content.as_str());
+                    self.idx += 1;
+                }
+                _ => break,
+            }
+        }
+        let build = self.matching.trim().to_string();
+        self.matching = build;
+    }
+
+    pub fn match_command(&mut self, command_name: &str) -> bool {
+        let sp_regexp = regex::Regex::new("\\s+").expect("proc_qq 正则错误");
+        let mut sp = sp_regexp.split(self.matching.as_str());
+        if let Some(first) = sp.next() {
+            if command_name.eq(first) {
+                self.matching = self.matching[first.len()..].trim().to_string();
+                return true;
+            }
+        }
+        return false;
+    }
 }
 
-pub trait BlockSupplier<T> {
-    fn get(&self) -> anyhow::Result<T>;
+pub trait MatcherSupplier<T> {
+    fn get(&mut self) -> Option<T>;
 }
 
-pub struct CommandMatcher<'a>(&'a str);
-
-impl CommandMatcher<'_> {
-    pub fn new(value: &'_ str) -> CommandMatcher<'_> {
-        CommandMatcher(value)
+impl MatcherSupplier<String> for CommandMatcher {
+    fn get(&mut self) -> Option<String> {
+        if self.matching.is_empty() {
+            return None;
+        }
+        let sp_regexp = regex::Regex::new("\\s+").expect("proc_qq 正则错误");
+        let mut sp = sp_regexp.split(self.matching.as_str());
+        if let Some(first) = sp.next() {
+            let result = Some(first.to_string());
+            self.matching = self.matching[first.len()..].trim().to_string();
+            return result;
+        }
+        None
     }
 }
 
 macro_rules! command_supplier {
     ($ty:ty) => {
-        impl BlockSupplier<$ty> for CommandMatcher<'_> {
-            fn get(&self) -> anyhow::Result<$ty> {
-                Ok(self.0.parse::<$ty>()?)
+        impl MatcherSupplier<$ty> for CommandMatcher {
+            fn get(&mut self) -> Option<$ty> {
+                if self.matching.is_empty() {
+                    return None;
+                }
+                let sp_regexp = regex::Regex::new("\\s+").expect("proc_qq 正则错误");
+                let mut sp = sp_regexp.split(self.matching.as_str());
+                if let Some(first) = sp.next() {
+                    let result = match first.parse::<$ty>() {
+                        Ok(value) => Some(value),
+                        Err(_) => return None,
+                    };
+                    self.matching = self.matching[first.len()..].trim().to_string();
+                    return result;
+                }
+                None
             }
         }
     };
@@ -548,14 +602,26 @@ command_supplier!(u128);
 command_supplier!(isize);
 command_supplier!(usize);
 
-impl BlockSupplier<String> for CommandMatcher<'_> {
-    fn get(&self) -> anyhow::Result<String> {
-        Ok(self.0.to_string())
-    }
-}
-
-impl<'a> BlockSupplier<&'a str> for CommandMatcher<'a> {
-    fn get(&self) -> anyhow::Result<&'a str> {
-        Ok(self.0)
+impl MatcherSupplier<At> for CommandMatcher {
+    fn get(&mut self) -> Option<At> {
+        println!("matching : {}", self.matching);
+        println!("idx : {}", self.idx);
+        if !self.matching.is_empty() {
+            return None;
+        }
+        if self.idx >= self.elements.len() {
+            return None;
+        }
+        println!(
+            "self.elements.get(self.idx).unwrap() : {}",
+            self.elements.get(self.idx).unwrap()
+        );
+        if let RQElem::At(at) = self.elements.get(self.idx).unwrap() {
+            let result = Some(at.clone());
+            self.idx += 1;
+            self.push_text();
+            return result;
+        }
+        None
     }
 }
