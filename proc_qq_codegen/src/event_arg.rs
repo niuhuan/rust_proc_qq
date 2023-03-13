@@ -15,6 +15,7 @@ pub(crate) enum EventArg {
     Eq(String),
     TrimRegexp(String),
     TrimEq(String),
+    BotCommand(String),
 }
 
 // 递归匹配表达式
@@ -102,6 +103,12 @@ pub(crate) fn parse_args(children: Vec<NestedMeta>) -> Vec<EventArg> {
                             }
                             _ => abort!(&ident.span(), "trim_eq只支持字符串类型参数值"),
                         },
+                        "bot_command" => match nv.lit {
+                            Str(value) => {
+                                children_args.push(EventArg::BotCommand(value.value()));
+                            }
+                            _ => abort!(&ident.span(), "bot_command只支持字符串类型参数值"),
+                        },
                         _ => abort!(&ident.span(), "不支持的参数名称"),
                     }
                 }
@@ -152,6 +159,9 @@ pub(crate) fn arg_to_token(arg: EventArg) -> proc_macro2::TokenStream {
                 ::proc_qq::EventArg::TrimRegexp(#string .to_string())
             }
         }
+        EventArg::BotCommand(_) => {
+            panic!("BotCommand 不能被序列化")
+        }
     }
 }
 
@@ -164,4 +174,34 @@ pub(crate) fn args_to_token(all: Vec<EventArg>) -> proc_macro2::TokenStream {
     quote! {
         vec![#args]
     }
+}
+
+pub(crate) fn contains_bot_command(all: &Vec<EventArg>) -> bool {
+    for x in all {
+        match x {
+            EventArg::BotCommand(_) => {
+                return true;
+            }
+            EventArg::All(args) => {
+                if contains_bot_command(args) {
+                    return true;
+                }
+            }
+            EventArg::Any(args) => {
+                if contains_bot_command(args) {
+                    return true;
+                }
+            }
+            EventArg::Not(args) => {
+                if contains_bot_command(args) {
+                    return true;
+                }
+            }
+            EventArg::Regexp(_) => {}
+            EventArg::Eq(_) => {}
+            EventArg::TrimRegexp(_) => {}
+            EventArg::TrimEq(_) => {}
+        }
+    }
+    false
 }

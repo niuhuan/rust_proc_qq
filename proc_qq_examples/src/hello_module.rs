@@ -95,6 +95,13 @@ async fn handle3_add(message: &MessageEvent) {
     println!("{}", message.message_content());
 }
 
+/// bot_command
+
+#[event(bot_command = "/ban {user} {time}")]
+async fn handle5(_message: &MessageEvent, user: String, time: String) -> anyhow::Result<bool> {
+    Ok(false)
+}
+
 /// module
 
 pub fn module() -> Module {
@@ -108,5 +115,6 @@ pub fn module() -> Module {
         handle2,
         handle3,
         handle4,
+        handle5,
     )
 }
