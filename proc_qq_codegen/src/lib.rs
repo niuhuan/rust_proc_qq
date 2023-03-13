@@ -13,18 +13,19 @@ use crate::event_arg::*;
 mod event_arg;
 
 /// debug = note expanded codes if env PROC_QQ_CODEGEN_DEBUG exists
+
 macro_rules! emit {
     ($tokens:expr) => {{
-        use devise::ext::SpanDiagnosticExt;
+        use proc_macro2_diagnostics::SpanDiagnosticExt;
         let mut tokens = $tokens;
         if std::env::var_os("PROC_QQ_CODEGEN_DEBUG").is_some() {
             let debug_tokens = proc_macro2::Span::call_site()
-                .note("emitting proc_qq_codegen debug output")
+                .note("emitting PROC_QQ code generation debug output")
                 .note(tokens.to_string())
                 .emit_as_item_tokens();
-
             tokens.extend(debug_tokens);
         }
+
         tokens.into()
     }};
 }
