@@ -578,6 +578,18 @@ impl FromCommandMatcher for String {
     }
 }
 
+impl FromCommandMatcher for Vec<String> {
+    fn get(matcher: &mut CommandMatcher) -> Option<Self> {
+        let sp_regexp = regex::Regex::new("\\s+").expect("proc_qq 正则错误");
+        let result = sp_regexp
+            .split(matcher.matching.as_str())
+            .map(String::from)
+            .collect();
+        matcher.matching = String::default();
+        Some(result)
+    }
+}
+
 macro_rules! command_base_ty_supplier {
     ($ty:ty) => {
         impl FromCommandMatcher for $ty {

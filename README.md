@@ -221,11 +221,11 @@ ricq::msg::elem::{
   FlashImage, VideoFile
 }; 以及Vec<T>
 
-Vec<T> 会匹配多个，也会匹配0个
+Vec<T> 会匹配多个，也会匹配0个, 会尽可能多的匹配。
+所以Vec<String> 会匹配到消息的结尾，或者非Text的RQElem节点。
 ```
 
 目前还在计划中：
-- 匹配 Vec<number>(尽可能多的匹配数字类型) ,Vec<&str / String>(只能存在于末尾)
 - 匹配Option<T>
 
 ### 自定义类型匹配
