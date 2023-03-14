@@ -526,6 +526,9 @@ impl CommandMatcher {
                     self.matching.push_str(st.content.as_str());
                     self.idx += 1;
                 }
+                RQElem::Other(_) => {
+                    self.idx += 1;
+                }
                 _ => break,
             }
         }
