@@ -257,16 +257,20 @@ async fn handle5(_message: &MessageEvent, user: String, time: i64) -> anyhow::Re
 
 #### 目前能匹配的类型 
 ```
-u8~u128, i8~i128, isize, usize, String, &str,
+u8~u128, i8~i128, isize, usize, String,
+
 ricq::msg::elem::{
   At, Face, MarketFace, Dice, FingerGuessing,
   LightApp, RichMsg, FriendImage, GroupImage,
   FlashImage, VideoFile
-}
+}; 以及Vec<T>
+
+Vec<T> 会匹配多个，也会匹配0个
 ```
 
-目前还在计划中：Vec<Element>(多个@使用空白字符分割), Vec<number>(尽可能多的匹配数字类型) ,Vec<&str / String>(只能存在于末尾)
-Option<Element>
+目前还在计划中：
+- 匹配 Vec<number>(尽可能多的匹配数字类型) ,Vec<&str / String>(只能存在于末尾)
+- 匹配Option<T>
 
 ### 自定义类型匹配
 - 您可以参考`proc_qq/src/handler/mod.rs`中`FromCommandMatcher`实现自定义类型的匹配。

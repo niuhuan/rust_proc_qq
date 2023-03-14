@@ -633,6 +633,28 @@ macro_rules! command_rq_element_ty_supplier {
                 None
             }
         }
+
+        impl FromCommandMatcher for Vec<$ty> {
+            fn get(matcher: &mut CommandMatcher) -> Option<Self> {
+                let mut result = vec![];
+                if !matcher.matching.is_empty() {
+                    return Some(result);
+                }
+                loop {
+                    if matcher.idx >= matcher.elements.len() {
+                        break;
+                    }
+                    if let $mat(item) = matcher.elements.get(matcher.idx).unwrap() {
+                        result.push(item.clone());
+                        matcher.idx += 1;
+                        matcher.push_text();
+                    } else {
+                        break;
+                    }
+                }
+                Some(result)
+            }
+        }
     };
 }
 
