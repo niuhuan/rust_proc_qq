@@ -255,13 +255,24 @@ async fn handle5(_message: &MessageEvent, user: String, time: i64) -> anyhow::Re
 }
 ```
 
-目前能匹配的类型 
+#### 目前能匹配的类型 
 ```
 u8~u128, i8~i128, isize, usize, String, &str,
-ricq_core::msg::elem::At
+ricq::msg::elem::{
+  At, Face, MarketFace, Dice, FingerGuessing,
+  LightApp, RichMsg, FriendImage, GroupImage,
+  FlashImage, VideoFile
+}
 ```
 
-目前还在计划中：可以匹配 At, Vec<At>(多个@使用空白字符分割), Vec<number>(尽可能多的匹配数字类型) ,Vec<&str / String>(只能存在于末尾)
+目前还在计划中：Vec<Element>(多个@使用空白字符分割), Vec<number>(尽可能多的匹配数字类型) ,Vec<&str / String>(只能存在于末尾)
+Option<Element>
+
+### 自定义类型匹配
+- 您可以参考`proc_qq/src/handler/mod.rs`中`FromCommandMatcher`实现自定义类型的匹配。
+- 您可以匹配文字，并且在`FromCommandMatcher::matching`去掉消耗了的部分
+- 如果匹配的是RQElem类型，您应该先判断`matching`是否为空，不空则不能匹配成功，如果匹配的元素，然后将`idx`加1
+- 这里比较难解释，需要您阅读`FromCommandMatcher`的代码，理解他的工作原理
 
 ## 过滤器
 

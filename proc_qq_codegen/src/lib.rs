@@ -267,20 +267,7 @@ pub fn event(args: TokenStream, input: TokenStream) -> TokenStream {
                 );
             }
             let ty = command_param.ty.as_ref();
-            let command_param_arg_type = format!("{}", quote! {#ty});
-            match command_param_arg_type.as_str() {
-                "At" | "String" | "i8" | "u8" | "i16" | "u16" | "i32" | "u32" | "i64" | "u64"
-                | "i128" | "u128" | "isize" | "usize" => {
-                    command_pats.push((pat, ty));
-                }
-                _ => {
-                    abort!(
-                        &command_param.span(),
-                        "不支持的类型 : {}",
-                        command_param_arg_type
-                    );
-                }
-            }
+            command_pats.push((pat, ty));
         }
     };
     //
@@ -343,17 +330,11 @@ pub fn event(args: TokenStream, input: TokenStream) -> TokenStream {
                    #pat: #ty,
                 });
                 gets.append_all(quote! {
-                    let #pat: #ty = match matcher.get() {
+                    let #pat: #ty = match ::proc_qq::matcher_get::<#ty>(&mut matcher) {
                         Some(value) => value,
                         None => return Ok(false),
                     };
                 });
-            }
-            if !gets.is_empty() {
-                gets = quote! {
-                     use ::proc_qq::MatcherSupplier;
-                     #gets
-                }
             }
             let command_name = bot_command_info.as_ref().unwrap().0.as_str();
             quote! {
@@ -375,6 +356,9 @@ pub fn event(args: TokenStream, input: TokenStream) -> TokenStream {
                             return Ok(false);
                         }
                         #gets
+                        if matcher.not_blank() {
+                            return Ok(false);
+                        }
                         self.raw(#param_pat, #p_pats).await
                     }
                 }

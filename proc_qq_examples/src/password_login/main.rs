@@ -1,4 +1,4 @@
-use proc_qq::re_exports::ricq::version::{ANDROID_PHONE, ANDROID_WATCH};
+use proc_qq::re_exports::ricq::version::ANDROID_PHONE;
 use proc_qq::*;
 use std::sync::Arc;
 
