@@ -1,6 +1,5 @@
 pub use proc_qq::re_exports::async_trait::async_trait;
 use proc_qq::re_exports::ricq::client::event::GroupMessageEvent;
-use proc_qq::re_exports::ricq::msg::elem::At;
 use proc_qq::{
     event, event_fn, module, LoginEvent, MessageChainParseTrait, MessageContentTrait, MessageEvent,
     MessageEventProcess, MessageSendToSourceTrait, Module,
@@ -105,8 +104,22 @@ async fn handle5(_message: &MessageEvent, user: String, time: i64) -> anyhow::Re
 }
 
 #[event(bot_command = "/ban {user} {time}")]
-async fn handle6(_message: &MessageEvent, user: At, time: i64) -> anyhow::Result<bool> {
+async fn handle6(
+    _message: &MessageEvent,
+    user: ::proc_qq::re_exports::ricq::msg::elem::At,
+    time: i64,
+) -> anyhow::Result<bool> {
     println!("handle6。 user : {user} , time : {time} ");
+    Ok(true)
+}
+
+#[event(bot_command = "/ban_list {user} {time}")]
+async fn handle7(
+    _message: &MessageEvent,
+    user: Vec<::proc_qq::re_exports::ricq::msg::elem::At>,
+    time: i64,
+) -> anyhow::Result<bool> {
+    println!("handle7。 user : {:?} , time : {:?} ", user, time);
     Ok(true)
 }
 
@@ -125,5 +138,6 @@ pub fn module() -> Module {
         handle4,
         handle5,
         handle6,
+        handle7,
     )
 }
