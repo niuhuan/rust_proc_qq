@@ -1,12 +1,15 @@
-use crate::DeviceSource::JsonFile;
-use anyhow::Result;
-use async_trait::async_trait;
-use bytes::Bytes;
 use core::future::Future;
 use std::fmt::{Debug, Formatter};
 use std::path::Path;
 use std::pin::Pin;
 use std::sync::Arc;
+
+use anyhow::Result;
+use async_trait::async_trait;
+use bytes::Bytes;
+use ricq_core::msg::elem::{FlashImage, FriendImage, GroupImage};
+
+use crate::DeviceSource::JsonFile;
 
 #[derive(Debug, Clone)]
 pub enum DeviceSource {
@@ -126,5 +129,143 @@ impl SessionStore for FileSessionStore {
     async fn remove_session(&self) -> Result<()> {
         let _ = tokio::fs::remove_file(self.path.as_str()).await;
         Ok(())
+    }
+}
+
+pub enum ImageElement {
+    GroupImage(GroupImage),
+    FriendImage(FriendImage),
+    FlashImage(FlashImage),
+}
+
+macro_rules! image_element_get {
+    ($name:ident, $ty:ty) => {
+        impl ImageElement {
+            pub fn $name(&self) -> $ty {
+                match self {
+                    ImageElement::GroupImage(image) => image.$name,
+                    ImageElement::FriendImage(image) => image.$name,
+                    ImageElement::FlashImage(image) => match image {
+                        FlashImage::FriendImage(image) => image.$name,
+                        FlashImage::GroupImage(image) => image.$name,
+                    },
+                }
+            }
+        }
+    };
+}
+
+image_element_get!(width, u32);
+image_element_get!(height, u32);
+image_element_get!(size, u32);
+
+impl ImageElement {
+    pub fn url(&self) -> String {
+        match self {
+            ImageElement::GroupImage(image) => image.url(),
+            ImageElement::FriendImage(image) => image.url(),
+            ImageElement::FlashImage(image) => match image {
+                FlashImage::FriendImage(image) => image.url(),
+                FlashImage::GroupImage(image) => image.url(),
+            },
+        }
+    }
+
+    pub fn md5(&self) -> Vec<u8> {
+        match self {
+            ImageElement::GroupImage(image) => image.md5.clone(),
+            ImageElement::FriendImage(image) => image.md5.clone(),
+            ImageElement::FlashImage(image) => match image {
+                FlashImage::FriendImage(image) => image.md5.clone(),
+                FlashImage::GroupImage(image) => image.md5.clone(),
+            },
+        }
+    }
+
+    pub fn is_flash(&self) -> bool {
+        match self {
+            ImageElement::FlashImage(_) => true,
+            _ => false,
+        }
+    }
+
+    pub fn case_flash(&self) -> Result<&'_ FlashImage> {
+        match self {
+            ImageElement::FlashImage(image) => Ok(&image),
+            _ => Err(anyhow::Error::msg("mismatching")),
+        }
+    }
+
+    pub fn into_flash(self) -> Result<FlashImage> {
+        match self {
+            ImageElement::FlashImage(image) => Ok(image),
+            _ => Err(anyhow::Error::msg("mismatching")),
+        }
+    }
+
+    pub fn is_group(&self) -> bool {
+        match self {
+            ImageElement::GroupImage(_) => true,
+            ImageElement::FriendImage(_) => false,
+            ImageElement::FlashImage(image) => match image {
+                FlashImage::FriendImage(_) => false,
+                FlashImage::GroupImage(_) => true,
+            },
+        }
+    }
+
+    pub fn case_group(&self) -> Result<&'_ GroupImage> {
+        match self {
+            ImageElement::GroupImage(image) => Ok(&image),
+            ImageElement::FriendImage(_) => Err(anyhow::Error::msg("mismatching")),
+            ImageElement::FlashImage(image) => match image {
+                FlashImage::FriendImage(_) => Err(anyhow::Error::msg("mismatching")),
+                FlashImage::GroupImage(image) => Ok(&image),
+            },
+        }
+    }
+
+    pub fn into_group(self) -> Result<GroupImage> {
+        match self {
+            ImageElement::GroupImage(image) => Ok(image),
+            ImageElement::FriendImage(_) => Err(anyhow::Error::msg("mismatching")),
+            ImageElement::FlashImage(image) => match image {
+                FlashImage::FriendImage(_) => Err(anyhow::Error::msg("mismatching")),
+                FlashImage::GroupImage(image) => Ok(image),
+            },
+        }
+    }
+
+    pub fn is_friend(&self) -> bool {
+        match self {
+            ImageElement::GroupImage(_) => false,
+            ImageElement::FriendImage(_) => true,
+            ImageElement::FlashImage(image) => match image {
+                FlashImage::FriendImage(_) => true,
+                FlashImage::GroupImage(_) => false,
+            },
+        }
+    }
+
+    pub fn case_friend(&self) -> Result<&'_ FriendImage> {
+        match self {
+            ImageElement::GroupImage(_) => Err(anyhow::Error::msg("mismatching")),
+            ImageElement::FriendImage(image) => Ok(&image),
+            ImageElement::FlashImage(image) => match image {
+                FlashImage::FriendImage(image) => Ok(&image),
+                FlashImage::GroupImage(_) => Err(anyhow::Error::msg("mismatching")),
+            },
+        }
+    }
+
+    pub fn into_friend(self) -> Result<FriendImage> {
+        match self {
+            ImageElement::GroupImage(_) => Err(anyhow::Error::msg("mismatching")),
+            ImageElement::FriendImage(image) => Ok(image),
+            ImageElement::FlashImage(image) => match image {
+                FlashImage::FriendImage(image) => Ok(image),
+                FlashImage::GroupImage(_) => Err(anyhow::Error::msg("mismatching")),
+            },
+        }
     }
 }

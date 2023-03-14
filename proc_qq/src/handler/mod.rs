@@ -8,7 +8,7 @@ pub use events::*;
 pub use processes::*;
 pub use results::*;
 
-use crate::MessageContentTrait;
+use crate::{ImageElement, MessageContentTrait};
 
 mod events;
 mod processes;
@@ -766,3 +766,99 @@ command_rq_element_ty_supplier!(ricq::msg::elem::FriendImage, RQElem::FriendImag
 command_rq_element_ty_supplier!(ricq::msg::elem::GroupImage, RQElem::GroupImage);
 command_rq_element_ty_supplier!(ricq::msg::elem::FlashImage, RQElem::FlashImage);
 command_rq_element_ty_supplier!(ricq::msg::elem::VideoFile, RQElem::VideoFile);
+
+impl FromCommandMatcher for ImageElement {
+    fn get(matcher: &mut CommandMatcher) -> Option<Self> {
+        if !matcher.matching.is_empty() {
+            return None;
+        }
+        if matcher.idx >= matcher.elements.len() {
+            return None;
+        }
+        match matcher.elements.get(matcher.idx).unwrap() {
+            RQElem::FriendImage(image) => {
+                let result = Some(ImageElement::FriendImage(image.clone()));
+                matcher.idx += 1;
+                matcher.push_text();
+                result
+            }
+            RQElem::GroupImage(image) => {
+                let result = Some(ImageElement::GroupImage(image.clone()));
+                matcher.idx += 1;
+                matcher.push_text();
+                result
+            }
+            RQElem::FlashImage(image) => {
+                let result = Some(ImageElement::FlashImage(image.clone()));
+                matcher.idx += 1;
+                matcher.push_text();
+                result
+            }
+            _ => None,
+        }
+    }
+}
+
+impl FromCommandMatcher for Option<ImageElement> {
+    fn get(matcher: &mut CommandMatcher) -> Option<Self> {
+        let mut result = None;
+        if !matcher.matching.is_empty() {
+            return Some(result);
+        }
+        if matcher.idx >= matcher.elements.len() {
+            return Some(result);
+        }
+        match matcher.elements.get(matcher.idx).unwrap() {
+            RQElem::FriendImage(image) => {
+                result = Some(ImageElement::FriendImage(image.clone()));
+                matcher.idx += 1;
+                matcher.push_text();
+            }
+            RQElem::GroupImage(image) => {
+                result = Some(ImageElement::GroupImage(image.clone()));
+                matcher.idx += 1;
+                matcher.push_text();
+            }
+            RQElem::FlashImage(image) => {
+                result = Some(ImageElement::FlashImage(image.clone()));
+                matcher.idx += 1;
+                matcher.push_text();
+            }
+            _ => (),
+        }
+        Some(result)
+    }
+}
+
+impl FromCommandMatcher for Vec<ImageElement> {
+    fn get(matcher: &mut CommandMatcher) -> Option<Self> {
+        let mut result = vec![];
+        if !matcher.matching.is_empty() {
+            return Some(result);
+        }
+        loop {
+            if matcher.idx >= matcher.elements.len() {
+                break;
+            }
+            match matcher.elements.get(matcher.idx).unwrap() {
+                RQElem::FriendImage(image) => {
+                    result.push(ImageElement::FriendImage(image.clone()));
+                    matcher.idx += 1;
+                    matcher.push_text();
+                }
+                RQElem::GroupImage(image) => {
+                    result.push(ImageElement::GroupImage(image.clone()));
+                    matcher.idx += 1;
+                    matcher.push_text();
+                }
+                RQElem::FlashImage(image) => {
+                    result.push(ImageElement::FlashImage(image.clone()));
+                    matcher.idx += 1;
+                    matcher.push_text();
+                }
+                _ => break,
+            }
+        }
+        Some(result)
+    }
+}

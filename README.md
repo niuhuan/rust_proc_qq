@@ -221,6 +221,9 @@ ricq::msg::elem::{
   FlashImage, VideoFile
 }; 以及对应的 Vec<T>， Option<T>
 
+proc_qq::ImageElement (匹配图片, 包括GroupImage, FriendImage, FlashImage)
+; 以及对应的 Vec<T>, Option<T> 
+
 Vec<T> 会匹配多个，也会匹配0个, 会尽可能多的匹配。
 Option<T> 匹配到一个会返回Some，否则返回None。
 空白字符串以及空字符串，不会被匹配为值
