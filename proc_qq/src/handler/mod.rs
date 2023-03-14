@@ -2,7 +2,7 @@ use std::sync::Arc;
 
 use async_trait::async_trait;
 use ricq::handler::{Handler, QEvent};
-use ricq_core::msg::elem::{At, RQElem};
+use ricq_core::msg::elem::RQElem;
 
 pub use events::*;
 pub use processes::*;
@@ -544,43 +544,52 @@ impl CommandMatcher {
         }
         return false;
     }
+
+    pub fn not_blank(&self) -> bool {
+        !self.matching.is_empty() || self.idx < self.elements.len()
+    }
 }
 
-pub trait MatcherSupplier<T> {
-    fn get(&mut self) -> Option<T>;
+pub trait FromCommandMatcher: Sized {
+    fn get(s: &mut CommandMatcher) -> Option<Self>;
 }
 
-impl MatcherSupplier<String> for CommandMatcher {
-    fn get(&mut self) -> Option<String> {
-        if self.matching.is_empty() {
+#[inline]
+pub fn matcher_get<F: Sized + FromCommandMatcher>(matcher: &mut CommandMatcher) -> Option<F> {
+    F::get(matcher)
+}
+
+impl FromCommandMatcher for String {
+    fn get(matcher: &mut CommandMatcher) -> Option<Self> {
+        if matcher.matching.is_empty() {
             return None;
         }
         let sp_regexp = regex::Regex::new("\\s+").expect("proc_qq 正则错误");
-        let mut sp = sp_regexp.split(self.matching.as_str());
+        let mut sp = sp_regexp.split(matcher.matching.as_str());
         if let Some(first) = sp.next() {
             let result = Some(first.to_string());
-            self.matching = self.matching[first.len()..].trim().to_string();
+            matcher.matching = matcher.matching[first.len()..].trim().to_string();
             return result;
         }
         None
     }
 }
 
-macro_rules! command_supplier {
+macro_rules! command_base_ty_supplier {
     ($ty:ty) => {
-        impl MatcherSupplier<$ty> for CommandMatcher {
-            fn get(&mut self) -> Option<$ty> {
-                if self.matching.is_empty() {
+        impl FromCommandMatcher for $ty {
+            fn get(matcher: &mut CommandMatcher) -> Option<$ty> {
+                if matcher.matching.is_empty() {
                     return None;
                 }
                 let sp_regexp = regex::Regex::new("\\s+").expect("proc_qq 正则错误");
-                let mut sp = sp_regexp.split(self.matching.as_str());
+                let mut sp = sp_regexp.split(matcher.matching.as_str());
                 if let Some(first) = sp.next() {
                     let result = match first.parse::<$ty>() {
                         Ok(value) => Some(value),
                         Err(_) => return None,
                     };
-                    self.matching = self.matching[first.len()..].trim().to_string();
+                    matcher.matching = matcher.matching[first.len()..].trim().to_string();
                     return result;
                 }
                 None
@@ -589,39 +598,49 @@ macro_rules! command_supplier {
     };
 }
 
-command_supplier!(i8);
-command_supplier!(u8);
-command_supplier!(i16);
-command_supplier!(u16);
-command_supplier!(i32);
-command_supplier!(u32);
-command_supplier!(i64);
-command_supplier!(u64);
-command_supplier!(i128);
-command_supplier!(u128);
-command_supplier!(isize);
-command_supplier!(usize);
+command_base_ty_supplier!(i8);
+command_base_ty_supplier!(u8);
+command_base_ty_supplier!(i16);
+command_base_ty_supplier!(u16);
+command_base_ty_supplier!(i32);
+command_base_ty_supplier!(u32);
+command_base_ty_supplier!(i64);
+command_base_ty_supplier!(u64);
+command_base_ty_supplier!(i128);
+command_base_ty_supplier!(u128);
+command_base_ty_supplier!(isize);
+command_base_ty_supplier!(usize);
 
-impl MatcherSupplier<At> for CommandMatcher {
-    fn get(&mut self) -> Option<At> {
-        println!("matching : {}", self.matching);
-        println!("idx : {}", self.idx);
-        if !self.matching.is_empty() {
-            return None;
+macro_rules! command_rq_element_ty_supplier {
+    ($ty:ty, $mat:path) => {
+        impl FromCommandMatcher for $ty {
+            fn get(matcher: &mut CommandMatcher) -> Option<Self> {
+                if !matcher.matching.is_empty() {
+                    return None;
+                }
+                if matcher.idx >= matcher.elements.len() {
+                    return None;
+                }
+                if let $mat(item) = matcher.elements.get(matcher.idx).unwrap() {
+                    let result = Some(item.clone());
+                    matcher.idx += 1;
+                    matcher.push_text();
+                    return result;
+                }
+                None
+            }
         }
-        if self.idx >= self.elements.len() {
-            return None;
-        }
-        println!(
-            "self.elements.get(self.idx).unwrap() : {}",
-            self.elements.get(self.idx).unwrap()
-        );
-        if let RQElem::At(at) = self.elements.get(self.idx).unwrap() {
-            let result = Some(at.clone());
-            self.idx += 1;
-            self.push_text();
-            return result;
-        }
-        None
-    }
+    };
 }
+
+command_rq_element_ty_supplier!(ricq::msg::elem::At, RQElem::At);
+command_rq_element_ty_supplier!(ricq::msg::elem::Face, RQElem::Face);
+command_rq_element_ty_supplier!(ricq::msg::elem::MarketFace, RQElem::MarketFace);
+command_rq_element_ty_supplier!(ricq::msg::elem::Dice, RQElem::Dice);
+command_rq_element_ty_supplier!(ricq::msg::elem::FingerGuessing, RQElem::FingerGuessing);
+command_rq_element_ty_supplier!(ricq::msg::elem::LightApp, RQElem::LightApp);
+command_rq_element_ty_supplier!(ricq::msg::elem::RichMsg, RQElem::RichMsg);
+command_rq_element_ty_supplier!(ricq::msg::elem::FriendImage, RQElem::FriendImage);
+command_rq_element_ty_supplier!(ricq::msg::elem::GroupImage, RQElem::GroupImage);
+command_rq_element_ty_supplier!(ricq::msg::elem::FlashImage, RQElem::FlashImage);
+command_rq_element_ty_supplier!(ricq::msg::elem::VideoFile, RQElem::VideoFile);
