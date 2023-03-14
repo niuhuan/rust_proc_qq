@@ -598,6 +598,36 @@ macro_rules! command_base_ty_supplier {
                 None
             }
         }
+
+        impl FromCommandMatcher for Vec<$ty> {
+            fn get(matcher: &mut CommandMatcher) -> Option<Self> {
+                let mut result = vec![];
+                if matcher.matching.is_empty() {
+                    return Some(result);
+                }
+                let sp_regexp = regex::Regex::new("\\s+").expect("proc_qq 正则错误");
+                let sp = sp_regexp.split(matcher.matching.as_str());
+                let mut new_matching = vec![];
+                for x in sp {
+                    if !new_matching.is_empty() {
+                        new_matching.push(x);
+                    } else {
+                        match x.parse::<$ty>() {
+                            Ok(value) => result.push(value),
+                            Err(_) => {
+                                if result.is_empty() {
+                                    return Some(result);
+                                } else {
+                                    new_matching.push(x);
+                                }
+                            }
+                        }
+                    }
+                }
+                matcher.matching = new_matching.join(" ");
+                Some(result)
+            }
+        }
     };
 }
 

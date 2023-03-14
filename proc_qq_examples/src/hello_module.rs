@@ -103,13 +103,9 @@ async fn handle5(_message: &MessageEvent, user: String, time: i64) -> anyhow::Re
     Ok(true)
 }
 
-#[event(bot_command = "/ban {user} {time}")]
-async fn handle6(
-    _message: &MessageEvent,
-    user: ::proc_qq::re_exports::ricq::msg::elem::At,
-    time: i64,
-) -> anyhow::Result<bool> {
-    println!("handle6。 user : {user} , time : {time} ");
+#[event(bot_command = "/numbers {time}")]
+async fn handle6(_message: &MessageEvent, time: Vec<usize>) -> anyhow::Result<bool> {
+    println!("handle6。 time : {:?} ", time);
     Ok(true)
 }
 

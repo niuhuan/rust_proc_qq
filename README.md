@@ -191,6 +191,49 @@ use proc_qq::{
 
 支持更多种事件封装中...
 
+## 字段匹配
+
+对消息进行匹配（`空白字符`或`RQElem界限`作为分隔符）
+
+如下所示，当您输入 `ban @abc 123` 的时候，控制台将会打印 `user : [At:abc] , time : 123`
+
+```rust
+#[event(bot_command = "ban {user} {time}")]
+async fn handle5(
+  _message: &MessageEvent,
+  user: ::proc_qq::re_exports::ricq::msg::elem::At,
+  time: i64,
+) -> anyhow::Result<bool> {
+    println!("user : {:?} , time : {:?} ", user, time);
+    Ok(true)
+}
+```
+
+#### 目前能匹配的类型
+```
+String,
+
+u8~u128, i8~i128, isize, usize, ; 以及Vec<T>
+
+ricq::msg::elem::{
+  At, Face, MarketFace, Dice, FingerGuessing,
+  LightApp, RichMsg, FriendImage, GroupImage,
+  FlashImage, VideoFile
+}; 以及Vec<T>
+
+Vec<T> 会匹配多个，也会匹配0个
+```
+
+目前还在计划中：
+- 匹配 Vec<number>(尽可能多的匹配数字类型) ,Vec<&str / String>(只能存在于末尾)
+- 匹配Option<T>
+
+### 自定义类型匹配
+- 您可以参考`proc_qq/src/handler/mod.rs`中`FromCommandMatcher`实现自定义类型的匹配。
+- 您可以匹配文字，并且在`FromCommandMatcher::matching`去掉消耗了的部分
+- 如果匹配的是RQElem类型，您应该先判断`matching`是否为空，不空则不能匹配成功，如果匹配的元素，然后将`idx`加1, 最后push_text
+- 这里比较难解释，需要您阅读`FromCommandMatcher`的代码，理解他的工作原理
+
 ### 拓展
 
 #### 直接获取消息的正文内容
@@ -240,43 +283,6 @@ let chain = chain.append(at).append(text).append(image);
 ## 定时任务或客户端事件发送消息
 
 参考template, 使用run_client(Arc\<Client\>), 使得机器人与定时任务并行, 并使用rc_client发送消息
-
-## 命令匹配
-
-对命令进行匹配（空白字符作为分隔符）
-
-如下所示，当您输入 `ban abc 123` 的时候，控制台将会打印 `user : abc , time : 123`
-
-```rust
-#[event(bot_command = "ban {user} {time}")]
-async fn handle5(_message: &MessageEvent, user: String, time: i64) -> anyhow::Result<bool> {
-    println!("user : {user} , time : {time} ");
-    Ok(true)
-}
-```
-
-#### 目前能匹配的类型 
-```
-u8~u128, i8~i128, isize, usize, String,
-
-ricq::msg::elem::{
-  At, Face, MarketFace, Dice, FingerGuessing,
-  LightApp, RichMsg, FriendImage, GroupImage,
-  FlashImage, VideoFile
-}; 以及Vec<T>
-
-Vec<T> 会匹配多个，也会匹配0个
-```
-
-目前还在计划中：
-- 匹配 Vec<number>(尽可能多的匹配数字类型) ,Vec<&str / String>(只能存在于末尾)
-- 匹配Option<T>
-
-### 自定义类型匹配
-- 您可以参考`proc_qq/src/handler/mod.rs`中`FromCommandMatcher`实现自定义类型的匹配。
-- 您可以匹配文字，并且在`FromCommandMatcher::matching`去掉消耗了的部分
-- 如果匹配的是RQElem类型，您应该先判断`matching`是否为空，不空则不能匹配成功，如果匹配的元素，然后将`idx`加1, 最后push_text
-- 这里比较难解释，需要您阅读`FromCommandMatcher`的代码，理解他的工作原理
 
 ### 其他
 `ricq::msg::elem::Other`在push_text的时候将会跳过
