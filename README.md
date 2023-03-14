@@ -211,22 +211,20 @@ async fn handle5(
 
 #### 目前能匹配的类型
 ```
-String,
+String,  以及对应的 Vec<T>， Option<T>
 
-u8~u128, i8~i128, isize, usize, ; 以及Vec<T>
+u8~u128, i8~i128, isize, usize, ; 以及对应的 Vec<T>， Option<T>
 
 ricq::msg::elem::{
   At, Face, MarketFace, Dice, FingerGuessing,
   LightApp, RichMsg, FriendImage, GroupImage,
   FlashImage, VideoFile
-}; 以及Vec<T>
+}; 以及对应的 Vec<T>， Option<T>
 
 Vec<T> 会匹配多个，也会匹配0个, 会尽可能多的匹配。
-所以Vec<String> 会匹配到消息的结尾，或者非Text的RQElem节点。
+Option<T> 匹配到一个会返回Some，否则返回None。
+空白字符串以及空字符串，不会被匹配为值
 ```
-
-目前还在计划中：
-- 匹配Option<T>
 
 ### 自定义类型匹配
 - 您可以参考`proc_qq/src/handler/mod.rs`中`FromCommandMatcher`实现自定义类型的匹配。

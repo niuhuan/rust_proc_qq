@@ -578,6 +578,22 @@ impl FromCommandMatcher for String {
     }
 }
 
+impl FromCommandMatcher for Option<String> {
+    fn get(matcher: &mut CommandMatcher) -> Option<Self> {
+        let mut result = None;
+        if matcher.matching.is_empty() {
+            return Some(result);
+        }
+        let sp_regexp = regex::Regex::new("\\s+").expect("proc_qq 正则错误");
+        let mut sp = sp_regexp.split(matcher.matching.as_str());
+        if let Some(first) = sp.next() {
+            result = Some(first.to_string());
+            matcher.matching = matcher.matching[first.len()..].trim().to_string();
+        }
+        Some(result)
+    }
+}
+
 impl FromCommandMatcher for Vec<String> {
     fn get(matcher: &mut CommandMatcher) -> Option<Self> {
         let sp_regexp = regex::Regex::new("\\s+").expect("proc_qq 正则错误");
@@ -608,6 +624,27 @@ macro_rules! command_base_ty_supplier {
                     return result;
                 }
                 None
+            }
+        }
+
+        impl FromCommandMatcher for Option<$ty> {
+            fn get(matcher: &mut CommandMatcher) -> Option<Self> {
+                let mut result = None;
+                if matcher.matching.is_empty() {
+                    return Some(result);
+                }
+                let sp_regexp = regex::Regex::new("\\s+").expect("proc_qq 正则错误");
+                let mut sp = sp_regexp.split(matcher.matching.as_str());
+                if let Some(first) = sp.next() {
+                    match first.parse::<$ty>() {
+                        Ok(value) => {
+                            result = Some(value);
+                            matcher.matching = matcher.matching[first.len()..].trim().to_string();
+                        }
+                        _ => {}
+                    };
+                }
+                return Some(result);
             }
         }
 
@@ -673,6 +710,24 @@ macro_rules! command_rq_element_ty_supplier {
                     return result;
                 }
                 None
+            }
+        }
+
+        impl FromCommandMatcher for Option<$ty> {
+            fn get(matcher: &mut CommandMatcher) -> Option<Self> {
+                let mut result = None;
+                if !matcher.matching.is_empty() {
+                    return Some(result);
+                }
+                if matcher.idx >= matcher.elements.len() {
+                    return Some(result);
+                }
+                if let $mat(item) = matcher.elements.get(matcher.idx).unwrap() {
+                    result = Some(item.clone());
+                    matcher.idx += 1;
+                    matcher.push_text();
+                }
+                Some(result)
             }
         }
 
