@@ -49,7 +49,7 @@ pub fn event(args: TokenStream, input: TokenStream) -> TokenStream {
             } else {
                 abort!(
                     &method.sig.span(),
-                    "bot_command 只能有一个，切必须是直接写在event括号种"
+                    "bot_command 只能有一个，且必须是直接写在event括号中"
                 );
             }
         } else {
@@ -60,7 +60,7 @@ pub fn event(args: TokenStream, input: TokenStream) -> TokenStream {
     if contains_bot_command(&all) {
         abort!(
             &method.sig.span(),
-            "bot_command 只能有一个，切必须是直接写在event括号种"
+            "bot_command 只能有一个，且必须是直接写在event括号中"
         );
     }
     let bot_command_info = if let Some(bot_command) = &bot_command {
@@ -346,7 +346,7 @@ pub fn event(args: TokenStream, input: TokenStream) -> TokenStream {
                         }
                         // 匹配指令是否能对应
                         use ::proc_qq::MessageChainPointTrait;
-                        let m_chan = _message.message_chain().clone();
+                        let m_chan = #param_pat.message_chain().clone();
                         let mut m_vec = vec![];
                         for x in m_chan {
                             m_vec.push(x);
