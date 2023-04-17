@@ -12,6 +12,7 @@ on:
 env:
   REQWEST_TEST_BODY_FULL: 1
   RUST_BACKTRACE: 1
+  RUST_TOOLCHAIN_VERSION: nightly-2023-03-13
 
 jobs:
   ci-pass:
@@ -37,7 +38,7 @@ jobs:
       - name: Install rust
         uses: actions-rs/toolchain@v1
         with:
-          toolchain: nightly
+          toolchain: nightly-2023-03-13
           components: rustfmt
           profile: minimal
           override: true
@@ -60,16 +61,16 @@ jobs:
       matrix:
         config:
           - os: macos-latest
-            toolchain: nightly-x86_64-apple-darwin
+            toolchain: nightly-x86_64-apple-darwin-nightly-2023-03-13
             target: x86_64-apple-darwin
           - os: ubuntu-latest
-            toolchain: nightly-x86_64-unknown-linux-gnu
+            toolchain: nightly-x86_64-unknown-linux-gnu-nightly-2023-03-13
             target: x86_64-unknown-linux-gnu
           - os: windows-latest
-            toolchain: nightly-x86_64-pc-windows-msvc
+            toolchain: nightly-x86_64-pc-windows-msvc-nightly-2023-03-13
             target: x86_64-pc-windows-msvc
           - os: windows-latest
-            toolchain: nightly-x86_64-pc-windows-gnu
+            toolchain: nightly-x86_64-pc-windows-gnu-nightly-2023-03-13
             target: x86_64-pc-windows-gnu
 
     steps:
@@ -115,7 +116,7 @@ jobs:
       - name: Install rust
         uses: actions-rs/toolchain@v1
         with:
-          toolchain: nightly
+          toolchain: nightly-2023-03-13
           target: aarch64-linux-android
           profile: minimal
           override: true
@@ -144,7 +145,7 @@ jobs:
       - name: Install rust
         uses: actions-rs/toolchain@v1
         with:
-          toolchain: nightly
+          toolchain: nightly-2023-03-13
           profile: minimal
           override: true
 

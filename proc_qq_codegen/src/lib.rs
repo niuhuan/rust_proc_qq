@@ -86,19 +86,14 @@ pub fn event(args: TokenStream, input: TokenStream) -> TokenStream {
         let mut items = vec![];
         for x in sp {
             if let Some(c) = item_reg.captures(x) {
-                if !c.get(1).unwrap().as_str().is_empty() {
-                    items.push(BotCommandItem::Param(
-                        c.get(3).unwrap().as_str().to_string(),
-                    ));
-                }
-                if !c.get(3).unwrap().as_str().is_empty() {
-                    if param_names.contains(&c.get(3).unwrap().as_str()) {
+                if let Some(command) = c.get(1) {
+                    items.push(BotCommandItem::Command(command.as_str().to_string()));
+                } else if let Some(param) = c.get(3) {
+                    if param_names.contains(&param.as_str()) {
                         abort!(&method.sig.span(), "bot_command 不符合规则： 参数名重复",);
                     }
-                    param_names.push(c.get(3).unwrap().as_str());
-                    items.push(BotCommandItem::Param(
-                        c.get(3).unwrap().as_str().to_string(),
-                    ));
+                    param_names.push(param.as_str());
+                    items.push(BotCommandItem::Param(param.as_str().to_string()));
                 }
             } else {
                 abort!(
@@ -256,7 +251,7 @@ pub fn event(args: TokenStream, input: TokenStream) -> TokenStream {
     } else if command_params.len() > 0 && bot_command.is_none() {
         abort!(sig_params.span(), "您没有使用bot_command, 不支持更多的参数",);
     } else if bot_command.is_some()
-        && command_params.len() != bot_command_info.as_ref().unwrap().1.len()
+        && command_params.len() != bot_command_info.as_ref().unwrap().0.len()
     {
         abort!(
             sig_params.span(),
@@ -264,7 +259,7 @@ pub fn event(args: TokenStream, input: TokenStream) -> TokenStream {
         );
     } else {
         for i in 0..command_params.len() {
-            let bot_arg_name = bot_command_info.as_ref().unwrap().1[i].as_str();
+            let bot_arg_name = *(bot_command_info.as_ref().unwrap().0.get(i).unwrap());
             let command_param = command_params[i];
             let command_param = match command_param {
                 FnArg::Receiver(_) => abort!(&command_param.span(), "不支持self"),
@@ -331,31 +326,39 @@ pub fn event(args: TokenStream, input: TokenStream) -> TokenStream {
                 }
             }
         } else {
-            enum BotCommandItem {
-                Command(String),
-                Param(String),
-            }
-            // todo
             let mut p_pats = quote! {};
             let mut command_params_in_raw = quote! {};
             let mut gets = quote! {};
-            for x in command_pats {
-                let pat = x.0;
-                let ty = x.1;
-                p_pats.append_all(quote! {
-                   #pat,
-                });
-                command_params_in_raw.append_all(quote! {
-                   #pat: #ty,
-                });
-                gets.append_all(quote! {
-                    let #pat: #ty = match ::proc_qq::matcher_get::<#ty>(&mut matcher) {
-                        Some(value) => value,
-                        None => return Ok(false),
-                    };
-                });
+            let mut idx = 0;
+            for x in bot_command_info.unwrap().1 {
+                match x {
+                    BotCommandItem::Command(command) => {
+                        gets.append_all(quote! {
+                            if !matcher.match_command(#command) {
+                                return Ok(false);
+                            }
+                        });
+                    }
+                    BotCommandItem::Param(_) => {
+                        let x = command_pats[idx];
+                        idx += 1;
+                        let pat = x.0;
+                        let ty = x.1;
+                        p_pats.append_all(quote! {
+                           #pat,
+                        });
+                        command_params_in_raw.append_all(quote! {
+                           #pat: #ty,
+                        });
+                        gets.append_all(quote! {
+                            let #pat: #ty = match ::proc_qq::matcher_get::<#ty>(&mut matcher) {
+                                Some(value) => value,
+                                None => return Ok(false),
+                            };
+                        });
+                    }
+                }
             }
-            let command_name = bot_command_info.as_ref().unwrap().0.as_str();
             quote! {
                 #[::proc_qq::re_exports::async_trait::async_trait]
                 impl #trait_name for #ident {
@@ -371,9 +374,6 @@ pub fn event(args: TokenStream, input: TokenStream) -> TokenStream {
                             m_vec.push(x);
                         }
                         let mut matcher = ::proc_qq::CommandMatcher::new(m_vec);
-                        if !matcher.match_command(#command_name) {
-                            return Ok(false);
-                        }
                         #gets
                         if matcher.not_blank() {
                             return Ok(false);

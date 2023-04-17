@@ -1,6 +1,7 @@
 #[cfg(all(any(target_os = "windows"), feature = "pop_window_slider"))]
 pub mod captcha_window;
 #[cfg(all(any(target_os = "windows"), feature = "pop_window_slider"))]
+#[allow(unused_imports)]
 pub use captcha_window::*;
 
 #[cfg(feature = "connect_handler")]
