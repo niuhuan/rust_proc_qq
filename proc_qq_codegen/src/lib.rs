@@ -63,37 +63,51 @@ pub fn event(args: TokenStream, input: TokenStream) -> TokenStream {
             "bot_command 只能有一个，且必须是直接写在event括号中"
         );
     }
+    enum BotCommandItem {
+        Command(String),
+        Param(String),
+    }
     let bot_command_info = if let Some(bot_command) = &bot_command {
         let bot_command_regexp =
-            regex::Regex::new("^(\\S+)((\\s+\\{\\S+\\})+)?$").expect("proc_qq的正则不正确(1)");
+            regex::Regex::new(r#"^((\S+)|(\{\S+\}))((\s+((\S+)|(\{\S+\})))+)?$"#)
+                .expect("proc_qq的正则不正确(1)");
         if !bot_command_regexp.is_match(bot_command) {
             abort!(
                 &method.sig.span(),
-                "bot_command 不符合规则： 您需要写成\"命令 {参数} {参数} ...\"的格式，例如：bot_command=\"/ban {user} {time}\"，命令不一定要使用/开始，这里只是演示。正则 \"^(\\S+)((\\s+\\{\\S+\\})+)?$\""
+                "bot_command 不符合规则： 您需要写成\"(命令|{参数})((命令|{参数})+)?\"的格式，例如：bot_command=\"/ban {user} {time}\"，命令不一定要使用/开始，这里只是演示。正则 \"^(\\S+)((\\s+\\{\\S+\\})+)?$\""
             );
         }
+        let item_reg =
+            regex::Regex::new(r#"^([A-Za-z0-9/]+)|(\{(\S+)\})$"#).expect("proc_qq的正则不正确(3)");
         let blank_sp_regexp = regex::Regex::new("\\s+").expect("proc_qq的正则不正确(2)");
         let sp: Vec<&str> = blank_sp_regexp.split(bot_command).collect();
-        let command_name = sp.first().unwrap().to_string();
-        let bot_command_regexp =
-            regex::Regex::new("^[A-Za-z_]([A-Za-z0-9_]+)?$").expect("proc_qq的正则不正确(2)");
-        let skip = sp.iter().skip(1).map(|i| i.to_string());
-        let mut args = vec![];
-        for x in skip {
-            let x = x[1..(x.len() - 1)].to_string();
-            if !bot_command_regexp.is_match(&x) {
+        //
+        let mut param_names: Vec<&str> = vec![];
+        let mut items = vec![];
+        for x in sp {
+            if let Some(c) = item_reg.captures(x) {
+                if !c.get(1).unwrap().as_str().is_empty() {
+                    items.push(BotCommandItem::Param(
+                        c.get(3).unwrap().as_str().to_string(),
+                    ));
+                }
+                if !c.get(3).unwrap().as_str().is_empty() {
+                    if param_names.contains(&c.get(3).unwrap().as_str()) {
+                        abort!(&method.sig.span(), "bot_command 不符合规则： 参数名重复",);
+                    }
+                    param_names.push(c.get(3).unwrap().as_str());
+                    items.push(BotCommandItem::Param(
+                        c.get(3).unwrap().as_str().to_string(),
+                    ));
+                }
+            } else {
                 abort!(
                     &method.sig.span(),
-                    "bot_command 的参数名只能由[0-9A-Za-z_]组成且不能以数字开头 : {}",
-                    x
+                    "bot_command 的元素需要为 ^(\\S+)|(\\{\\S+\\})$",
                 );
             }
-            if args.contains(&x) {
-                abort!(&method.sig.span(), "bot_command 的参数名不能重复");
-            }
-            args.push(x);
         }
-        Some((command_name, args))
+        Some((param_names, items))
     } else {
         None
     };
@@ -317,6 +331,11 @@ pub fn event(args: TokenStream, input: TokenStream) -> TokenStream {
                 }
             }
         } else {
+            enum BotCommandItem {
+                Command(String),
+                Param(String),
+            }
+            // todo
             let mut p_pats = quote! {};
             let mut command_params_in_raw = quote! {};
             let mut gets = quote! {};
