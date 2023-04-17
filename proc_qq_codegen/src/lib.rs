@@ -12,7 +12,7 @@ use crate::event_arg::*;
 
 mod event_arg;
 
-/// debug = note expanded codes if env PROC_QQ_CODEGEN_DEBUG exists
+/// 如果设置PROC_QQ_CODEGEN_DEBUG变量，编译时将会以note方式打印PROC_QQ_CODEGEN的生成结果
 
 macro_rules! emit {
     ($tokens:expr) => {{
@@ -34,12 +34,12 @@ macro_rules! emit {
 #[proc_macro_error]
 #[proc_macro_attribute]
 pub fn event(args: TokenStream, input: TokenStream) -> TokenStream {
-    // event attrs
+    // 获取#[event]的参数
     let attrs = parse_macro_input!(args as syn::AttributeArgs);
     let all: Vec<EventArg> = parse_args(attrs);
-    // method
+    // 获取方法
     let method = parse_macro_input!(input as syn::ItemFn);
-    // process = bot_command
+    // 从众多EventArg中找到bot_command（如果存在）
     let mut bot_command = None;
     let mut _all = vec![];
     for x in all {
@@ -58,30 +58,45 @@ pub fn event(args: TokenStream, input: TokenStream) -> TokenStream {
     }
     let all = _all;
     if contains_bot_command(&all) {
+        // 这里是为了判断all/in之类的聚合指令内部有没有bot_command，在其指令内部包括bot_command不被允许。因为场景太少，而且逻辑复杂入不敷出。
         abort!(
             &method.sig.span(),
             "bot_command 只能有一个，且必须是直接写在event括号中"
         );
     }
+    // 解析bot_command
+    //
+    // bot_command所有元素应该满足以下正则
+    //
+    // [A-Za-z0-9_\/\p{Han}\p{Hiragana}\p{Katakana}]+
+    // 或者
+    // \{[A-Za-z_]([A-Za-z0-9_]+)?\}
+    //
+    // 元素之间并由空白字符进行链接
+    //
+    // 第一条正则代表命令允许 A-Z a-z 0-9 / _ 以及CJK汉字
+    // 第二条正则用于匹配参数 只允许 A-Za-z_ 作为参数的开始 其余字符可以和0-9任意组合
     enum BotCommandItem {
         Command(String),
         Param(String),
     }
     let bot_command_info = if let Some(bot_command) = &bot_command {
+        // 校验格式是否匹配
         let bot_command_regexp =
-            regex::Regex::new(r#"^((\S+)|(\{\S+\}))((\s+((\S+)|(\{\S+\})))+)?$"#)
+            regex::Regex::new(r#"^([A-Za-z0-9_/\p{Han}\p{Hiragana}\p{Katakana}]+)|(\{[A-Za-z_]([A-Za-z0-9_]+)?\})((\s+(([A-Za-z0-9_/\p{Han}\p{Hiragana}\p{Katakana}]+)|(\{[A-Za-z_]([A-Za-z0-9_]+)?\})))+)?$"#)
                 .expect("proc_qq的正则不正确(1)");
         if !bot_command_regexp.is_match(bot_command) {
             abort!(
                 &method.sig.span(),
-                "bot_command 不符合规则： 您需要写成\"(命令|{参数})((命令|{参数})+)?\"的格式，例如：bot_command=\"/ban {user} {time}\"，命令不一定要使用/开始，这里只是演示。正则 \"^(\\S+)((\\s+\\{\\S+\\})+)?$\""
+                "bot_command 不符合规则： 您需要写成\"(固定字段|{参数})(空白字符+(固定字段|{参数})+)?\"的格式，例如：bot_command=\"/ban {user} {time}\", bot_command=\"禁言 {user} {time}\" 。 其中命令允许CJK汉字，参数必须使用大括号包含，并且只能使用rust允许的变量名的格式。"
             );
         }
-        let item_reg =
-            regex::Regex::new(r#"^([A-Za-z0-9/]+)|(\{(\S+)\})$"#).expect("proc_qq的正则不正确(3)");
+        // 用空白字符切开元素
         let blank_sp_regexp = regex::Regex::new("\\s+").expect("proc_qq的正则不正确(2)");
         let sp: Vec<&str> = blank_sp_regexp.split(bot_command).collect();
-        //
+        // 校验
+        let item_reg =
+            regex::Regex::new(r#"^([A-Za-z0-9_/\p{Han}\p{Hiragana}\p{Katakana}]+)|(\{([A-Za-z_]([A-Za-z0-9_]+)?)\})$"#).expect("proc_qq的正则不正确(3)");
         let mut param_names: Vec<&str> = vec![];
         let mut items = vec![];
         for x in sp {
@@ -94,11 +109,18 @@ pub fn event(args: TokenStream, input: TokenStream) -> TokenStream {
                     }
                     param_names.push(param.as_str());
                     items.push(BotCommandItem::Param(param.as_str().to_string()));
+                } else {
+                    // 正常情况下这里不会被运行，除proc_qq的正则或逻辑错误
+                    abort!(
+                        &method.sig.span(),
+                        "proc_qq_code_gen error ： bot_command 格式错误，请参考文档，或提交issue",
+                    );
                 }
             } else {
+                // 正常情况下这里不会被运行，除proc_qq的正则或逻辑错误
                 abort!(
                     &method.sig.span(),
-                    "bot_command 的元素需要为 ^(\\S+)|(\\{\\S+\\})$",
+                    "proc_qq_code_gen error ： bot_command 格式错误，请参考文档，或提交issue",
                 );
             }
         }
@@ -106,11 +128,11 @@ pub fn event(args: TokenStream, input: TokenStream) -> TokenStream {
     } else {
         None
     };
-    // must append to async fn
+    // 判断是否为async方法
     if method.sig.asyncness.is_none() {
         abort!(&method.sig.span(), "必须是async方法");
     }
-    // params check
+    // 判断事件
     let sig_params = &method.sig.inputs;
     if sig_params.is_empty() {
         abort!(&sig_params.span(), "需要事件作为参数");
@@ -245,6 +267,7 @@ pub fn event(args: TokenStream, input: TokenStream) -> TokenStream {
             format!("未知的参数类型 {}, 事件必须作为&self下一个参数(或第一个参数), 请在文档中查看兼容的事件以及参数类型 https://github.com/niuhuan/rust_proc_qq", t),
         ),
     };
+    // 判断事件之后判断bot_command参数
     let mut command_pats: Vec<(&syn::Pat, &syn::Type)> = vec![];
     let command_params = &params[param_skip..params.len()];
     if command_params.is_empty() && bot_command.is_none() {
@@ -279,7 +302,7 @@ pub fn event(args: TokenStream, input: TokenStream) -> TokenStream {
             command_pats.push((pat, ty));
         }
     };
-    //
+    // 生成代码
     let trait_name = tokens.0;
     let enum_name = tokens.1;
     // gen token stream

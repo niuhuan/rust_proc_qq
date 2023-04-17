@@ -5,7 +5,7 @@ use proc_qq::{
     MessageEventProcess, MessageSendToSourceTrait, Module,
 };
 
-/// 登录成功的时候调用
+/// 登录的时候调用 (但是不一定登录成功)
 #[event]
 async fn login(event: &LoginEvent) -> anyhow::Result<bool> {
     tracing::info!("正在登录 : {}", event.uin);
@@ -97,18 +97,21 @@ async fn handle3_add(message: &MessageEvent) {
 
 /// bot_command
 
+// 一般指令
 #[event(bot_command = "/ban {user} {time}")]
 async fn handle5(_message: &MessageEvent, user: String, time: i64) -> anyhow::Result<bool> {
     println!("handle5。user : {user} , time : {time} ");
     Ok(true)
 }
 
+// 匹配Vec
 #[event(bot_command = "/numbers {time}")]
 async fn handle6(_message: &MessageEvent, time: Vec<usize>) -> anyhow::Result<bool> {
     println!("handle6。 time : {:?} ", time);
     Ok(true)
 }
 
+// 匹配多个参数 Vec<At> + i64
 #[event(bot_command = "/ban_list {user} {time}")]
 async fn handle7(
     _message: &MessageEvent,
@@ -119,6 +122,7 @@ async fn handle7(
     Ok(true)
 }
 
+// 匹配子命令
 #[event(bot_command = "/test_ban a {user} b {time}")]
 async fn handle8(_message: &MessageEvent, user: String, time: i64) -> anyhow::Result<bool> {
     println!("handle8。 user : {:?} , time : {:?} ", user, time);
@@ -126,6 +130,8 @@ async fn handle8(_message: &MessageEvent, user: String, time: i64) -> anyhow::Re
 }
 
 /// module
+
+// 这里尽可能多的展示了示例，同时也为了ci check, 搬运代码建议删掉一部分使用
 
 pub fn module() -> Module {
     module!(
