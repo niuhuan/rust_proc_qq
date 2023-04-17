@@ -61,17 +61,11 @@ jobs:
       matrix:
         config:
           - os: macos-latest
-            toolchain: nightly-x86_64-apple-darwin-nightly-2023-03-13
             target: x86_64-apple-darwin
           - os: ubuntu-latest
-            toolchain: nightly-x86_64-unknown-linux-gnu-nightly-2023-03-13
             target: x86_64-unknown-linux-gnu
           - os: windows-latest
-            toolchain: nightly-x86_64-pc-windows-msvc-nightly-2023-03-13
             target: x86_64-pc-windows-msvc
-          - os: windows-latest
-            toolchain: nightly-x86_64-pc-windows-gnu-nightly-2023-03-13
-            target: x86_64-pc-windows-gnu
 
     steps:
       - name: Checkout
@@ -80,22 +74,9 @@ jobs:
       - name: Install rust
         uses: actions-rs/toolchain@v1
         with:
-          toolchain: ${{ matrix.config.toolchain }}
+          toolchain: ${{ env.RUST_TOOLCHAIN_VERSION }}-${{ matrix.config.target }}
           profile: minimal
           override: true
-
-      - name: Add mingw64 to path for x86_64-gnu
-        if: matrix.config.target == 'x86_64-pc-windows-gnu'
-        shell: bash
-        run: |
-          echo "C:\msys64\mingw64\bin" >> $GITHUB_PATH
-          echo "C:\msys64\usr\bin" >> $GITHUB_PATH
-
-      # clang used by silk-rs
-
-      - name: Update gcc
-        if: matrix.config.target == 'x86_64-pc-windows-gnu'
-        run: pacman.exe -Sy --noconfirm mingw-w64-x86_64-toolchain mingw-w64-x86_64-clang mingw-w64-x86_64-llvm
 
       - name: Build
         uses: actions-rs/cargo@v1
@@ -116,7 +97,7 @@ jobs:
       - name: Install rust
         uses: actions-rs/toolchain@v1
         with:
-          toolchain: nightly-2023-03-13
+          toolchain: ${{ env.RUST_TOOLCHAIN_VERSION }}
           target: aarch64-linux-android
           profile: minimal
           override: true
@@ -145,7 +126,7 @@ jobs:
       - name: Install rust
         uses: actions-rs/toolchain@v1
         with:
-          toolchain: nightly-2023-03-13
+          toolchain: ${{ env.RUST_TOOLCHAIN_VERSION }}
           profile: minimal
           override: true
 
