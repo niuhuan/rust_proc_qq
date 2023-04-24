@@ -502,6 +502,7 @@ pub struct CommandMatcher {
     pub idx: usize,
     pub elements: Vec<RQElem>,
     pub matching: String,
+    pub boundary: bool,
 }
 
 impl CommandMatcher {
@@ -510,6 +511,7 @@ impl CommandMatcher {
             idx: 0,
             elements: value,
             matching: String::new(),
+            boundary: false,
         };
         matcher.push_text();
         matcher
@@ -551,6 +553,15 @@ impl CommandMatcher {
     pub fn not_blank(&self) -> bool {
         !self.matching.is_empty() || self.idx < self.elements.len()
     }
+
+    pub fn match_boundary(&mut self) -> bool {
+        if self.boundary {
+            self.boundary = false;
+            true
+        } else {
+            false
+        }
+    }
 }
 
 pub trait FromCommandMatcher: Sized {
@@ -572,6 +583,7 @@ impl FromCommandMatcher for String {
         if let Some(first) = sp.next() {
             let result = Some(first.to_string());
             matcher.matching = matcher.matching[first.len()..].trim().to_string();
+            matcher.boundary = true;
             return result;
         }
         None
@@ -582,6 +594,7 @@ impl FromCommandMatcher for Option<String> {
     fn get(matcher: &mut CommandMatcher) -> Option<Self> {
         let mut result = None;
         if matcher.matching.is_empty() {
+            matcher.boundary = true;
             return Some(result);
         }
         let sp_regexp = regex::Regex::new("\\s+").expect("proc_qq 正则错误");
@@ -590,6 +603,7 @@ impl FromCommandMatcher for Option<String> {
             result = Some(first.to_string());
             matcher.matching = matcher.matching[first.len()..].trim().to_string();
         }
+        matcher.boundary = true;
         Some(result)
     }
 }
@@ -602,10 +616,12 @@ impl FromCommandMatcher for Vec<String> {
             .map(String::from)
             .collect();
         matcher.matching = String::default();
+        matcher.boundary = true;
         Some(result)
     }
 }
 
+// todo: 匹配是否以\-?\d+开头，不匹配返回none，匹配返回Some, 匹配到字符串结束 boundary = true, 否则boundary = false
 macro_rules! command_base_ty_supplier {
     ($ty:ty) => {
         impl FromCommandMatcher for $ty {

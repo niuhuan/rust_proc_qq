@@ -3,8 +3,8 @@ use quote::{quote, TokenStreamExt};
 use syn::spanned::Spanned;
 use syn::Lit::Str;
 use syn::Meta::{List, NameValue, Path};
-use syn::NestedMeta;
 use syn::NestedMeta::{Lit, Meta};
+use syn::{AttributeArgs, ItemFn, NestedMeta};
 
 #[derive(Clone, Debug)]
 pub(crate) enum EventArg {
@@ -204,4 +204,37 @@ pub(crate) fn contains_bot_command(all: &Vec<EventArg>) -> bool {
         }
     }
     false
+}
+
+pub(crate) fn parse_args_and_command(
+    method: &ItemFn,
+    attrs: AttributeArgs,
+) -> (Vec<EventArg>, Option<String>) {
+    // 从众多EventArg中找到bot_command（如果存在）
+    let all: Vec<EventArg> = parse_args(attrs);
+    let mut bot_command = None;
+    let mut _all = vec![];
+    for x in all {
+        if let EventArg::BotCommand(command) = x {
+            if bot_command.is_none() {
+                bot_command = Some(command);
+            } else {
+                abort!(
+                    &method.sig.span(),
+                    "bot_command 只能有一个，且必须是直接写在event括号中"
+                );
+            }
+        } else {
+            _all.push(x);
+        }
+    }
+    let all = _all;
+    if contains_bot_command(&all) {
+        // 这里是为了判断all/in之类的聚合指令内部有没有bot_command，在其指令内部包括bot_command不被允许。因为场景太少，而且逻辑复杂入不敷出。
+        abort!(
+            &method.sig.span(),
+            "bot_command 只能有一个，且必须是直接写在event括号中"
+        );
+    }
+    (all, bot_command)
 }
