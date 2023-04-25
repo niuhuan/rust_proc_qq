@@ -1,6 +1,6 @@
 use proc_macro::TokenStream;
 
-use crate::bot_command::{parse_bot_args, parse_bot_command, ParamsMather};
+use crate::bot_command::{parse_bot_args, parse_bot_command, ParamsMather, ParamsMatherMultiple};
 use proc_macro2::Span;
 use proc_macro_error::{abort, proc_macro_error};
 use quote::{quote, ToTokens, TokenStreamExt};
@@ -42,7 +42,6 @@ pub fn event(args: TokenStream, input: TokenStream) -> TokenStream {
     let method = parse_macro_input!(input as syn::ItemFn);
     // 解析参数
     let (all, bot_command) = parse_args_and_command(&method, attrs);
-    //
     let command_items = parse_bot_command(&method, bot_command);
     // 判断是否为async方法
     if method.sig.asyncness.is_none() {
@@ -261,12 +260,56 @@ pub fn event(args: TokenStream, input: TokenStream) -> TokenStream {
                             };
                         });
                     }
-                    ParamsMather::Boundary => {
+                    ParamsMather::Multiple(multiple) => {
+                        let mut mme = quote! {};
+                        let mut pp = vec![];
+                        for x in &multiple {
+                            match x {
+                                ParamsMatherMultiple::Command(name) => {
+                                    mme.append_all(quote! {
+                                        ::proc_qq::MutilMatcherElement::Command(#name),
+                                    });
+                                }
+                                ParamsMatherMultiple::Params(p, t) => {
+                                    mme.append_all(quote! {
+                                        ::proc_qq::MutilMatcherElement::Param,
+                                    });
+                                    pp.push((*p, *t));
+                                }
+                            }
+                        }
                         gets.append_all(quote! {
-                            if !matcher.match_boundary() {
+                            let mut ps = if let Some(ps) = matcher.mutil_matcher(vec![#mme]) {
+                                ps
+                            } else {
+                                return Ok(false);
+                            };
+                        });
+                        let len = pp.len();
+                        gets.append_all(quote! {
+                            if ps.len() != #len {
                                 return Ok(false);
                             }
                         });
+                        for (pat, ty) in pp {
+                            p_pats.append_all(quote! {
+                              #pat,
+                            });
+                            command_params_in_raw.append_all(quote! {
+                                #pat: #ty,
+                            });
+                            gets.append_all(quote! {
+                                let #pat: #ty = if let Some(np) = ps.pop() {
+                                    let mut sub_matcher = ::proc_qq::CommandMatcher::new_from_text(np);
+                                    match ::proc_qq::matcher_get::<#ty>(&mut sub_matcher) {
+                                        Some(value) => value,
+                                        None => return Ok(false),
+                                    }
+                                } else {
+                                    return Ok(false);
+                                };
+                        });
+                        }
                     }
                 }
             }
