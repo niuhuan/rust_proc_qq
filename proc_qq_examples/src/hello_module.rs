@@ -129,6 +129,13 @@ async fn handle8(_message: &MessageEvent, user: String, time: i64) -> anyhow::Re
     Ok(true)
 }
 
+// 匹配子命令2
+#[event(bot_command = "/test_ban a{int1}b{int2}c")]
+async fn handle9(_message: &MessageEvent, int1: i64, int2: i64) -> anyhow::Result<bool> {
+    println!("handle9。 test_ban : {:?} , time : {:?} ", int1, int2);
+    Ok(true)
+}
+
 /// module
 
 // 这里尽可能多的展示了示例，同时也为了ci check, 搬运代码建议删掉一部分使用

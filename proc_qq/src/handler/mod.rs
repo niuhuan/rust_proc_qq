@@ -640,12 +640,21 @@ macro_rules! command_base_ty_supplier {
                 let sp_regexp = regex::Regex::new("\\s+").expect("proc_qq 正则错误");
                 let mut sp = sp_regexp.split(matcher.matching.as_str());
                 if let Some(first) = sp.next() {
-                    let result = match first.parse::<$ty>() {
-                        Ok(value) => Some(value),
-                        Err(_) => return None,
-                    };
-                    matcher.matching = matcher.matching[first.len()..].trim().to_string();
-                    return result;
+                    // 用正则匹配 first, 取得最前面的数字 ^\-?\d+
+                    let num_reg = regex::Regex::new(r#"^\-?\d+"#).expect("proc_qq 正则错误");
+                    if let Some(find) = num_reg.find(first) {
+                        let result = match find.as_str().parse::<$ty>() {
+                            Ok(value) => Some(value),
+                            Err(_) => return None,
+                        };
+                        matcher.matching = matcher.matching[find.len()..].trim().to_string();
+                        matcher.boundary = matcher.matching.is_empty()
+                            || regex::Regex::new(r#"^\s"#)
+                                .expect("proc_qq 正则错误")
+                                .find(matcher.matching.as_str())
+                                .is_some();
+                        return result;
+                    }
                 }
                 None
             }
@@ -655,19 +664,29 @@ macro_rules! command_base_ty_supplier {
             fn get(matcher: &mut CommandMatcher) -> Option<Self> {
                 let mut result = None;
                 if matcher.matching.is_empty() {
+                    matcher.boundary = true;
                     return Some(result);
                 }
                 let sp_regexp = regex::Regex::new("\\s+").expect("proc_qq 正则错误");
                 let mut sp = sp_regexp.split(matcher.matching.as_str());
                 if let Some(first) = sp.next() {
-                    match first.parse::<$ty>() {
-                        Ok(value) => {
-                            result = Some(value);
-                            matcher.matching = matcher.matching[first.len()..].trim().to_string();
-                        }
-                        _ => {}
-                    };
+                    // 用正则匹配 first, 取得最前面的数字 ^\-?\d+
+                    let num_reg = regex::Regex::new(r#"^\-?\d+"#).expect("proc_qq 正则错误");
+                    if let Some(find) = num_reg.find(first) {
+                        let result = match find.as_str().parse::<$ty>() {
+                            Ok(value) => Some(Some(value)),
+                            Err(_) => Some(None),
+                        };
+                        matcher.matching = matcher.matching[find.len()..].trim().to_string();
+                        matcher.boundary = matcher.matching.is_empty()
+                            || regex::Regex::new(r#"^\s"#)
+                                .expect("proc_qq 正则错误")
+                                .find(matcher.matching.as_str())
+                                .is_some();
+                        return result;
+                    }
                 }
+                matcher.boundary = true;
                 return Some(result);
             }
         }
@@ -698,6 +717,7 @@ macro_rules! command_base_ty_supplier {
                     }
                 }
                 matcher.matching = new_matching.join(" ");
+                matcher.boundary = true;
                 Some(result)
             }
         }
@@ -731,6 +751,7 @@ macro_rules! command_rq_element_ty_supplier {
                     let result = Some(item.clone());
                     matcher.idx += 1;
                     matcher.push_text();
+                    matcher.boundary = true;
                     return result;
                 }
                 None
@@ -741,9 +762,11 @@ macro_rules! command_rq_element_ty_supplier {
             fn get(matcher: &mut CommandMatcher) -> Option<Self> {
                 let mut result = None;
                 if !matcher.matching.is_empty() {
+                    matcher.boundary = true;
                     return Some(result);
                 }
                 if matcher.idx >= matcher.elements.len() {
+                    matcher.boundary = true;
                     return Some(result);
                 }
                 if let $mat(item) = matcher.elements.get(matcher.idx).unwrap() {
@@ -751,6 +774,7 @@ macro_rules! command_rq_element_ty_supplier {
                     matcher.idx += 1;
                     matcher.push_text();
                 }
+                matcher.boundary = true;
                 Some(result)
             }
         }
@@ -759,6 +783,7 @@ macro_rules! command_rq_element_ty_supplier {
             fn get(matcher: &mut CommandMatcher) -> Option<Self> {
                 let mut result = vec![];
                 if !matcher.matching.is_empty() {
+                    matcher.boundary = true;
                     return Some(result);
                 }
                 loop {
@@ -773,6 +798,7 @@ macro_rules! command_rq_element_ty_supplier {
                         break;
                     }
                 }
+                matcher.boundary = true;
                 Some(result)
             }
         }
@@ -804,18 +830,21 @@ impl FromCommandMatcher for ImageElement {
                 let result = Some(ImageElement::FriendImage(image.clone()));
                 matcher.idx += 1;
                 matcher.push_text();
+                matcher.boundary = true;
                 result
             }
             RQElem::GroupImage(image) => {
                 let result = Some(ImageElement::GroupImage(image.clone()));
                 matcher.idx += 1;
                 matcher.push_text();
+                matcher.boundary = true;
                 result
             }
             RQElem::FlashImage(image) => {
                 let result = Some(ImageElement::FlashImage(image.clone()));
                 matcher.idx += 1;
                 matcher.push_text();
+                matcher.boundary = true;
                 result
             }
             _ => None,
@@ -827,9 +856,11 @@ impl FromCommandMatcher for Option<ImageElement> {
     fn get(matcher: &mut CommandMatcher) -> Option<Self> {
         let mut result = None;
         if !matcher.matching.is_empty() {
+            matcher.boundary = true;
             return Some(result);
         }
         if matcher.idx >= matcher.elements.len() {
+            matcher.boundary = true;
             return Some(result);
         }
         match matcher.elements.get(matcher.idx).unwrap() {
@@ -850,6 +881,7 @@ impl FromCommandMatcher for Option<ImageElement> {
             }
             _ => (),
         }
+        matcher.boundary = true;
         Some(result)
     }
 }
@@ -858,6 +890,7 @@ impl FromCommandMatcher for Vec<ImageElement> {
     fn get(matcher: &mut CommandMatcher) -> Option<Self> {
         let mut result = vec![];
         if !matcher.matching.is_empty() {
+            matcher.boundary = true;
             return Some(result);
         }
         loop {
@@ -883,6 +916,7 @@ impl FromCommandMatcher for Vec<ImageElement> {
                 _ => break,
             }
         }
+        matcher.boundary = true;
         Some(result)
     }
 }
