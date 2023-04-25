@@ -4,7 +4,7 @@ use ricq::client::event::{
     ClientDisconnect, DeleteFriendEvent, FriendAudioMessageEvent, FriendMessageEvent,
     FriendMessageRecallEvent, FriendPokeEvent, GroupAudioMessageEvent, GroupDisbandEvent,
     GroupLeaveEvent, GroupMessageEvent, GroupMessageRecallEvent, GroupMuteEvent,
-    GroupNameUpdateEvent, GroupTempMessageEvent, JoinGroupRequestEvent,
+    GroupNameUpdateEvent, GroupPokeEvent, GroupTempMessageEvent, JoinGroupRequestEvent,
     MemberPermissionChangeEvent, NewFriendEvent, NewFriendRequestEvent, NewMemberEvent,
     SelfInvitedEvent,
 };
@@ -48,6 +48,7 @@ pub enum ModuleEventProcess {
     GroupAudioMessage(Box<dyn GroupAudioMessageEventProcess>),
     FriendAudioMessage(Box<dyn FriendAudioMessageEventProcess>),
     ClientDisconnect(Box<dyn ClientDisconnectProcess>),
+    GroupPoke(Box<dyn GroupPokeEventProcess>),
 }
 
 macro_rules! process_trait {
@@ -99,3 +100,4 @@ process_trait!(SelfInvitedEventProcess, SelfInvitedEvent);
 process_trait!(GroupAudioMessageEventProcess, GroupAudioMessageEvent);
 process_trait!(FriendAudioMessageEventProcess, FriendAudioMessageEvent);
 process_trait!(ClientDisconnectProcess, ClientDisconnect);
+process_trait!(GroupPokeEventProcess, GroupPokeEvent);

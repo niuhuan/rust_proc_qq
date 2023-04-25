@@ -14,8 +14,8 @@ proc_qq_codegen = { path = "../proc_qq_codegen" }
 bytes = "1"
 tokio = { version = "1", features = ["full"] }
 tracing = "0.1"
-ricq = "0.1.19"
-ricq-core = "0.1.19"
+ricq = { git = "https://github.com/lz1998/ricq.git" }
+ricq-core = { git = "https://github.com/lz1998/ricq.git" }
 anyhow = "1.0"
 serde = "1.0"
 serde_json = "1.0"

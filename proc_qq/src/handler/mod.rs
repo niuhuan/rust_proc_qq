@@ -344,6 +344,14 @@ impl Handler for ClientHandler {
                     ResultProcess::ClientDisconnect
                 );
             }
+            QEvent::GroupPoke(event) => {
+                let _ = map_handlers!(
+                    &self,
+                    &event,
+                    ModuleEventProcess::GroupPoke,
+                    ResultProcess::GroupPoke
+                );
+            }
         }
     }
 }

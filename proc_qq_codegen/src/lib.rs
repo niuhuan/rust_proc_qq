@@ -1,6 +1,6 @@
 use proc_macro::TokenStream;
 
-use crate::bot_command::{parse_bot_args, parse_bot_command, BotCommandItem, ParamsMather};
+use crate::bot_command::{parse_bot_args, parse_bot_command, ParamsMather};
 use proc_macro2::Span;
 use proc_macro_error::{abort, proc_macro_error};
 use quote::{quote, ToTokens, TokenStreamExt};
@@ -178,12 +178,15 @@ pub fn event(args: TokenStream, input: TokenStream) -> TokenStream {
             quote! {::proc_qq::ClientDisconnectProcess},
             quote! {::proc_qq::ModuleEventProcess::ClientDisconnect},
         ),
+        "& GroupPoke" => (
+            quote! {::proc_qq::GroupPokeProcess},
+            quote! {::proc_qq::ModuleEventProcess::GroupPoke},
+        ),
         t => abort!(
             event_param.span(),
             format!("未知的参数类型 {}, 事件必须作为&self下一个参数(或第一个参数), 请在文档中查看兼容的事件以及参数类型 https://github.com/niuhuan/rust_proc_qq", t),
         ),
     };
-    // 判断事件之后判断bot_command参数
     let pms = parse_bot_args(&method, &params[param_skip..params.len()], command_items);
     // 生成代码
     let trait_name = tokens.0;
@@ -235,7 +238,6 @@ pub fn event(args: TokenStream, input: TokenStream) -> TokenStream {
             let mut p_pats = quote! {};
             let mut command_params_in_raw = quote! {};
             let mut gets = quote! {};
-            let mut idx = 0;
             for x in pms.unwrap() {
                 match x {
                     ParamsMather::Command(command) => {
