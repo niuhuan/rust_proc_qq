@@ -924,3 +924,103 @@ pub enum TupleMatcherElement {
     Command(&'static str),
     Param,
 }
+
+pub struct TupleMatcher(String);
+
+impl TupleMatcher {
+    pub fn new(context: String) -> Self {
+        Self(context)
+    }
+}
+
+pub trait FromTupleMatcher: Sized {
+    fn get(matcher: TupleMatcher) -> Option<Self>;
+}
+
+#[inline]
+pub fn tuple_matcher_get<F: Sized + FromTupleMatcher>(matcher: TupleMatcher) -> Option<F> {
+    F::get(matcher)
+}
+
+impl FromTupleMatcher for String {
+    fn get(matcher: TupleMatcher) -> Option<Self> {
+        if matcher.0.is_empty() {
+            None
+        } else {
+            Some(matcher.0)
+        }
+    }
+}
+
+impl FromTupleMatcher for Option<String> {
+    fn get(matcher: TupleMatcher) -> Option<Self> {
+        if matcher.0.is_empty() {
+            Some(None)
+        } else {
+            Some(Some(matcher.0))
+        }
+    }
+}
+
+impl FromTupleMatcher for Vec<String> {
+    fn get(matcher: TupleMatcher) -> Option<Self> {
+        if matcher.0.is_empty() {
+            Some(vec![])
+        } else {
+            Some(vec![matcher.0])
+        }
+    }
+}
+
+impl FromTupleMatcher for Vec<Option<String>> {
+    fn get(matcher: TupleMatcher) -> Option<Self> {
+        if matcher.0.is_empty() {
+            Some(vec![])
+        } else {
+            Some(vec![Some(matcher.0)])
+        }
+    }
+}
+
+macro_rules! tuple_base_ty_supplier {
+    ($ty:ty) => {
+        impl FromTupleMatcher for $ty {
+            fn get(matcher: TupleMatcher) -> Option<Self> {
+                matcher.0.parse::<$ty>().ok()
+            }
+        }
+
+        impl FromTupleMatcher for Option<$ty> {
+            fn get(matcher: TupleMatcher) -> Option<Self> {
+                if matcher.0.is_empty() {
+                    Some(None)
+                } else {
+                    matcher.0.parse::<$ty>().ok().map(|v| Some(v))
+                }
+            }
+        }
+
+        impl FromTupleMatcher for Vec<$ty> {
+            fn get(matcher: TupleMatcher) -> Option<Self> {
+                if matcher.0.is_empty() {
+                    Some(vec![])
+                } else {
+                    matcher.0.parse::<$ty>().ok().map(|v| vec![v])
+                }
+            }
+        }
+    };
+}
+
+tuple_base_ty_supplier!(i8);
+tuple_base_ty_supplier!(u8);
+tuple_base_ty_supplier!(i16);
+tuple_base_ty_supplier!(u16);
+tuple_base_ty_supplier!(i32);
+tuple_base_ty_supplier!(u32);
+tuple_base_ty_supplier!(i64);
+tuple_base_ty_supplier!(u64);
+tuple_base_ty_supplier!(i128);
+tuple_base_ty_supplier!(u128);
+tuple_base_ty_supplier!(isize);
+tuple_base_ty_supplier!(usize);

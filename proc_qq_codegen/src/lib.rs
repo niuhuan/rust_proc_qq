@@ -299,16 +299,16 @@ pub fn event(args: TokenStream, input: TokenStream) -> TokenStream {
                                 #pat: #ty,
                             });
                             gets.append_all(quote! {
-                                let #pat: #ty = if let Some(np) = ps.pop() {
-                                    let mut sub_matcher = ::proc_qq::CommandMatcher::new_from_text(np);
-                                    match ::proc_qq::matcher_get::<#ty>(&mut sub_matcher) {
-                                        Some(value) => value,
-                                        None => return Ok(false),
-                                    }
-                                } else {
-                                    return Ok(false);
-                                };
-                        });
+                                    let #pat: #ty = if let Some(np) = ps.pop() {
+                                        let sub_matcher = ::proc_qq::TupleMatcher::new(np);
+                                        match ::proc_qq::tuple_matcher_get::<#ty>(sub_matcher) {
+                                            Some(value) => value,
+                                            None => return Ok(false),
+                                        }
+                                    } else {
+                                        return Ok(false);
+                                    };
+                            });
                         }
                     }
                 }
