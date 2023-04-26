@@ -53,18 +53,18 @@ pub trait MessageSendToSourceTrait: Send + Sync + ClientTrait {
         message: S,
     ) -> RQResult<MessageReceipt>;
 
-    async fn upload_image_to_source<S: Into<Vec<u8>> + Send + Sync>(
+    async fn upload_image_to_source<S: AsRef<[u8]> + Send + Sync>(
         &self,
         data: S,
     ) -> RQResult<UploadImage>;
 
-    async fn upload_short_video_buff_to_source<S: Into<Vec<u8>> + Send + Sync>(
+    async fn upload_short_video_buff_to_source<S: AsRef<[u8]> + Send + Sync>(
         &self,
         data: S,
         thumb: S,
     ) -> RQResult<VideoFile>;
 
-    async fn send_audio_to_source<S: Into<Vec<u8>> + Send + Sync>(
+    async fn send_audio_to_source<S: AsRef<[u8]> + Send + Sync>(
         &self,
         data: S,
         codec: u32,
@@ -158,28 +158,28 @@ impl MessageSendToSourceTrait for GroupMessageEvent {
         self.client.send_message_to_target(self, message).await
     }
 
-    async fn upload_image_to_source<S: Into<Vec<u8>> + Send + Sync>(
+    async fn upload_image_to_source<S: AsRef<[u8]> + Send + Sync>(
         &self,
         data: S,
     ) -> RQResult<UploadImage> {
         Ok(UploadImage::GroupImage(
             self.client
-                .upload_group_image(self.inner.group_code, data.into())
+                .upload_group_image(self.inner.group_code, data.as_ref())
                 .await?,
         ))
     }
 
-    async fn upload_short_video_buff_to_source<S: Into<Vec<u8>> + Send + Sync>(
+    async fn upload_short_video_buff_to_source<S: AsRef<[u8]> + Send + Sync>(
         &self,
         data: S,
         thumb: S,
     ) -> RQResult<VideoFile> {
         self.client
-            .upload_group_short_video(self.inner.group_code, data.into(), thumb.into())
+            .upload_group_short_video(self.inner.group_code, data.as_ref(), thumb.as_ref())
             .await
     }
 
-    async fn send_audio_to_source<S: Into<Vec<u8>> + Send + Sync>(
+    async fn send_audio_to_source<S: AsRef<[u8]> + Send + Sync>(
         &self,
         data: S,
         codec: u32,
@@ -187,7 +187,7 @@ impl MessageSendToSourceTrait for GroupMessageEvent {
     ) -> RQResult<MessageReceipt> {
         let group_audio = self
             .client
-            .upload_group_audio(self.inner.group_code, data.into(), codec)
+            .upload_group_audio(self.inner.group_code, data.as_ref(), codec)
             .await?;
         self.client
             .send_group_audio(self.inner.group_code, group_audio)
@@ -303,29 +303,29 @@ impl MessageSendToSourceTrait for FriendMessageEvent {
         self.client.send_message_to_target(self, message).await
     }
 
-    async fn upload_image_to_source<S: Into<Vec<u8>> + Send + Sync>(
+    async fn upload_image_to_source<S: AsRef<[u8]> + Send + Sync>(
         &self,
         data: S,
     ) -> RQResult<UploadImage> {
         Ok(UploadImage::FriendImage(
             self.client
-                .upload_friend_image(self.inner.from_uin, data.into())
+                .upload_friend_image(self.inner.from_uin, data.as_ref())
                 .await?,
         ))
     }
 
-    async fn upload_short_video_buff_to_source<S: Into<Vec<u8>> + Send + Sync>(
+    async fn upload_short_video_buff_to_source<S: AsRef<[u8]> + Send + Sync>(
         &self,
         data: S,
         thumb: S,
     ) -> RQResult<VideoFile> {
         // todo RICQ 并没有区分
         self.client
-            .upload_group_short_video(self.inner.from_uin, data.into(), thumb.into())
+            .upload_group_short_video(self.inner.from_uin, data.as_ref(), thumb.as_ref())
             .await
     }
 
-    async fn send_audio_to_source<S: Into<Vec<u8>> + Send + Sync>(
+    async fn send_audio_to_source<S: AsRef<[u8]> + Send + Sync>(
         &self,
         data: S,
         _codec: u32,
@@ -333,7 +333,7 @@ impl MessageSendToSourceTrait for FriendMessageEvent {
     ) -> RQResult<MessageReceipt> {
         let friend_audio = self
             .client
-            .upload_friend_audio(self.inner.from_uin, data.into(), audio_duration)
+            .upload_friend_audio(self.inner.from_uin, data.as_ref(), audio_duration)
             .await?;
         self.client
             .send_friend_audio(self.inner.from_uin, friend_audio)
@@ -409,7 +409,7 @@ impl MessageSendToSourceTrait for GroupTempMessageEvent {
         self.client.send_message_to_target(self, message).await
     }
 
-    async fn upload_image_to_source<S: Into<Vec<u8>> + Send + Sync>(
+    async fn upload_image_to_source<S: AsRef<[u8]> + Send + Sync>(
         &self,
         _: S,
     ) -> RQResult<UploadImage> {
@@ -418,7 +418,7 @@ impl MessageSendToSourceTrait for GroupTempMessageEvent {
         ))
     }
 
-    async fn upload_short_video_buff_to_source<S: Into<Vec<u8>> + Send + Sync>(
+    async fn upload_short_video_buff_to_source<S: AsRef<[u8]> + Send + Sync>(
         &self,
         _data: S,
         _thumb: S,
@@ -428,7 +428,7 @@ impl MessageSendToSourceTrait for GroupTempMessageEvent {
         ))
     }
 
-    async fn send_audio_to_source<S: Into<Vec<u8>> + Send + Sync>(
+    async fn send_audio_to_source<S: AsRef<[u8]> + Send + Sync>(
         &self,
         _data: S,
         _codec: u32,
@@ -503,7 +503,7 @@ impl MessageSendToSourceTrait for MessageEvent {
         .await
     }
 
-    async fn upload_image_to_source<S: Into<Vec<u8>> + Send + Sync>(
+    async fn upload_image_to_source<S: AsRef<[u8]> + Send + Sync>(
         &self,
         data: S,
     ) -> RQResult<UploadImage> {
@@ -515,7 +515,7 @@ impl MessageSendToSourceTrait for MessageEvent {
         .await
     }
 
-    async fn upload_short_video_buff_to_source<S: Into<Vec<u8>> + Send + Sync>(
+    async fn upload_short_video_buff_to_source<S: AsRef<[u8]> + Send + Sync>(
         &self,
         data: S,
         thumb: S,
@@ -534,7 +534,7 @@ impl MessageSendToSourceTrait for MessageEvent {
         .await
     }
 
-    async fn send_audio_to_source<S: Into<Vec<u8>> + Send + Sync>(
+    async fn send_audio_to_source<S: AsRef<[u8]> + Send + Sync>(
         &self,
         data: S,
         codec: u32,

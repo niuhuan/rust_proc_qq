@@ -129,6 +129,20 @@ async fn handle8(_message: &MessageEvent, user: String, time: i64) -> anyhow::Re
     Ok(true)
 }
 
+// 匹配子命令2
+#[event(bot_command = "/test {var1}秒后发送{var2}")]
+async fn handle9(_message: &MessageEvent, var1: i64, var2: String) -> anyhow::Result<bool> {
+    println!("handle9。 : {:?} , {:?} ", var1, var2);
+    Ok(true)
+}
+
+// 匹配子命令2
+#[event(bot_command = "/test{var1}秒后发送{var2}")]
+async fn handle10(_message: &MessageEvent, var1: i64, var2: String) -> anyhow::Result<bool> {
+    println!("handle10。 : {:?} , {:?} ", var1, var2);
+    Ok(true)
+}
+
 /// module
 
 // 这里尽可能多的展示了示例，同时也为了ci check, 搬运代码建议删掉一部分使用
@@ -148,5 +162,7 @@ pub fn module() -> Module {
         handle6,
         handle7,
         handle8,
+        handle9,
+        handle10,
     )
 }
