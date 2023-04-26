@@ -749,6 +749,10 @@ command_base_ty_supplier!(i128);
 command_base_ty_supplier!(u128);
 command_base_ty_supplier!(isize);
 command_base_ty_supplier!(usize);
+command_base_ty_supplier!(f32);
+command_base_ty_supplier!(f64);
+command_base_ty_supplier!(bool);
+command_base_ty_supplier!(char);
 
 macro_rules! command_rq_element_ty_supplier {
     ($ty:ty, $mat:path) => {
@@ -1024,3 +1028,7 @@ tuple_base_ty_supplier!(i128);
 tuple_base_ty_supplier!(u128);
 tuple_base_ty_supplier!(isize);
 tuple_base_ty_supplier!(usize);
+tuple_base_ty_supplier!(f32);
+tuple_base_ty_supplier!(f64);
+tuple_base_ty_supplier!(bool);
+tuple_base_ty_supplier!(char);

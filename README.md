@@ -213,7 +213,7 @@ async fn handle5(
 ```
 String,  以及对应的 Vec<T>， Option<T>
 
-u8~u128, i8~i128, isize, usize, ; 以及对应的 Vec<T>， Option<T>
+u8~u128, i8~i128, isize, usize, char, bool, f32, f64; 以及对应的 Vec<T>， Option<T>
 
 ricq::msg::elem::{
   At, Face, MarketFace, Dice, FingerGuessing,
