@@ -284,6 +284,7 @@ pub fn event(args: TokenStream, input: TokenStream) -> TokenStream {
                             } else {
                                 return Ok(false);
                             };
+                            ps.reverse();
                         });
                         let len = pp.len();
                         gets.append_all(quote! {

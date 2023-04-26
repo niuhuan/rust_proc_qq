@@ -3,6 +3,7 @@ use std::sync::Arc;
 use async_trait::async_trait;
 use ricq::handler::{Handler, QEvent};
 use ricq_core::msg::elem::RQElem;
+use tracing::warn;
 
 pub use events::*;
 pub use processes::*;
@@ -564,27 +565,29 @@ impl CommandMatcher {
         if self.matching.is_empty() {
             None
         } else {
+            warn!("{:?}", elements);
             // matching 恒不为空，至少有1节
             let mut saw = self.matching.split_ascii_whitespace();
             let first = saw.next().unwrap();
             let mut params_match: Vec<&str> = Vec::new();
             let mut params_holding = false;
-            let mut position = 0;
+            let mut sub_match = first;
             for ele in elements {
                 match ele {
                     TupleMatcherElement::Command(data) => {
                         if params_holding {
-                            if let Some(find) = first[position..].find(data) {
-                                params_match.push(&first[position..position + find]);
-                                position += position + find;
+                            if let Some(find) = sub_match.find(data) {
+                                params_match.push(&sub_match[..find]);
+                                sub_match = &sub_match[find..];
+                                sub_match = &sub_match[data.len()..];
                                 params_holding = false;
                             } else {
                                 return None;
                             }
                         } else {
                             // 第一次匹配
-                            if first[position..].starts_with(data) {
-                                position += data.len();
+                            if sub_match.starts_with(data) {
+                                sub_match = &sub_match[data.len()..];
                             } else {
                                 return None;
                             }
@@ -601,10 +604,11 @@ impl CommandMatcher {
             }
             // 最后一个参数
             if params_holding {
-                params_match.push(&first[position..]);
+                params_match.push(&sub_match);
             }
             let result = params_match.iter().map(|s| s.to_string()).collect();
             self.matching = self.matching[first.len()..].trim().to_string();
+            warn!("{:?}", result);
             Some(result)
         }
     }
@@ -924,11 +928,13 @@ impl FromCommandMatcher for Vec<ImageElement> {
     }
 }
 
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub enum TupleMatcherElement {
     Command(&'static str),
     Param,
 }
 
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct TupleMatcher(String);
 
 impl TupleMatcher {

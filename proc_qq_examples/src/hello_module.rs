@@ -130,9 +130,16 @@ async fn handle8(_message: &MessageEvent, user: String, time: i64) -> anyhow::Re
 }
 
 // 匹配子命令2
-#[event(bot_command = "/test_ban a{int1}b{int2}c")]
-async fn handle9(_message: &MessageEvent, int1: i64, int2: i64) -> anyhow::Result<bool> {
-    println!("handle9。 test_ban : {:?} , time : {:?} ", int1, int2);
+#[event(bot_command = "/test {var1}秒后发送{var2}")]
+async fn handle9(_message: &MessageEvent, var1: i64, var2: String) -> anyhow::Result<bool> {
+    println!("handle9。 : {:?} , {:?} ", var1, var2);
+    Ok(true)
+}
+
+// 匹配子命令2
+#[event(bot_command = "/test{var1}秒后发送{var2}")]
+async fn handle10(_message: &MessageEvent, var1: i64, var2: String) -> anyhow::Result<bool> {
+    println!("handle10。 : {:?} , {:?} ", var1, var2);
     Ok(true)
 }
 
@@ -155,5 +162,7 @@ pub fn module() -> Module {
         handle6,
         handle7,
         handle8,
+        handle9,
+        handle10,
     )
 }

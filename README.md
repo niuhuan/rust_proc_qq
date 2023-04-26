@@ -209,6 +209,22 @@ async fn handle5(
 }
 ```
 
+同样的也支持文字和数字的组合
+
+```rust
+#[event(bot_command = "请{time}秒之后告诉我{text}")]
+async fn handle5(
+  _message: &MessageEvent,
+  time: i64,
+  text: String,
+) -> anyhow::Result<bool> {
+  println!("text : {:?} , time : {:?} ", text, time);
+  Ok(true)
+}
+```
+
+TODO:枚举 : "请{time}{unit:时|分|秒|天}之后告诉我{text}"
+
 #### 目前能匹配的类型
 ```
 String,  以及对应的 Vec<T>， Option<T>
