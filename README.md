@@ -26,9 +26,10 @@ QQ机器人框架 | [Telegram(电报)机器人框架](https://github.com/niuhuan
 
 ## 如何使用 / demo
 
-如果您使用密码登录，并且不是windows系统，使用安卓设备安装滑块助手，用于第一次登录的验证
+如果您使用密码登录，并且不是windows系统，则需要使用安卓设备安装滑块助手，用于第一次登录的验证(windows将会默认使用弹窗进行滑块，除非您禁用它)
 
 https://github.com/mzdluo123/TxCaptchaHelper
+
 
 ### 新建项目
 
@@ -50,6 +51,14 @@ rustup override set nightly
 
 ```toml
 proc_qq = "0.1"
+```
+
+如果您使用的较新nightly的rust时，ricq可能会编译不通过，您需要使用git的方式引入。在ricq发布到到0.1.20时我们将去除这个提示.
+
+同样next分支具有一些新的features，以及使用了较高版本ricqAPI，您可以切换到next分支阅读readme和examples。
+
+```toml
+proc_qq = { git = "https://github.com/niuhuan/rust_proc_qq.git", branch = "next" }
 ```
 
 ### 声明一个模块
