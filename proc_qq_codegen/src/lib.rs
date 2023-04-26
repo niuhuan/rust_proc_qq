@@ -1,6 +1,6 @@
 use proc_macro::TokenStream;
 
-use crate::bot_command::{parse_bot_args, parse_bot_command, ParamsMather, ParamsMatherMultiple};
+use crate::bot_command::{parse_bot_args, parse_bot_command, ParamsMather, ParamsMatherTuple};
 use proc_macro2::Span;
 use proc_macro_error::{abort, proc_macro_error};
 use quote::{quote, ToTokens, TokenStreamExt};
@@ -265,21 +265,21 @@ pub fn event(args: TokenStream, input: TokenStream) -> TokenStream {
                         let mut pp = vec![];
                         for x in &multiple {
                             match x {
-                                ParamsMatherMultiple::Command(name) => {
+                                ParamsMatherTuple::Command(name) => {
                                     mme.append_all(quote! {
-                                        ::proc_qq::MutilMatcherElement::Command(#name),
+                                        ::proc_qq::TupleMatcherElement::Command(#name),
                                     });
                                 }
-                                ParamsMatherMultiple::Params(p, t) => {
+                                ParamsMatherTuple::Params(p, t) => {
                                     mme.append_all(quote! {
-                                        ::proc_qq::MutilMatcherElement::Param,
+                                        ::proc_qq::TupleMatcherElement::Param,
                                     });
                                     pp.push((*p, *t));
                                 }
                             }
                         }
                         gets.append_all(quote! {
-                            let mut ps = if let Some(ps) = matcher.mutil_matcher(vec![#mme]) {
+                            let mut ps = if let Some(ps) = matcher.tuple_matcher(vec![#mme]) {
                                 ps
                             } else {
                                 return Ok(false);

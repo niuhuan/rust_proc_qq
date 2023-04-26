@@ -523,14 +523,6 @@ impl CommandMatcher {
         matcher
     }
 
-    pub fn new_from_text(text: String) -> Self {
-        CommandMatcher {
-            idx: 0,
-            elements: Vec::new(),
-            matching: text,
-        }
-    }
-
     pub fn push_text(&mut self) {
         loop {
             if self.idx >= self.elements.len() {
@@ -568,7 +560,7 @@ impl CommandMatcher {
         !self.matching.is_empty() || self.idx < self.elements.len()
     }
 
-    pub fn mutil_matcher(&mut self, elements: Vec<MutilMatcherElement>) -> Option<Vec<String>> {
+    pub fn tuple_matcher(&mut self, elements: Vec<TupleMatcherElement>) -> Option<Vec<String>> {
         if self.matching.is_empty() {
             None
         } else {
@@ -580,7 +572,7 @@ impl CommandMatcher {
             let mut position = 0;
             for ele in elements {
                 match ele {
-                    MutilMatcherElement::Command(data) => {
+                    TupleMatcherElement::Command(data) => {
                         if params_holding {
                             if let Some(find) = first[position..].find(data) {
                                 params_match.push(&first[position..position + find]);
@@ -598,7 +590,7 @@ impl CommandMatcher {
                             }
                         }
                     }
-                    MutilMatcherElement::Param => {
+                    TupleMatcherElement::Param => {
                         if params_holding {
                             return None;
                         } else {
@@ -928,7 +920,7 @@ impl FromCommandMatcher for Vec<ImageElement> {
     }
 }
 
-pub enum MutilMatcherElement {
+pub enum TupleMatcherElement {
     Command(&'static str),
     Param,
 }

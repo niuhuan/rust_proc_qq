@@ -8,11 +8,11 @@ use syn::{FnArg, ItemFn, Pat, Type};
 pub(crate) enum BotCommandRaw {
     Command(String),
     Param(String),
-    Multiple(Vec<BotCommandRawMultiple>),
+    Multiple(Vec<BotCommandRawTuple>),
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
-pub(crate) enum BotCommandRawMultiple {
+pub(crate) enum BotCommandRawTuple {
     Command(String),
     Param(String),
 }
@@ -21,11 +21,11 @@ pub(crate) enum BotCommandRawMultiple {
 pub enum ParamsMather<'a> {
     Command(String),
     Params(&'a syn::Ident, &'a syn::Type),
-    Multiple(Vec<ParamsMatherMultiple<'a>>),
+    Multiple(Vec<ParamsMatherTuple<'a>>),
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
-pub enum ParamsMatherMultiple<'a> {
+pub enum ParamsMatherTuple<'a> {
     Command(String),
     Params(&'a syn::Ident, &'a syn::Type),
 }
@@ -59,12 +59,11 @@ pub(crate) fn parse_bot_command(
             while let Some(element_str) = element_strs.next() {
                 let element_str = element_str.as_str();
                 if element_str.starts_with('{') {
-                    bot_command_elements.push(BotCommandRawMultiple::Param(
+                    bot_command_elements.push(BotCommandRawTuple::Param(
                         element_str[1..element_str.len() - 1].to_string(),
                     ));
                 } else {
-                    bot_command_elements
-                        .push(BotCommandRawMultiple::Command(element_str.to_string()));
+                    bot_command_elements.push(BotCommandRawTuple::Command(element_str.to_string()));
                 }
             }
             if bot_command_elements.is_empty() {
@@ -76,8 +75,8 @@ pub(crate) fn parse_bot_command(
             }
             if bot_command_elements.len() == 1 {
                 bot_command_items.push(match bot_command_elements.first().unwrap() {
-                    BotCommandRawMultiple::Command(tmp) => BotCommandRaw::Command(tmp.clone()),
-                    BotCommandRawMultiple::Param(tmp) => BotCommandRaw::Param(tmp.clone()),
+                    BotCommandRawTuple::Command(tmp) => BotCommandRaw::Command(tmp.clone()),
+                    BotCommandRawTuple::Param(tmp) => BotCommandRaw::Param(tmp.clone()),
                 });
             } else {
                 bot_command_items.push(BotCommandRaw::Multiple(bot_command_elements))
@@ -111,12 +110,12 @@ pub(crate) fn parse_bot_args<'a>(
                     let mut multiple_result = vec![];
                     for m in multiple {
                         multiple_result.push(match m {
-                            BotCommandRawMultiple::Command(tmp) => {
-                                ParamsMatherMultiple::Command(tmp.clone())
+                            BotCommandRawTuple::Command(tmp) => {
+                                ParamsMatherTuple::Command(tmp.clone())
                             }
-                            BotCommandRawMultiple::Param(tmp) => {
+                            BotCommandRawTuple::Param(tmp) => {
                                 let (pat, ty) = take_param(method, args_iter.next(), tmp.as_str());
-                                ParamsMatherMultiple::Params(pat, ty)
+                                ParamsMatherTuple::Params(pat, ty)
                             }
                         })
                     }
