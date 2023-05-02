@@ -475,6 +475,12 @@ event.reply_text("你好").await?;
 #### 鸣谢
 
 - RICQ commiters
+
+
 - JetBrains IDEs
 
 ![](images/JetBrains.png)
+
+- GitHub Copilot
+
+![](images/GitHub-Copilot.png)
