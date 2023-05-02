@@ -55,11 +55,12 @@ proc_qq = "0.1"
 
 如果您使用的较新nightly的rust时，ricq可能会编译不通过，您需要使用git的方式引入。在ricq发布到到0.1.20时我们将去除这个提示.
 
-同样next分支具有一些新的features，以及使用了较高版本ricqAPI，您可以切换到next分支阅读readme和examples。
+同样master分支具有一些新的features，以及使用了较高版本ricqAPI，还没有发布到 crates.io。
 
 ```toml
-proc_qq = { git = "https://github.com/niuhuan/rust_proc_qq.git", branch = "next" }
+proc_qq = { git = "https://github.com/niuhuan/rust_proc_qq.git", branch = "master" }
 ```
+
 
 ### 声明一个模块
 
