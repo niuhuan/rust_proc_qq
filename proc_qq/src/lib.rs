@@ -1,3 +1,5 @@
+#![feature(impl_trait_in_assoc_type)]
+
 pub use client::*;
 pub use entities::*;
 #[allow(unused_imports)]

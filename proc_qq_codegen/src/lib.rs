@@ -1,5 +1,6 @@
 use proc_macro::TokenStream;
 
+use crate::bot_command::{parse_bot_args, parse_bot_command, ParamsMather, ParamsMatherTuple};
 use proc_macro2::Span;
 use proc_macro_error::{abort, proc_macro_error};
 use quote::{quote, ToTokens, TokenStreamExt};
@@ -10,6 +11,7 @@ use syn::{parse_macro_input, Expr, FnArg, Meta, NestedMeta, Token};
 
 use crate::event_arg::*;
 
+mod bot_command;
 mod event_arg;
 
 /// 如果设置PROC_QQ_CODEGEN_DEBUG变量，编译时将会以note方式打印PROC_QQ_CODEGEN的生成结果
@@ -36,98 +38,11 @@ macro_rules! emit {
 pub fn event(args: TokenStream, input: TokenStream) -> TokenStream {
     // 获取#[event]的参数
     let attrs = parse_macro_input!(args as syn::AttributeArgs);
-    let all: Vec<EventArg> = parse_args(attrs);
     // 获取方法
     let method = parse_macro_input!(input as syn::ItemFn);
-    // 从众多EventArg中找到bot_command（如果存在）
-    let mut bot_command = None;
-    let mut _all = vec![];
-    for x in all {
-        if let EventArg::BotCommand(command) = x {
-            if bot_command.is_none() {
-                bot_command = Some(command);
-            } else {
-                abort!(
-                    &method.sig.span(),
-                    "bot_command 只能有一个，且必须是直接写在event括号中"
-                );
-            }
-        } else {
-            _all.push(x);
-        }
-    }
-    let all = _all;
-    if contains_bot_command(&all) {
-        // 这里是为了判断all/in之类的聚合指令内部有没有bot_command，在其指令内部包括bot_command不被允许。因为场景太少，而且逻辑复杂入不敷出。
-        abort!(
-            &method.sig.span(),
-            "bot_command 只能有一个，且必须是直接写在event括号中"
-        );
-    }
-    // 解析bot_command
-    //
-    // bot_command所有元素应该满足以下正则
-    //
-    // [A-Za-z0-9_\/\p{Han}\p{Hiragana}\p{Katakana}]+
-    // 或者
-    // \{[A-Za-z_]([A-Za-z0-9_]+)?\}
-    //
-    // 元素之间并由空白字符进行链接
-    //
-    // 第一条正则代表命令允许 A-Z a-z 0-9 / _ 以及CJK汉字
-    // 第二条正则用于匹配参数 只允许 A-Za-z_ 作为参数的开始 其余字符可以和0-9任意组合
-    enum BotCommandItem {
-        Command(String),
-        Param(String),
-    }
-    let bot_command_info = if let Some(bot_command) = &bot_command {
-        // 校验格式是否匹配
-        let bot_command_regexp =
-            regex::Regex::new(r#"^([A-Za-z0-9_/\p{Han}\p{Hiragana}\p{Katakana}]+)|(\{[A-Za-z_]([A-Za-z0-9_]+)?\})((\s+(([A-Za-z0-9_/\p{Han}\p{Hiragana}\p{Katakana}]+)|(\{[A-Za-z_]([A-Za-z0-9_]+)?\})))+)?$"#)
-                .expect("proc_qq的正则不正确(1)");
-        if !bot_command_regexp.is_match(bot_command) {
-            abort!(
-                &method.sig.span(),
-                "bot_command 不符合规则： 您需要写成\"(固定字段|{参数})(空白字符+(固定字段|{参数})+)?\"的格式，例如：bot_command=\"/ban {user} {time}\", bot_command=\"禁言 {user} {time}\" 。 其中命令允许CJK汉字，参数必须使用大括号包含，并且只能使用rust允许的变量名的格式。"
-            );
-        }
-        // 用空白字符切开元素
-        let blank_sp_regexp = regex::Regex::new("\\s+").expect("proc_qq的正则不正确(2)");
-        let sp: Vec<&str> = blank_sp_regexp.split(bot_command).collect();
-        // 校验
-        let item_reg =
-            regex::Regex::new(r#"^([A-Za-z0-9_/\p{Han}\p{Hiragana}\p{Katakana}]+)|(\{([A-Za-z_]([A-Za-z0-9_]+)?)\})$"#).expect("proc_qq的正则不正确(3)");
-        let mut param_names: Vec<&str> = vec![];
-        let mut items = vec![];
-        for x in sp {
-            if let Some(c) = item_reg.captures(x) {
-                if let Some(command) = c.get(1) {
-                    items.push(BotCommandItem::Command(command.as_str().to_string()));
-                } else if let Some(param) = c.get(3) {
-                    if param_names.contains(&param.as_str()) {
-                        abort!(&method.sig.span(), "bot_command 不符合规则： 参数名重复",);
-                    }
-                    param_names.push(param.as_str());
-                    items.push(BotCommandItem::Param(param.as_str().to_string()));
-                } else {
-                    // 正常情况下这里不会被运行，除proc_qq的正则或逻辑错误
-                    abort!(
-                        &method.sig.span(),
-                        "proc_qq_code_gen error ： bot_command 格式错误，请参考文档，或提交issue",
-                    );
-                }
-            } else {
-                // 正常情况下这里不会被运行，除proc_qq的正则或逻辑错误
-                abort!(
-                    &method.sig.span(),
-                    "proc_qq_code_gen error ： bot_command 格式错误，请参考文档，或提交issue",
-                );
-            }
-        }
-        Some((param_names, items))
-    } else {
-        None
-    };
+    // 解析参数
+    let (all, bot_command) = parse_args_and_command(&method, attrs);
+    let command_items = parse_bot_command(&method, bot_command);
     // 判断是否为async方法
     if method.sig.asyncness.is_none() {
         abort!(&method.sig.span(), "必须是async方法");
@@ -262,46 +177,16 @@ pub fn event(args: TokenStream, input: TokenStream) -> TokenStream {
             quote! {::proc_qq::ClientDisconnectProcess},
             quote! {::proc_qq::ModuleEventProcess::ClientDisconnect},
         ),
+        "& GroupPoke" => (
+            quote! {::proc_qq::GroupPokeProcess},
+            quote! {::proc_qq::ModuleEventProcess::GroupPoke},
+        ),
         t => abort!(
             event_param.span(),
             format!("未知的参数类型 {}, 事件必须作为&self下一个参数(或第一个参数), 请在文档中查看兼容的事件以及参数类型 https://github.com/niuhuan/rust_proc_qq", t),
         ),
     };
-    // 判断事件之后判断bot_command参数
-    let mut command_pats: Vec<(&syn::Pat, &syn::Type)> = vec![];
-    let command_params = &params[param_skip..params.len()];
-    if command_params.is_empty() && bot_command.is_none() {
-    } else if command_params.len() > 0 && bot_command.is_none() {
-        abort!(sig_params.span(), "您没有使用bot_command, 不支持更多的参数",);
-    } else if bot_command.is_some()
-        && command_params.len() != bot_command_info.as_ref().unwrap().0.len()
-    {
-        abort!(
-            sig_params.span(),
-            "当您使用了bot_command时，若bot_command有变量，函数需要追加的参数，且个数必须与bot_command的变量相等，且名称的顺序一致。例如 \"/ban {user} {time}\"，您需要追加两个参数，user和time，且必须user在前，顺序不能打乱",
-        );
-    } else {
-        for i in 0..command_params.len() {
-            let bot_arg_name = *(bot_command_info.as_ref().unwrap().0.get(i).unwrap());
-            let command_param = command_params[i];
-            let command_param = match command_param {
-                FnArg::Receiver(_) => abort!(&command_param.span(), "不支持self"),
-                FnArg::Typed(pt) => pt,
-            };
-            let pat = command_param.pat.as_ref();
-            let command_param_arg_name = format!("{}", quote! {#pat});
-            if !command_param_arg_name.eq(bot_arg_name) {
-                abort!(
-                    sig_params.span(),
-                    "函数追加的参数必须与bot_command的变量相等，且名称顺序一致 : \"{}\" != \"{}\"",
-                    bot_arg_name,
-                    command_param_arg_name,
-                );
-            }
-            let ty = command_param.ty.as_ref();
-            command_pats.push((pat, ty));
-        }
-    };
+    let pms = parse_bot_args(&method, &params[param_skip..params.len()], command_items);
     // 生成代码
     let trait_name = tokens.0;
     let enum_name = tokens.1;
@@ -314,7 +199,7 @@ pub fn event(args: TokenStream, input: TokenStream) -> TokenStream {
     };
     // gen trait
     let block = &method.block;
-    let build_trait = if all.is_empty() && bot_command.is_none() {
+    let build_trait = if all.is_empty() && pms.is_none() {
         quote! {
             #[::proc_qq::re_exports::async_trait::async_trait]
             impl #trait_name for #ident {
@@ -333,7 +218,7 @@ pub fn event(args: TokenStream, input: TokenStream) -> TokenStream {
             ),
         }
         let args_vec = args_to_token(all);
-        if bot_command.is_none() {
+        if pms.is_none() {
             quote! {
                 #[::proc_qq::re_exports::async_trait::async_trait]
                 impl #trait_name for #ident {
@@ -352,21 +237,16 @@ pub fn event(args: TokenStream, input: TokenStream) -> TokenStream {
             let mut p_pats = quote! {};
             let mut command_params_in_raw = quote! {};
             let mut gets = quote! {};
-            let mut idx = 0;
-            for x in bot_command_info.unwrap().1 {
+            for x in pms.unwrap() {
                 match x {
-                    BotCommandItem::Command(command) => {
+                    ParamsMather::Command(command) => {
                         gets.append_all(quote! {
                             if !matcher.match_command(#command) {
                                 return Ok(false);
                             }
                         });
                     }
-                    BotCommandItem::Param(_) => {
-                        let x = command_pats[idx];
-                        idx += 1;
-                        let pat = x.0;
-                        let ty = x.1;
+                    ParamsMather::Params(pat, ty) => {
                         p_pats.append_all(quote! {
                            #pat,
                         });
@@ -379,6 +259,58 @@ pub fn event(args: TokenStream, input: TokenStream) -> TokenStream {
                                 None => return Ok(false),
                             };
                         });
+                    }
+                    ParamsMather::Multiple(multiple) => {
+                        let mut mme = quote! {};
+                        let mut pp = vec![];
+                        for x in &multiple {
+                            match x {
+                                ParamsMatherTuple::Command(name) => {
+                                    mme.append_all(quote! {
+                                        ::proc_qq::TupleMatcherElement::Command(#name),
+                                    });
+                                }
+                                ParamsMatherTuple::Params(p, t) => {
+                                    mme.append_all(quote! {
+                                        ::proc_qq::TupleMatcherElement::Param,
+                                    });
+                                    pp.push((*p, *t));
+                                }
+                            }
+                        }
+                        gets.append_all(quote! {
+                            let mut ps = if let Some(ps) = matcher.tuple_matcher(vec![#mme]) {
+                                ps
+                            } else {
+                                return Ok(false);
+                            };
+                            ps.reverse();
+                        });
+                        let len = pp.len();
+                        gets.append_all(quote! {
+                            if ps.len() != #len {
+                                return Ok(false);
+                            }
+                        });
+                        for (pat, ty) in pp {
+                            p_pats.append_all(quote! {
+                              #pat,
+                            });
+                            command_params_in_raw.append_all(quote! {
+                                #pat: #ty,
+                            });
+                            gets.append_all(quote! {
+                                    let #pat: #ty = if let Some(np) = ps.pop() {
+                                        let sub_matcher = ::proc_qq::TupleMatcher::new(np);
+                                        match ::proc_qq::tuple_matcher_get::<#ty>(sub_matcher) {
+                                            Some(value) => value,
+                                            None => return Ok(false),
+                                        }
+                                    } else {
+                                        return Ok(false);
+                                    };
+                            });
+                        }
                     }
                 }
             }

@@ -3,6 +3,7 @@ use std::sync::Arc;
 use async_trait::async_trait;
 use ricq::handler::{Handler, QEvent};
 use ricq_core::msg::elem::RQElem;
+use tracing::warn;
 
 pub use events::*;
 pub use processes::*;
@@ -344,6 +345,14 @@ impl Handler for ClientHandler {
                     ResultProcess::ClientDisconnect
                 );
             }
+            QEvent::GroupPoke(event) => {
+                let _ = map_handlers!(
+                    &self,
+                    &event,
+                    ModuleEventProcess::GroupPoke,
+                    ResultProcess::GroupPoke
+                );
+            }
         }
     }
 }
@@ -551,6 +560,58 @@ impl CommandMatcher {
     pub fn not_blank(&self) -> bool {
         !self.matching.is_empty() || self.idx < self.elements.len()
     }
+
+    pub fn tuple_matcher(&mut self, elements: Vec<TupleMatcherElement>) -> Option<Vec<String>> {
+        if self.matching.is_empty() {
+            None
+        } else {
+            warn!("{:?}", elements);
+            // matching 恒不为空，至少有1节
+            let mut saw = self.matching.split_ascii_whitespace();
+            let first = saw.next().unwrap();
+            let mut params_match: Vec<&str> = Vec::new();
+            let mut params_holding = false;
+            let mut sub_match = first;
+            for ele in elements {
+                match ele {
+                    TupleMatcherElement::Command(data) => {
+                        if params_holding {
+                            if let Some(find) = sub_match.find(data) {
+                                params_match.push(&sub_match[..find]);
+                                sub_match = &sub_match[find..];
+                                sub_match = &sub_match[data.len()..];
+                                params_holding = false;
+                            } else {
+                                return None;
+                            }
+                        } else {
+                            // 第一次匹配
+                            if sub_match.starts_with(data) {
+                                sub_match = &sub_match[data.len()..];
+                            } else {
+                                return None;
+                            }
+                        }
+                    }
+                    TupleMatcherElement::Param => {
+                        if params_holding {
+                            return None;
+                        } else {
+                            params_holding = true;
+                        }
+                    }
+                }
+            }
+            // 最后一个参数
+            if params_holding {
+                params_match.push(&sub_match);
+            }
+            let result = params_match.iter().map(|s| s.to_string()).collect();
+            self.matching = self.matching[first.len()..].trim().to_string();
+            warn!("{:?}", result);
+            Some(result)
+        }
+    }
 }
 
 pub trait FromCommandMatcher: Sized {
@@ -692,6 +753,10 @@ command_base_ty_supplier!(i128);
 command_base_ty_supplier!(u128);
 command_base_ty_supplier!(isize);
 command_base_ty_supplier!(usize);
+command_base_ty_supplier!(f32);
+command_base_ty_supplier!(f64);
+command_base_ty_supplier!(bool);
+command_base_ty_supplier!(char);
 
 macro_rules! command_rq_element_ty_supplier {
     ($ty:ty, $mat:path) => {
@@ -862,3 +927,114 @@ impl FromCommandMatcher for Vec<ImageElement> {
         Some(result)
     }
 }
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum TupleMatcherElement {
+    Command(&'static str),
+    Param,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct TupleMatcher(String);
+
+impl TupleMatcher {
+    pub fn new(context: String) -> Self {
+        Self(context)
+    }
+}
+
+pub trait FromTupleMatcher: Sized {
+    fn get(matcher: TupleMatcher) -> Option<Self>;
+}
+
+#[inline]
+pub fn tuple_matcher_get<F: Sized + FromTupleMatcher>(matcher: TupleMatcher) -> Option<F> {
+    F::get(matcher)
+}
+
+impl FromTupleMatcher for String {
+    fn get(matcher: TupleMatcher) -> Option<Self> {
+        if matcher.0.is_empty() {
+            None
+        } else {
+            Some(matcher.0)
+        }
+    }
+}
+
+impl FromTupleMatcher for Option<String> {
+    fn get(matcher: TupleMatcher) -> Option<Self> {
+        if matcher.0.is_empty() {
+            Some(None)
+        } else {
+            Some(Some(matcher.0))
+        }
+    }
+}
+
+impl FromTupleMatcher for Vec<String> {
+    fn get(matcher: TupleMatcher) -> Option<Self> {
+        if matcher.0.is_empty() {
+            Some(vec![])
+        } else {
+            Some(vec![matcher.0])
+        }
+    }
+}
+
+impl FromTupleMatcher for Vec<Option<String>> {
+    fn get(matcher: TupleMatcher) -> Option<Self> {
+        if matcher.0.is_empty() {
+            Some(vec![])
+        } else {
+            Some(vec![Some(matcher.0)])
+        }
+    }
+}
+
+macro_rules! tuple_base_ty_supplier {
+    ($ty:ty) => {
+        impl FromTupleMatcher for $ty {
+            fn get(matcher: TupleMatcher) -> Option<Self> {
+                matcher.0.parse::<$ty>().ok()
+            }
+        }
+
+        impl FromTupleMatcher for Option<$ty> {
+            fn get(matcher: TupleMatcher) -> Option<Self> {
+                if matcher.0.is_empty() {
+                    Some(None)
+                } else {
+                    matcher.0.parse::<$ty>().ok().map(|v| Some(v))
+                }
+            }
+        }
+
+        impl FromTupleMatcher for Vec<$ty> {
+            fn get(matcher: TupleMatcher) -> Option<Self> {
+                if matcher.0.is_empty() {
+                    Some(vec![])
+                } else {
+                    matcher.0.parse::<$ty>().ok().map(|v| vec![v])
+                }
+            }
+        }
+    };
+}
+
+tuple_base_ty_supplier!(i8);
+tuple_base_ty_supplier!(u8);
+tuple_base_ty_supplier!(i16);
+tuple_base_ty_supplier!(u16);
+tuple_base_ty_supplier!(i32);
+tuple_base_ty_supplier!(u32);
+tuple_base_ty_supplier!(i64);
+tuple_base_ty_supplier!(u64);
+tuple_base_ty_supplier!(i128);
+tuple_base_ty_supplier!(u128);
+tuple_base_ty_supplier!(isize);
+tuple_base_ty_supplier!(usize);
+tuple_base_ty_supplier!(f32);
+tuple_base_ty_supplier!(f64);
+tuple_base_ty_supplier!(bool);
+tuple_base_ty_supplier!(char);

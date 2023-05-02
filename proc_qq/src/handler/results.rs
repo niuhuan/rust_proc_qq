@@ -4,7 +4,7 @@ use ricq::client::event::{
     ClientDisconnect, DeleteFriendEvent, FriendAudioMessageEvent, FriendMessageEvent,
     FriendMessageRecallEvent, FriendPokeEvent, GroupAudioMessageEvent, GroupDisbandEvent,
     GroupLeaveEvent, GroupMessageEvent, GroupMessageRecallEvent, GroupMuteEvent,
-    GroupNameUpdateEvent, GroupTempMessageEvent, JoinGroupRequestEvent,
+    GroupNameUpdateEvent, GroupPokeEvent, GroupTempMessageEvent, JoinGroupRequestEvent,
     MemberPermissionChangeEvent, NewFriendEvent, NewFriendRequestEvent, NewMemberEvent,
     SelfInvitedEvent,
 };
@@ -69,6 +69,8 @@ pub enum ResultProcess {
     FriendAudioMessage(Box<dyn FriendAudioMessageResultHandler>),
     ClientDisconnect(Box<dyn ClientDisconnectResultHandler>),
 
+    GroupPoke(Box<dyn GroupPokeResultHandler>),
+
     OnlyResult(Box<dyn OnlyResultHandler>),
 }
 
@@ -113,6 +115,8 @@ error_trait!(SelfInvitedResultHandler, SelfInvitedEvent);
 error_trait!(GroupAudioMessageResultHandler, GroupAudioMessageEvent);
 error_trait!(FriendAudioMessageResultHandler, FriendAudioMessageEvent);
 error_trait!(ClientDisconnectResultHandler, ClientDisconnect);
+
+error_trait!(GroupPokeResultHandler, GroupPokeEvent);
 
 #[async_trait]
 pub trait OnlyResultHandler: Sync + Send {
