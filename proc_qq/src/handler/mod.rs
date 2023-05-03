@@ -38,7 +38,7 @@ macro_rules! map_result {
                         hand = b;
                     }
                     Err(err) => {
-                        tracing::error!(target = "proc_qq", " 出现错误 : {:?}", err);
+                        tracing::error!(" 出现错误 : {:?}", err);
                         hand = true;
                     }
                 },
@@ -47,7 +47,7 @@ macro_rules! map_result {
                         hand = b;
                     }
                     Err(err) => {
-                        tracing::error!(target = "proc_qq", " 出现错误 : {:?}", err);
+                        tracing::error!(" 出现错误 : {:?}", err);
                         hand = true;
                     }
                 },
@@ -82,7 +82,7 @@ macro_rules! map_handlers {
                             }
                         }
                         Err(err) => {
-                            tracing::error!(target = "proc_qq", " 出现错误 : {:?}", err);
+                            tracing::error!(" 出现错误 : {:?}", err);
                             result = MapResult::Exception(&m.id, &h.name);
                             let event_result = EventResult::Exception(
                                 ModuleInfo{
@@ -117,7 +117,7 @@ impl Handler for ClientHandler {
     async fn handle(&self, e: QEvent) {
         match e {
             QEvent::Login(event) => {
-                tracing::debug!(target = "proc_qq", "LOGIN : (UIN={})", event,);
+                tracing::debug!("LOGIN : (UIN={})", event,);
                 let _ = map_handlers!(
                     &self,
                     &LoginEvent { uin: event },
@@ -127,7 +127,6 @@ impl Handler for ClientHandler {
             }
             QEvent::GroupMessage(event) => {
                 tracing::debug!(
-                    target = "proc_qq",
                     "(GROUP={}, UIN={}) MESSAGE : {}",
                     event.inner.group_code,
                     event.inner.from_uin,
@@ -146,7 +145,6 @@ impl Handler for ClientHandler {
             }
             QEvent::FriendMessage(event) => {
                 tracing::debug!(
-                    target = "proc_qq",
                     "(UIN={}) MESSAGE : {}",
                     event.inner.from_uin,
                     event.inner.elements.to_string()
@@ -164,7 +162,6 @@ impl Handler for ClientHandler {
             }
             QEvent::GroupTempMessage(event) => {
                 tracing::debug!(
-                    target = "proc_qq",
                     "(UIN={}) MESSAGE : {}",
                     event.inner.from_uin,
                     event.inner.elements.to_string()
@@ -182,7 +179,6 @@ impl Handler for ClientHandler {
             }
             QEvent::GroupRequest(event) => {
                 tracing::debug!(
-                    target = "proc_qq",
                     "REQUEST (GROUP={}, UIN={}): {}",
                     event.inner.group_code,
                     event.inner.req_uin,
@@ -197,7 +193,6 @@ impl Handler for ClientHandler {
             }
             QEvent::NewFriendRequest(event) => {
                 tracing::debug!(
-                    target = "proc_qq",
                     "REQUEST (UIN={}): {}",
                     event.inner.req_uin,
                     event.inner.message
