@@ -125,7 +125,6 @@ pub async fn run_client(c: Arc<Client>) -> Result<()> {
 pub async fn run_client_once(client: Arc<Client>) -> Result<()> {
     // connect to server
     let handle = connection(client.clone()).await?;
-    tokio::task::yield_now().await;
     // token login if allow and file exists
     if !token_login(&client).await {
         // authentication if token login failed or not set
@@ -184,6 +183,13 @@ async fn connection(client: Arc<Client>) -> Result<JoinHandle<()>> {
             .with_context(|| "连接到服务器出错")?;
         tokio::spawn(async move { client.rq_client.start(stream).await })
     };
+    // 让步。 若不进行让步，有可能导致连接失败。（猜测时client.rq_client.start没有被执行时）
+    // 测试结果：
+    //   runtime.spawn(run_client), 一定会失败
+    //   runtime.block_on(run_client), 一定不会失败
+    tokio::task::yield_now().await;
+    tokio::time::sleep(Duration::from_millis(200)).await;
+    // 返回结果
     Ok(handle)
 }
 
