@@ -16,3 +16,7 @@ regex = "1"
 
 [lib]
 proc-macro = true
+
+[features]
+default = []
+event_args = []

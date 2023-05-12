@@ -39,8 +39,9 @@ openssl = { version = "0.10.45", features = ["vendored"] }
 wry = { version = "0.23", optional = true }
 
 [features]
-default = ["pop_window_slider", "console_qr"]
+default = ["event_args", "console_qr", "pop_window_slider"]
 pop_window_slider = ["dep:wry"]
 console_qr = ["dep:rqrr", "dep:image"]
 connect_handler = []
 proxy = ["connect_handler", "dep:tokio-socks", "dep:trust-dns-resolver", "dep:url"]
+event_args = ["proc_qq_codegen/event_args"]
