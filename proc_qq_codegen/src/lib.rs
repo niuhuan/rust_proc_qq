@@ -39,7 +39,11 @@ macro_rules! emit {
 /// event proc
 #[proc_macro_error]
 #[proc_macro_attribute]
-pub fn event(_args: TokenStream, input: TokenStream) -> TokenStream {
+pub fn event(args: TokenStream, input: TokenStream) -> TokenStream {
+    #[cfg(not(feature = "event_args"))]
+    if !args.is_empty() {
+        abort!(&method.span(), "event参数请配合event_args特性使用");
+    }
     // 获取方法
     let method = parse_macro_input!(input as syn::ItemFn);
     // 判断是否为async方法
@@ -74,7 +78,7 @@ pub fn event(_args: TokenStream, input: TokenStream) -> TokenStream {
     let (trait_name, enum_name) = struct_name(event_param, param_ty.to_string());
     // event过程宏的的参数机型匹配
     #[cfg(feature = "event_args")]
-    let attrs = parse_macro_input!(_args as syn::AttributeArgs);
+    let attrs = parse_macro_input!(args as syn::AttributeArgs);
     #[cfg(feature = "event_args")]
     let (all_filter_without_bot_command, bot_command) = parse_args_and_command(&method, attrs);
     #[cfg(feature = "event_args")]
