@@ -1,17 +1,21 @@
 use proc_macro::TokenStream;
 
-use crate::bot_command::{parse_bot_args, parse_bot_command, ParamsMather, ParamsMatherTuple};
 use proc_macro2::Span;
 use proc_macro_error::{abort, proc_macro_error};
 use quote::{quote, ToTokens, TokenStreamExt};
 use syn::parse::{Parse, ParseStream};
 use syn::punctuated::Punctuated;
 use syn::spanned::Spanned;
-use syn::{parse_macro_input, Expr, FnArg, Meta, NestedMeta, Token};
+use syn::{parse_macro_input, Expr, FnArg, Meta, NestedMeta, PatType, Token};
 
+#[cfg(feature = "event_args")]
+use crate::bot_command::*;
+#[cfg(feature = "event_args")]
 use crate::event_arg::*;
 
+#[cfg(feature = "event_args")]
 mod bot_command;
+#[cfg(feature = "event_args")]
 mod event_arg;
 
 /// 如果设置PROC_QQ_CODEGEN_DEBUG变量，编译时将会以note方式打印PROC_QQ_CODEGEN的生成结果
@@ -35,14 +39,9 @@ macro_rules! emit {
 /// event proc
 #[proc_macro_error]
 #[proc_macro_attribute]
-pub fn event(args: TokenStream, input: TokenStream) -> TokenStream {
-    // 获取#[event]的参数
-    let attrs = parse_macro_input!(args as syn::AttributeArgs);
+pub fn event(_args: TokenStream, input: TokenStream) -> TokenStream {
     // 获取方法
     let method = parse_macro_input!(input as syn::ItemFn);
-    // 解析参数
-    let (all, bot_command) = parse_args_and_command(&method, attrs);
-    let command_items = parse_bot_command(&method, bot_command);
     // 判断是否为async方法
     if method.sig.asyncness.is_none() {
         abort!(&method.sig.span(), "必须是async方法");
@@ -72,7 +71,207 @@ pub fn event(args: TokenStream, input: TokenStream) -> TokenStream {
     let param_pat = event_param.pat.as_ref();
     let param_ty = event_param.ty.as_ref();
     let param_ty = quote! {#param_ty};
-    let tokens = match param_ty.to_string().as_str() {
+    let (trait_name, enum_name) = struct_name(event_param, param_ty.to_string());
+    // event过程宏的的参数机型匹配
+    #[cfg(feature = "event_args")]
+    let attrs = parse_macro_input!(_args as syn::AttributeArgs);
+    #[cfg(feature = "event_args")]
+    let (all_filter_without_bot_command, bot_command) = parse_args_and_command(&method, attrs);
+    #[cfg(feature = "event_args")]
+    let command_items = parse_bot_command(&method, bot_command);
+    #[cfg(feature = "event_args")]
+    let bot_args = parse_bot_args(&method, &params[param_skip..params.len()], command_items);
+    #[cfg(not(feature = "event_args"))]
+    if params.len() > param_skip {
+        abort!(
+            &params[param_skip].span(),
+            "不支持更多的参数，请配合event_args特性使用"
+        );
+    }
+    // struct
+    let ident = &method.sig.ident;
+    let ident_str = format!("{}", ident);
+    let build_struct = quote! {
+        #[allow(non_camel_case_types)]
+        pub struct #ident {}
+    };
+    // trait
+    let block = &method.block;
+    #[cfg(not(feature = "event_args"))]
+    let build_trait = quote! {
+        #[::proc_qq::re_exports::async_trait::async_trait]
+        impl #trait_name for #ident {
+            async fn handle(&self, #param_pat: #param_ty) -> ::proc_qq::re_exports::anyhow::Result<bool> #block
+        }
+    };
+    #[cfg(feature = "event_args")]
+    let build_trait = if all_filter_without_bot_command.is_empty() && bot_args.is_none() {
+        quote! {
+            #[::proc_qq::re_exports::async_trait::async_trait]
+            impl #trait_name for #ident {
+                async fn handle(&self, #param_pat: #param_ty) -> ::proc_qq::re_exports::anyhow::Result<bool> #block
+            }
+        }
+    } else {
+        match param_ty.to_string().as_str() {
+            "& MessageEvent" => (),
+            "& GroupMessageEvent" => (),
+            "& FriendMessageEvent" => (),
+            "& GroupTempMessageEvent" => (),
+            _ => abort!(
+                &method.sig.span(),
+                "event 的参数只支持消息类型事件 (MessageEvent,*MessageEvent)"
+            ),
+        }
+        let args_vec = args_to_token(all_filter_without_bot_command);
+        if bot_args.is_none() {
+            quote! {
+                #[::proc_qq::re_exports::async_trait::async_trait]
+                impl #trait_name for #ident {
+                    async fn handle(&self, #param_pat: #param_ty) -> ::proc_qq::re_exports::anyhow::Result<bool> {
+                        if !::proc_qq::match_event_args_all(#args_vec, #param_pat.into())? {
+                            return Ok(false);
+                        }
+                        self.raw(#param_pat).await
+                    }
+                }
+                impl #ident {
+                    async fn raw(&self, #param_pat: #param_ty) -> ::proc_qq::re_exports::anyhow::Result<bool> #block
+                }
+            }
+        } else {
+            let mut p_pats = quote! {};
+            let mut command_params_in_raw = quote! {};
+            let mut gets = quote! {};
+            for x in bot_args.unwrap() {
+                match x {
+                    BotParamsMather::Command(command) => {
+                        gets.append_all(quote! {
+                            if !matcher.match_command(#command) {
+                                return Ok(false);
+                            }
+                        });
+                    }
+                    BotParamsMather::Params(pat, ty) => {
+                        p_pats.append_all(quote! {
+                           #pat,
+                        });
+                        command_params_in_raw.append_all(quote! {
+                           #pat: #ty,
+                        });
+                        gets.append_all(quote! {
+                            let #pat: #ty = match ::proc_qq::matcher_get::<#ty>(&mut matcher) {
+                                Some(value) => value,
+                                None => return Ok(false),
+                            };
+                        });
+                    }
+                    BotParamsMather::Multiple(multiple) => {
+                        let mut mme = quote! {};
+                        let mut pp = vec![];
+                        for x in &multiple {
+                            match x {
+                                BotParamsMatherTuple::Command(name) => {
+                                    mme.append_all(quote! {
+                                        ::proc_qq::TupleMatcherElement::Command(#name),
+                                    });
+                                }
+                                BotParamsMatherTuple::Params(p, t) => {
+                                    mme.append_all(quote! {
+                                        ::proc_qq::TupleMatcherElement::Param,
+                                    });
+                                    pp.push((*p, *t));
+                                }
+                            }
+                        }
+                        gets.append_all(quote! {
+                            let mut ps = if let Some(ps) = matcher.tuple_matcher(vec![#mme]) {
+                                ps
+                            } else {
+                                return Ok(false);
+                            };
+                            ps.reverse();
+                        });
+                        let len = pp.len();
+                        gets.append_all(quote! {
+                            if ps.len() != #len {
+                                return Ok(false);
+                            }
+                        });
+                        for (pat, ty) in pp {
+                            p_pats.append_all(quote! {
+                              #pat,
+                            });
+                            command_params_in_raw.append_all(quote! {
+                                #pat: #ty,
+                            });
+                            gets.append_all(quote! {
+                                    let #pat: #ty = if let Some(np) = ps.pop() {
+                                        let sub_matcher = ::proc_qq::TupleMatcher::new(np);
+                                        match ::proc_qq::tuple_matcher_get::<#ty>(sub_matcher) {
+                                            Some(value) => value,
+                                            None => return Ok(false),
+                                        }
+                                    } else {
+                                        return Ok(false);
+                                    };
+                            });
+                        }
+                    }
+                }
+            }
+            quote! {
+                #[::proc_qq::re_exports::async_trait::async_trait]
+                impl #trait_name for #ident {
+                    async fn handle(&self, #param_pat: #param_ty) -> ::proc_qq::re_exports::anyhow::Result<bool> {
+                        if !::proc_qq::match_event_args_all(#args_vec, #param_pat.into())? {
+                            return Ok(false);
+                        }
+                        // 匹配指令是否能对应
+                        use ::proc_qq::MessageChainPointTrait;
+                        let m_chan = #param_pat.message_chain().clone();
+                        let mut m_vec = vec![];
+                        for x in m_chan {
+                            m_vec.push(x);
+                        }
+                        let mut matcher = ::proc_qq::CommandMatcher::new(m_vec);
+                        #gets
+                        if matcher.not_blank() {
+                            return Ok(false);
+                        }
+                        self.raw(#param_pat, #p_pats).await
+                    }
+                }
+                impl #ident {
+                    async fn raw(&self, #param_pat: #param_ty, #command_params_in_raw) -> ::proc_qq::re_exports::anyhow::Result<bool> #block
+                }
+            }
+        }
+    };
+    // into
+    let build_into = quote! {
+        impl Into<::proc_qq::ModuleEventHandler> for #ident {
+            fn into(self) -> ::proc_qq::ModuleEventHandler {
+                ::proc_qq::ModuleEventHandler{
+                    name: #ident_str.into(),
+                    process: #enum_name(Box::new(self)),
+                }
+            }
+        }
+    };
+    // emit
+    emit!(quote! {
+        #build_struct
+        #build_trait
+        #build_into
+    })
+}
+
+fn struct_name(
+    pt: &PatType,
+    param_ty: String,
+) -> (proc_macro2::TokenStream, proc_macro2::TokenStream) {
+    match param_ty.as_str() {
         "& LoginEvent" => (
             quote! {::proc_qq::LoginEventProcess},
             quote! {::proc_qq::ModuleEventProcess::LoginEvent},
@@ -182,183 +381,10 @@ pub fn event(args: TokenStream, input: TokenStream) -> TokenStream {
             quote! {::proc_qq::ModuleEventProcess::GroupPoke},
         ),
         t => abort!(
-            event_param.span(),
+            pt.span(),
             format!("未知的参数类型 {}, 事件必须作为&self下一个参数(或第一个参数), 请在文档中查看兼容的事件以及参数类型 https://github.com/niuhuan/rust_proc_qq", t),
         ),
-    };
-    let pms = parse_bot_args(&method, &params[param_skip..params.len()], command_items);
-    // 生成代码
-    let trait_name = tokens.0;
-    let enum_name = tokens.1;
-    // gen token stream
-    let ident = &method.sig.ident;
-    let ident_str = format!("{}", ident);
-    let build_struct = quote! {
-        #[allow(non_camel_case_types)]
-        pub struct #ident {}
-    };
-    // gen trait
-    let block = &method.block;
-    let build_trait = if all.is_empty() && pms.is_none() {
-        quote! {
-            #[::proc_qq::re_exports::async_trait::async_trait]
-            impl #trait_name for #ident {
-                async fn handle(&self, #param_pat: #param_ty) -> ::proc_qq::re_exports::anyhow::Result<bool> #block
-            }
-        }
-    } else {
-        match param_ty.to_string().as_str() {
-            "& MessageEvent" => (),
-            "& GroupMessageEvent" => (),
-            "& FriendMessageEvent" => (),
-            "& GroupTempMessageEvent" => (),
-            _ => abort!(
-                &method.sig.span(),
-                "event 的参数只支持消息类型事件 (MessageEvent,*MessageEvent)"
-            ),
-        }
-        let args_vec = args_to_token(all);
-        if pms.is_none() {
-            quote! {
-                #[::proc_qq::re_exports::async_trait::async_trait]
-                impl #trait_name for #ident {
-                    async fn handle(&self, #param_pat: #param_ty) -> ::proc_qq::re_exports::anyhow::Result<bool> {
-                        if !::proc_qq::match_event_args_all(#args_vec, #param_pat.into())? {
-                            return Ok(false);
-                        }
-                        self.raw(#param_pat).await
-                    }
-                }
-                impl #ident {
-                    async fn raw(&self, #param_pat: #param_ty) -> ::proc_qq::re_exports::anyhow::Result<bool> #block
-                }
-            }
-        } else {
-            let mut p_pats = quote! {};
-            let mut command_params_in_raw = quote! {};
-            let mut gets = quote! {};
-            for x in pms.unwrap() {
-                match x {
-                    ParamsMather::Command(command) => {
-                        gets.append_all(quote! {
-                            if !matcher.match_command(#command) {
-                                return Ok(false);
-                            }
-                        });
-                    }
-                    ParamsMather::Params(pat, ty) => {
-                        p_pats.append_all(quote! {
-                           #pat,
-                        });
-                        command_params_in_raw.append_all(quote! {
-                           #pat: #ty,
-                        });
-                        gets.append_all(quote! {
-                            let #pat: #ty = match ::proc_qq::matcher_get::<#ty>(&mut matcher) {
-                                Some(value) => value,
-                                None => return Ok(false),
-                            };
-                        });
-                    }
-                    ParamsMather::Multiple(multiple) => {
-                        let mut mme = quote! {};
-                        let mut pp = vec![];
-                        for x in &multiple {
-                            match x {
-                                ParamsMatherTuple::Command(name) => {
-                                    mme.append_all(quote! {
-                                        ::proc_qq::TupleMatcherElement::Command(#name),
-                                    });
-                                }
-                                ParamsMatherTuple::Params(p, t) => {
-                                    mme.append_all(quote! {
-                                        ::proc_qq::TupleMatcherElement::Param,
-                                    });
-                                    pp.push((*p, *t));
-                                }
-                            }
-                        }
-                        gets.append_all(quote! {
-                            let mut ps = if let Some(ps) = matcher.tuple_matcher(vec![#mme]) {
-                                ps
-                            } else {
-                                return Ok(false);
-                            };
-                            ps.reverse();
-                        });
-                        let len = pp.len();
-                        gets.append_all(quote! {
-                            if ps.len() != #len {
-                                return Ok(false);
-                            }
-                        });
-                        for (pat, ty) in pp {
-                            p_pats.append_all(quote! {
-                              #pat,
-                            });
-                            command_params_in_raw.append_all(quote! {
-                                #pat: #ty,
-                            });
-                            gets.append_all(quote! {
-                                    let #pat: #ty = if let Some(np) = ps.pop() {
-                                        let sub_matcher = ::proc_qq::TupleMatcher::new(np);
-                                        match ::proc_qq::tuple_matcher_get::<#ty>(sub_matcher) {
-                                            Some(value) => value,
-                                            None => return Ok(false),
-                                        }
-                                    } else {
-                                        return Ok(false);
-                                    };
-                            });
-                        }
-                    }
-                }
-            }
-            quote! {
-                #[::proc_qq::re_exports::async_trait::async_trait]
-                impl #trait_name for #ident {
-                    async fn handle(&self, #param_pat: #param_ty) -> ::proc_qq::re_exports::anyhow::Result<bool> {
-                        if !::proc_qq::match_event_args_all(#args_vec, #param_pat.into())? {
-                            return Ok(false);
-                        }
-                        // 匹配指令是否能对应
-                        use ::proc_qq::MessageChainPointTrait;
-                        let m_chan = #param_pat.message_chain().clone();
-                        let mut m_vec = vec![];
-                        for x in m_chan {
-                            m_vec.push(x);
-                        }
-                        let mut matcher = ::proc_qq::CommandMatcher::new(m_vec);
-                        #gets
-                        if matcher.not_blank() {
-                            return Ok(false);
-                        }
-                        self.raw(#param_pat, #p_pats).await
-                    }
-                }
-                impl #ident {
-                    async fn raw(&self, #param_pat: #param_ty, #command_params_in_raw) -> ::proc_qq::re_exports::anyhow::Result<bool> #block
-                }
-            }
-        }
-    };
-    // gen into
-    let build_into = quote! {
-        impl Into<::proc_qq::ModuleEventHandler> for #ident {
-            fn into(self) -> ::proc_qq::ModuleEventHandler {
-                ::proc_qq::ModuleEventHandler{
-                    name: #ident_str.into(),
-                    process: #enum_name(Box::new(self)),
-                }
-            }
-        }
-    };
-    // emit
-    emit!(quote! {
-        #build_struct
-        #build_trait
-        #build_into
-    })
+    }
 }
 
 #[proc_macro_error]

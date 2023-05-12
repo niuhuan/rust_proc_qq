@@ -119,6 +119,7 @@ jobs:
       matrix:
         config:
           - flags: --all-features
+          - flags: --no-default-features
     steps:
       - name: Checkout
         uses: actions/checkout@v1

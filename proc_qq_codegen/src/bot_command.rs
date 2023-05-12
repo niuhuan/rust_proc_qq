@@ -18,14 +18,14 @@ pub(crate) enum BotCommandRawTuple {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
-pub enum ParamsMather<'a> {
+pub enum BotParamsMather<'a> {
     Command(String),
     Params(&'a syn::Ident, &'a syn::Type),
-    Multiple(Vec<ParamsMatherTuple<'a>>),
+    Multiple(Vec<BotParamsMatherTuple<'a>>),
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
-pub enum ParamsMatherTuple<'a> {
+pub enum BotParamsMatherTuple<'a> {
     Command(String),
     Params(&'a syn::Ident, &'a syn::Type),
 }
@@ -89,37 +89,35 @@ pub(crate) fn parse_bot_command(
 }
 
 // 将命令行跟参数进行匹配
-
-// 将命令行跟参数进行匹配
 pub(crate) fn parse_bot_args<'a>(
     method: &'a ItemFn,
     args: &'a [&'a FnArg],
     items: Option<Vec<BotCommandRaw>>,
-) -> Option<Vec<ParamsMather<'a>>> {
+) -> Option<Vec<BotParamsMather<'a>>> {
     if let Some(items) = items {
         let mut result = vec![];
         let mut args_iter = args.iter();
         for item in items {
             result.push(match item {
-                BotCommandRaw::Command(tmp) => ParamsMather::Command(tmp),
+                BotCommandRaw::Command(tmp) => BotParamsMather::Command(tmp),
                 BotCommandRaw::Param(tmp) => {
                     let (pat, ty) = take_param(method, args_iter.next(), tmp.as_str());
-                    ParamsMather::Params(pat, ty)
+                    BotParamsMather::Params(pat, ty)
                 }
                 BotCommandRaw::Multiple(multiple) => {
                     let mut multiple_result = vec![];
                     for m in multiple {
                         multiple_result.push(match m {
                             BotCommandRawTuple::Command(tmp) => {
-                                ParamsMatherTuple::Command(tmp.clone())
+                                BotParamsMatherTuple::Command(tmp.clone())
                             }
                             BotCommandRawTuple::Param(tmp) => {
                                 let (pat, ty) = take_param(method, args_iter.next(), tmp.as_str());
-                                ParamsMatherTuple::Params(pat, ty)
+                                BotParamsMatherTuple::Params(pat, ty)
                             }
                         })
                     }
-                    ParamsMather::Multiple(multiple_result)
+                    BotParamsMather::Multiple(multiple_result)
                 }
             })
         }
