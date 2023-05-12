@@ -1,9 +1,6 @@
 use crate::handler::EventSender;
 use crate::DeviceSource::{JsonFile, JsonString};
-use crate::{
-    Authentication, ClientHandler, DeviceLockVerification, DeviceSource, EventResultHandler,
-    Module, SessionStore, ShowQR, ShowSlider,
-};
+use crate::{Authentication, ClientHandler, DeviceLockVerification, DeviceSource, EventResultHandler, Module, SessionStore, ShowQR, ShowSlider};
 use anyhow::{anyhow, Context, Result};
 use bytes::{Buf, BufMut, Bytes, BytesMut};
 use futures::future::BoxFuture;
@@ -33,6 +30,11 @@ use std::path::Path;
 #[cfg(feature = "connect_handler")]
 use std::pin::Pin;
 
+#[cfg(feature = "scheduler")]
+use crate::{
+    SchedulerJob,SchedulerHandler
+};
+
 /// 客户端
 pub struct Client {
     pub rq_client: Arc<ricq::Client>,
@@ -40,6 +42,8 @@ pub struct Client {
     pub session_store: Arc<Option<Box<dyn SessionStore + Sync + Send>>>,
     pub(crate) modules: Arc<Vec<Module>>,
     pub(crate) result_handlers: Arc<Vec<EventResultHandler>>,
+    #[cfg(feature = "scheduler")]
+    pub(crate) scheduler: Vec<SchedulerJob>,
     pub show_qr: ShowQR,
     pub show_slider: ShowSlider,
     pub shutting: bool,
@@ -120,6 +124,17 @@ pub async fn run_client(c: Arc<Client>) -> Result<()> {
             login.await?;
         }
     }
+    
+}
+#[cfg(feature = "scheduler")]
+pub async fn run_scheduler(client: Arc<Client>) -> Result<()>{
+    let scheduler_job = client.scheduler.clone();
+    let handler = SchedulerHandler {
+        client,
+        scheduler_job,
+    };
+    handler.start().await?;
+    Ok(())
 }
 
 pub async fn run_client_once(client: Arc<Client>) -> Result<()> {
@@ -535,6 +550,8 @@ pub struct ClientBuilder {
     session_store: Arc<Option<Box<dyn SessionStore + Sync + Send>>>,
     modules_vec: Arc<Vec<Module>>,
     result_handlers_vec: Arc<Vec<EventResultHandler>>,
+    #[cfg(feature = "scheduler")]
+    scheduler: Vec<SchedulerJob>,
     show_qr: Option<ShowQR>,
     show_slider: Option<ShowSlider>,
     device_lock_verification: Option<DeviceLockVerification>,
@@ -553,6 +570,8 @@ impl ClientBuilder {
             session_store: Arc::new(None),
             modules_vec: Arc::new(vec![]),
             result_handlers_vec: Arc::new(vec![]),
+            #[cfg(feature = "scheduler")]
+            scheduler:vec![],
             show_qr: None,
             show_slider: None,
             device_lock_verification: None,
@@ -573,7 +592,12 @@ impl ClientBuilder {
         self.result_handlers_vec = e.into();
         self
     }
-
+    /// 设置定时任务
+    #[cfg(feature = "scheduler")]
+    pub fn scheduler<S :Into<Vec<SchedulerJob>>>(mut self, s: S) ->Self{
+        self.scheduler = s.into();
+        self
+    }
     /// 设置显示二维码的方式
     pub fn show_rq<E: Into<Option<ShowQR>>>(mut self, show_qr: E) -> Self {
         self.show_qr = show_qr.into();
@@ -642,6 +666,8 @@ impl ClientBuilder {
             session_store: self.session_store.clone(),
             modules: self.modules_vec.clone(),
             result_handlers: self.result_handlers_vec.clone(),
+            #[cfg(feature = "scheduler")]
+            scheduler: self.scheduler.clone(),
             show_qr: if self.show_qr.is_some() {
                 self.show_qr.clone().unwrap()
             } else {

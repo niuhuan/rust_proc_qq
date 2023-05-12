@@ -15,6 +15,11 @@ mod events;
 mod processes;
 mod results;
 
+#[cfg(feature = "scheduler")]
+mod scheduler;
+#[cfg(feature = "scheduler")]
+pub use scheduler::*;
+
 pub(crate) struct ClientHandler {
     pub(crate) modules: Arc<Vec<Module>>,
     pub(crate) result_handlers: Arc<Vec<EventResultHandler>>,
@@ -350,6 +355,12 @@ impl Handler for ClientHandler {
             }
         }
     }
+}
+
+#[derive(Clone)]
+pub struct SchedulerJob {
+    pub name: String,
+    pub handles: Vec<Arc<Box<dyn ScheduledJobHandler>>>,
 }
 
 pub struct Module {
