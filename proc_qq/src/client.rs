@@ -87,6 +87,9 @@ pub async fn run_client(c: Arc<Client>) -> Result<()> {
         modules: c.modules.clone(),
         result_handlers: c.result_handlers.clone(),
     };
+    // 启动定时任务
+    #[cfg(feature = "scheduler")]
+    run_scheduler(c.clone()).await?;
     loop {
         // 每次轮询d
         after_login(&c.rq_client.clone()).await;
@@ -126,7 +129,6 @@ pub async fn run_client(c: Arc<Client>) -> Result<()> {
         }
     }
 }
-
 #[cfg(feature = "scheduler")]
 pub async fn run_scheduler(client: Arc<Client>) -> Result<()> {
     let scheduler_job = client.schedulers.clone();
