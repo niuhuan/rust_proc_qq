@@ -40,12 +40,12 @@ macro_rules! emit {
 #[proc_macro_error]
 #[proc_macro_attribute]
 pub fn event(args: TokenStream, input: TokenStream) -> TokenStream {
+    // 获取方法
+    let method = parse_macro_input!(input as syn::ItemFn);
     #[cfg(not(feature = "event_args"))]
     if !args.is_empty() {
         abort!(&method.span(), "event参数请配合event_args特性使用");
     }
-    // 获取方法
-    let method = parse_macro_input!(input as syn::ItemFn);
     // 判断是否为async方法
     if method.sig.asyncness.is_none() {
         abort!(&method.sig.span(), "必须是async方法");
