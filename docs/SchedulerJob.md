@@ -1,9 +1,9 @@
-¶¨Ê±ÈÎÎñ
+å®šæ—¶ä»»åŠ¡
 ======
 
 
 ```rust
-/// Ã¿1·ÖÖÓ·¢ËÍÒ»´Î Hello
+/// æ¯1åˆ†é’Ÿå‘é€ä¸€æ¬¡ Hello
 #[scheduler_job(cron = "0 0/1 * * * ?")]
 async fn handle_scheduler(c:Arc<Client>) {
     let chain = MessageChain::default()
@@ -11,7 +11,7 @@ async fn handle_scheduler(c:Arc<Client>) {
     c.rq_client.send_friend_message(123123,chain).await.expect("sent message failed");
 }
 
-/// Ã¿3·ÖÖÓ »ñÈ¡Ò»´ÎÍøÂç×´Ì¬
+/// æ¯3åˆ†é’Ÿ è·å–ä¸€æ¬¡ç½‘ç»œçŠ¶æ€
 #[scheduler_job(cron = "0 0/3 * * * ?")]
 async fn handle_scheduler02(c:Arc<Client>) {
     println!("{}",c.rq_client.get_status());
