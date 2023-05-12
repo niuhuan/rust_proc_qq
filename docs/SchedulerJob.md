@@ -1,9 +1,9 @@
-use std::sync::Arc;
-use proc_qq::{Client, MessageChainAppendTrait, scheduler, scheduler_job, SchedulerJob};
-use proc_qq::re_exports::ricq_core::msg::elem::Text;
-use proc_qq::re_exports::ricq_core::msg::MessageChain;
+¶¨Ê±ÈÎÎñ
+======
 
-/// æ¯1åˆ†é’Ÿå‘é€ä¸€æ¬¡ Hello
+
+```rust
+/// Ã¿1·ÖÖÓ·¢ËÍÒ»´Î Hello
 #[scheduler_job(cron = "0 0/1 * * * ?")]
 async fn handle_scheduler(c:Arc<Client>) {
     let chain = MessageChain::default()
@@ -11,7 +11,7 @@ async fn handle_scheduler(c:Arc<Client>) {
     c.rq_client.send_friend_message(123123,chain).await.expect("sent message failed");
 }
 
-/// æ¯3åˆ†é’Ÿ è·å–ä¸€æ¬¡ç½‘ç»œçŠ¶æ€
+/// Ã¿3·ÖÖÓ »ñÈ¡Ò»´ÎÍøÂç×´Ì¬
 #[scheduler_job(cron = "0 0/3 * * * ?")]
 async fn handle_scheduler02(c:Arc<Client>) {
     println!("{}",c.rq_client.get_status());
@@ -25,3 +25,11 @@ pub fn scheduler() -> SchedulerJob {
         handle_scheduler02,
     )
 }
+```
+
+```rust
+ClientBuilder::new()
+.modules(vec![hello_module::module()])
+.schedulers(vec![scheduler_handlers::scheduler()])
+.build()
+```

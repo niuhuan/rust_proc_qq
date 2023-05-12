@@ -18,12 +18,9 @@ async fn main() {
         .session_store(FileSessionStore::boxed("session.token"))
         .modules(vec![hello_module::module()])
         .result_handlers(vec![result_handlers::on_result {}.into()])
-        .scheduler(vec![scheduler_handlers::scheduler()])
+        .schedulers(vec![scheduler_handlers::scheduler()])
         .build()
         .await
         .unwrap();
-    let client = Arc::new(client);
-    let copy = client.clone();
-    run_scheduler(copy).await.unwrap();
-    run_client(client).await.unwrap();
+    run_client(Arc::new(client)).await.unwrap();
 }

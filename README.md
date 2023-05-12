@@ -139,6 +139,7 @@ async fn test_qr_login() {
         .version(&ANDROID_WATCH)  // 安卓手表支持扫码登录
         // .show_slider_pop_menu_if_possible() // 密码登录时, 如果是windows, 弹出一个窗口代替手机滑块 (需要启用feature=pop_window_slider)
         .modules(vec![hello_module::module()])    // 您可以注册多个模块
+        .schedulers(vec![scheduler_handlers::scheduler()]) // 设置定时任务
         .show_rq(Some(ShowQR::OpenBySystem))  // 自动打开二维码 在macos/linux/windows中, 不支持安卓
         .build()
         .await
@@ -307,10 +308,27 @@ let chain = chain.append(at).append(text).append(image);
 
 [Example](docs/EventResult.md)
 
-## 定时任务或客户端事件发送消息
+## 定时任务
+使用 `rq_client` 发送消息
+```rust
+/// 使用cron表达式来指定任务在某个时间点或者周期性的执行
+/// 每1分钟发送一次 Hello
+#[scheduler_job(cron = "0 0/1 * * * ?")]
+async fn handle_scheduler(c:Arc<Client>) {
+  let chain = MessageChain::default()
+          .append(Text::new("Hello".to_owned()));
+  c.rq_client.send_friend_message(123123,chain).await.expect("sent message failed");
+}
 
-参考template, 使用run_client(Arc\<Client\>), 使得机器人与定时任务并行, 并使用rc_client发送消息
-
+/// 返回定时任务
+pub fn scheduler() -> SchedulerJob {
+  scheduler!(
+        "hello_jobs",
+        handle_scheduler
+    )
+}
+```
+[Example](docs/SchedulerJob.md)
 ### 其他
 `ricq::msg::elem::Other`在push_text的时候将会跳过
 

@@ -43,7 +43,7 @@ pub struct Client {
     pub(crate) modules: Arc<Vec<Module>>,
     pub(crate) result_handlers: Arc<Vec<EventResultHandler>>,
     #[cfg(feature = "scheduler")]
-    pub(crate) scheduler: Vec<SchedulerJob>,
+    pub(crate) schedulers: Vec<SchedulerJob>,
     pub show_qr: ShowQR,
     pub show_slider: ShowSlider,
     pub shutting: bool,
@@ -86,6 +86,10 @@ pub async fn run_client(c: Arc<Client>) -> Result<()> {
         modules: c.modules.clone(),
         result_handlers: c.result_handlers.clone(),
     };
+    // 启动定时任务
+    #[cfg(feature = "scheduler")]
+    run_scheduler(c.clone()).await?;
+    
     loop {
         // 每次轮询d
         after_login(&c.rq_client.clone()).await;
@@ -128,7 +132,7 @@ pub async fn run_client(c: Arc<Client>) -> Result<()> {
 }
 #[cfg(feature = "scheduler")]
 pub async fn run_scheduler(client: Arc<Client>) -> Result<()>{
-    let scheduler_job = client.scheduler.clone();
+    let scheduler_job = client.schedulers.clone();
     let handler = SchedulerHandler {
         client,
         scheduler_job,
@@ -551,7 +555,7 @@ pub struct ClientBuilder {
     modules_vec: Arc<Vec<Module>>,
     result_handlers_vec: Arc<Vec<EventResultHandler>>,
     #[cfg(feature = "scheduler")]
-    scheduler: Vec<SchedulerJob>,
+    schedulers: Vec<SchedulerJob>,
     show_qr: Option<ShowQR>,
     show_slider: Option<ShowSlider>,
     device_lock_verification: Option<DeviceLockVerification>,
@@ -571,7 +575,7 @@ impl ClientBuilder {
             modules_vec: Arc::new(vec![]),
             result_handlers_vec: Arc::new(vec![]),
             #[cfg(feature = "scheduler")]
-            scheduler:vec![],
+            schedulers:vec![],
             show_qr: None,
             show_slider: None,
             device_lock_verification: None,
@@ -594,8 +598,8 @@ impl ClientBuilder {
     }
     /// 设置定时任务
     #[cfg(feature = "scheduler")]
-    pub fn scheduler<S :Into<Vec<SchedulerJob>>>(mut self, s: S) ->Self{
-        self.scheduler = s.into();
+    pub fn schedulers<S :Into<Vec<SchedulerJob>>>(mut self, s: S) ->Self{
+        self.schedulers = s.into();
         self
     }
     /// 设置显示二维码的方式
@@ -667,7 +671,7 @@ impl ClientBuilder {
             modules: self.modules_vec.clone(),
             result_handlers: self.result_handlers_vec.clone(),
             #[cfg(feature = "scheduler")]
-            scheduler: self.scheduler.clone(),
+            schedulers: self.schedulers.clone(),
             show_qr: if self.show_qr.is_some() {
                 self.show_qr.clone().unwrap()
             } else {
