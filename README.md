@@ -144,7 +144,11 @@ async fn test_qr_login() {
         .build()
         .await
         .unwrap();
-    run_client(client.into()).await?;
+    let client = Arc::new(client);
+    // 如果使用了定时任务 features,请使用 run_scheduler 启动定时任务
+    let copy = Arc::clone(&client);
+    run_scheduler(copy).await?;
+    run_client(client).await?;
 }
 
 fn init_tracing_subscriber() {

@@ -22,5 +22,8 @@ async fn main() {
         .build()
         .await
         .unwrap();
-    run_client(Arc::new(client)).await.unwrap();
+    let client = Arc::new(client);
+    let copy = Arc::clone(&client);
+    run_scheduler(copy).await.unwrap();
+    run_client(client).await.unwrap();
 }

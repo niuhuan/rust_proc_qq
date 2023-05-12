@@ -535,7 +535,6 @@ pub fn event_fn(args: TokenStream, input: TokenStream) -> TokenStream {
 #[proc_macro_error]
 #[proc_macro_attribute]
 pub fn scheduler_job(args: TokenStream, input: TokenStream) -> TokenStream {
-    
     // 获取#[scheduler_job]的参数
     let attrs = parse_macro_input!(args as syn::AttributeArgs);
     // 获取方法
@@ -548,17 +547,17 @@ pub fn scheduler_job(args: TokenStream, input: TokenStream) -> TokenStream {
     let sig_params = &method.sig.inputs;
     let bot_params = match sig_params.first() {
         None => abort!(&sig_params.span(), "需要Arc<proc_qq::Client>作为参数"),
-        Some(bot) => {
-            match bot {
-                FnArg::Receiver(_) =>  abort!(&sig_params.span(), "第一个参数不能是self"),
-                FnArg::Typed(t) => t
-            }
-        }
+        Some(bot) => match bot {
+            FnArg::Receiver(_) => abort!(&sig_params.span(), "第一个参数不能是self"),
+            FnArg::Typed(t) => t,
+        },
     };
     let block = &method.block;
     let mut cron = String::new();
     match attrs.first() {
-        None => { abort!(&method.span(), "cron参数是必须的!") }
+        None => {
+            abort!(&method.span(), "cron参数是必须的!")
+        }
         Some(nm) => {
             if let NestedMeta::Meta(meta) = nm {
                 if let Meta::NameValue(nv) = meta {
@@ -594,7 +593,6 @@ pub fn scheduler_job(args: TokenStream, input: TokenStream) -> TokenStream {
             fn cron(&self) -> String {
                 #cron.to_owned()
             }
-            
             fn call(&self, #bot_params_pat: #bot_params_ty) -> ::std::pin::Pin<Box<dyn ::std::future::Future<Output = ()> + Send + 'static>> {
                 let r = self.clone();
                 Box::pin(async move{
@@ -615,13 +613,16 @@ pub fn scheduler(input: TokenStream) -> TokenStream {
     if params.expressions.len() < 1 {
         abort!(params.span, "参数数量不足")
     }
-    
+
     let name = syn::parse_str::<Expr>(&params.expressions[0]).expect("name 解析错误");
     let mut handle_builder = String::new();
     for i in 1..params.expressions.len() {
-        handle_builder.push_str(&format!("::std::sync::Arc::new(Box::new({})),", params.expressions[i]));
+        handle_builder.push_str(&format!(
+            "::std::sync::Arc::new(Box::new({})),",
+            params.expressions[i]
+        ));
     }
-    
+
     let handle_invoker =
         syn::parse_str::<Expr>(&format!("vec![{handle_builder}]")).expect("handle invoker解析错误");
     TokenStream::from(quote! {

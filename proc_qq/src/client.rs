@@ -1,6 +1,9 @@
 use crate::handler::EventSender;
 use crate::DeviceSource::{JsonFile, JsonString};
-use crate::{Authentication, ClientHandler, DeviceLockVerification, DeviceSource, EventResultHandler, Module, SessionStore, ShowQR, ShowSlider};
+use crate::{
+    Authentication, ClientHandler, DeviceLockVerification, DeviceSource, EventResultHandler,
+    Module, SessionStore, ShowQR, ShowSlider,
+};
 use anyhow::{anyhow, Context, Result};
 use bytes::{Buf, BufMut, Bytes, BytesMut};
 use futures::future::BoxFuture;
@@ -31,9 +34,7 @@ use std::path::Path;
 use std::pin::Pin;
 
 #[cfg(feature = "scheduler")]
-use crate::{
-    SchedulerJob,SchedulerHandler
-};
+use crate::{SchedulerHandler, SchedulerJob};
 
 /// 客户端
 pub struct Client {
@@ -86,10 +87,6 @@ pub async fn run_client(c: Arc<Client>) -> Result<()> {
         modules: c.modules.clone(),
         result_handlers: c.result_handlers.clone(),
     };
-    // 启动定时任务
-    #[cfg(feature = "scheduler")]
-    run_scheduler(c.clone()).await?;
-    
     loop {
         // 每次轮询d
         after_login(&c.rq_client.clone()).await;
@@ -128,10 +125,10 @@ pub async fn run_client(c: Arc<Client>) -> Result<()> {
             login.await?;
         }
     }
-    
 }
+
 #[cfg(feature = "scheduler")]
-pub async fn run_scheduler(client: Arc<Client>) -> Result<()>{
+pub async fn run_scheduler(client: Arc<Client>) -> Result<()> {
     let scheduler_job = client.schedulers.clone();
     let handler = SchedulerHandler {
         client,
@@ -575,7 +572,7 @@ impl ClientBuilder {
             modules_vec: Arc::new(vec![]),
             result_handlers_vec: Arc::new(vec![]),
             #[cfg(feature = "scheduler")]
-            schedulers:vec![],
+            schedulers: vec![],
             show_qr: None,
             show_slider: None,
             device_lock_verification: None,
@@ -598,7 +595,7 @@ impl ClientBuilder {
     }
     /// 设置定时任务
     #[cfg(feature = "scheduler")]
-    pub fn schedulers<S :Into<Vec<SchedulerJob>>>(mut self, s: S) ->Self{
+    pub fn schedulers<S: Into<Vec<SchedulerJob>>>(mut self, s: S) -> Self {
         self.schedulers = s.into();
         self
     }
