@@ -144,11 +144,7 @@ async fn test_qr_login() {
         .build()
         .await
         .unwrap();
-    let client = Arc::new(client);
-    // 如果使用了定时任务 features,请使用 run_scheduler 启动定时任务
-    let copy = Arc::clone(&client);
-    run_scheduler(copy).await?;
-    run_client(client).await?;
+    run_client(Arc::new(client)).await?;
 }
 
 fn init_tracing_subscriber() {
@@ -313,7 +309,7 @@ let chain = chain.append(at).append(text).append(image);
 [Example](docs/EventResult.md)
 
 ## 定时任务
-使用 `rq_client` 发送消息
+使用 `ricq::Client` 发送消息
 ```rust
 /// 使用cron表达式来指定任务在某个时间点或者周期性的执行
 /// 每1分钟发送一次 Hello
@@ -324,11 +320,18 @@ async fn handle_scheduler(c:Arc<Client>) {
   c.rq_client.send_friend_message(123123,chain).await.expect("sent message failed");
 }
 
+/// 每3分钟 获取一次网络状态 
+/// std::time::Duration::from_secs 
+#[scheduler_job(time = 180)]
+async fn handle_scheduler02(c: Arc<Client>) {
+  println!("{}", c.get_status());
+}
 /// 返回定时任务
 pub fn scheduler() -> SchedulerJob {
   scheduler!(
         "hello_jobs",
-        handle_scheduler
+        handle_scheduler,
+        handle_scheduler02
     )
 }
 ```

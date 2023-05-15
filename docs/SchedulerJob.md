@@ -8,13 +8,13 @@
 async fn handle_scheduler(c:Arc<Client>) {
     let chain = MessageChain::default()
         .append(Text::new("Hello".to_owned()));
-    c.rq_client.send_friend_message(123123,chain).await.expect("sent message failed");
+    c.send_friend_message(123123,chain).await.expect("sent message failed");
 }
 
 /// 每3分钟 获取一次网络状态
-#[scheduler_job(cron = "0 0/3 * * * ?")]
+#[scheduler_job(time = 180)]
 async fn handle_scheduler02(c:Arc<Client>) {
-    println!("{}",c.rq_client.get_status());
+    println!("{}",c.get_status());
 }
 
 /// scheduler

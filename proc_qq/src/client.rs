@@ -87,9 +87,9 @@ pub async fn run_client(c: Arc<Client>) -> Result<()> {
         modules: c.modules.clone(),
         result_handlers: c.result_handlers.clone(),
     };
-    // 启动定时任务
+    // 初始化定时任务
     #[cfg(feature = "scheduler")]
-    run_scheduler(c.clone()).await?;
+    let mut scheduler_handle = init_scheduler(&c).await?;
     loop {
         // 每次轮询d
         after_login(&c.rq_client.clone()).await;
@@ -106,6 +106,16 @@ pub async fn run_client(c: Arc<Client>) -> Result<()> {
             }
         };
         handle = re_connection(c.clone()).await?;
+        #[cfg(feature = "scheduler")]
+        match loop_schedulers(scheduler_handle, &event_sender).await {
+            Ok(_) => {
+                tracing::warn!("定时任务中断");
+            }
+            Err(err) => {
+                tracing::warn!("{:?}", err);
+            }
+        }
+        scheduler_handle = init_scheduler(&c).await?;
         tracing::info!("恢复连接");
         if token_login(c.as_ref()).await {
             tracing::info!("恢复会话");
@@ -129,14 +139,33 @@ pub async fn run_client(c: Arc<Client>) -> Result<()> {
         }
     }
 }
+
 #[cfg(feature = "scheduler")]
-pub async fn run_scheduler(client: Arc<Client>) -> Result<()> {
-    let scheduler_job = client.schedulers.clone();
-    let handler = SchedulerHandler {
-        client,
-        scheduler_job,
-    };
-    handler.start().await?;
+pub async fn init_scheduler(
+    c: &Arc<Client>,
+) -> Result<JoinHandle<tokio_cron_scheduler::JobScheduler>> {
+    let mut handler = SchedulerHandler::new(c.rq_client.clone()).await?;
+    handler.scheduler_job = c.schedulers.clone();
+    let handle = handler.init().await?;
+    Ok(handle)
+}
+
+#[cfg(feature = "scheduler")]
+pub async fn loop_schedulers(
+    handle: JoinHandle<tokio_cron_scheduler::JobScheduler>,
+    event_sender: &EventSender,
+) -> Result<()> {
+    let _ = event_sender.send_connected_and_online().await;
+    let result = handle.await;
+    let _ = event_sender.send_disconnected_and_offline().await;
+    match result {
+        Ok(mut j) => {
+            j.shutdown()
+                .await
+                .with_context(|| "Shut the scheduler down")?;
+        }
+        Err(_) => {}
+    }
     Ok(())
 }
 
