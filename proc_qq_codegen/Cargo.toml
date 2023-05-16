@@ -20,3 +20,4 @@ proc-macro = true
 [features]
 default = []
 event_args = []
+scheduler = []

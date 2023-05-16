@@ -4,6 +4,7 @@ use tracing_subscriber::util::SubscriberInitExt;
 
 pub mod hello_module;
 pub mod result_handlers;
+pub mod scheduler_handlers;
 
 pub fn init_tracing_subscriber() {
     tracing_subscriber::registry()

@@ -33,6 +33,9 @@ use std::path::Path;
 #[cfg(feature = "connect_handler")]
 use std::pin::Pin;
 
+#[cfg(feature = "scheduler")]
+use crate::{SchedulerHandler, SchedulerJob};
+
 /// 客户端
 pub struct Client {
     pub rq_client: Arc<ricq::Client>,
@@ -40,6 +43,8 @@ pub struct Client {
     pub session_store: Arc<Option<Box<dyn SessionStore + Sync + Send>>>,
     pub(crate) modules: Arc<Vec<Module>>,
     pub(crate) result_handlers: Arc<Vec<EventResultHandler>>,
+    #[cfg(feature = "scheduler")]
+    pub(crate) schedulers: Vec<SchedulerJob>,
     pub show_qr: ShowQR,
     pub show_slider: ShowSlider,
     pub shutting: bool,
@@ -82,6 +87,10 @@ pub async fn run_client(c: Arc<Client>) -> Result<()> {
         modules: c.modules.clone(),
         result_handlers: c.result_handlers.clone(),
     };
+    // 初始化定时任务
+    #[cfg(feature = "scheduler")]
+    let mut scheduler_handle = init_scheduler(&c).await?;
+
     loop {
         // 每次轮询d
         after_login(&c.rq_client.clone()).await;
@@ -97,6 +106,15 @@ pub async fn run_client(c: Arc<Client>) -> Result<()> {
                 err.into()
             }
         };
+        #[cfg(feature = "scheduler")]
+        match loop_schedulers(scheduler_handle, &event_sender).await {
+            Ok(_) => {
+                tracing::warn!("定时任务中断");
+            }
+            Err(err) => {
+                tracing::warn!("{:?}", err);
+            }
+        }
         handle = re_connection(c.clone()).await?;
         tracing::info!("恢复连接");
         if token_login(c.as_ref()).await {
@@ -119,7 +137,38 @@ pub async fn run_client(c: Arc<Client>) -> Result<()> {
             };
             login.await?;
         }
+        #[cfg(feature = "scheduler")]
+        {
+            scheduler_handle = init_scheduler(&c).await?;
+        }
     }
+}
+
+#[cfg(feature = "scheduler")]
+async fn init_scheduler(c: &Arc<Client>) -> Result<JoinHandle<tokio_cron_scheduler::JobScheduler>> {
+    let mut handler = SchedulerHandler::new(c.rq_client.clone()).await?;
+    handler.scheduler_job = c.schedulers.clone();
+    let handle = handler.init().await?;
+    Ok(handle)
+}
+
+#[cfg(feature = "scheduler")]
+async fn loop_schedulers(
+    handle: JoinHandle<tokio_cron_scheduler::JobScheduler>,
+    event_sender: &EventSender,
+) -> Result<()> {
+    let _ = event_sender.send_connected_and_online().await;
+    let result = handle.await;
+    let _ = event_sender.send_disconnected_and_offline().await;
+    match result {
+        Ok(mut j) => {
+            j.shutdown()
+                .await
+                .with_context(|| "Shut the scheduler down")?;
+        }
+        Err(_) => {}
+    }
+    Ok(())
 }
 
 pub async fn run_client_once(client: Arc<Client>) -> Result<()> {
@@ -535,6 +584,8 @@ pub struct ClientBuilder {
     session_store: Arc<Option<Box<dyn SessionStore + Sync + Send>>>,
     modules_vec: Arc<Vec<Module>>,
     result_handlers_vec: Arc<Vec<EventResultHandler>>,
+    #[cfg(feature = "scheduler")]
+    schedulers: Vec<SchedulerJob>,
     show_qr: Option<ShowQR>,
     show_slider: Option<ShowSlider>,
     device_lock_verification: Option<DeviceLockVerification>,
@@ -553,6 +604,8 @@ impl ClientBuilder {
             session_store: Arc::new(None),
             modules_vec: Arc::new(vec![]),
             result_handlers_vec: Arc::new(vec![]),
+            #[cfg(feature = "scheduler")]
+            schedulers: vec![],
             show_qr: None,
             show_slider: None,
             device_lock_verification: None,
@@ -573,7 +626,12 @@ impl ClientBuilder {
         self.result_handlers_vec = e.into();
         self
     }
-
+    /// 设置定时任务
+    #[cfg(feature = "scheduler")]
+    pub fn schedulers<S: Into<Vec<SchedulerJob>>>(mut self, s: S) -> Self {
+        self.schedulers = s.into();
+        self
+    }
     /// 设置显示二维码的方式
     pub fn show_rq<E: Into<Option<ShowQR>>>(mut self, show_qr: E) -> Self {
         self.show_qr = show_qr.into();
@@ -642,6 +700,8 @@ impl ClientBuilder {
             session_store: self.session_store.clone(),
             modules: self.modules_vec.clone(),
             result_handlers: self.result_handlers_vec.clone(),
+            #[cfg(feature = "scheduler")]
+            schedulers: self.schedulers.clone(),
             show_qr: if self.show_qr.is_some() {
                 self.show_qr.clone().unwrap()
             } else {
