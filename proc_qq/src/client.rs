@@ -90,6 +90,7 @@ pub async fn run_client(c: Arc<Client>) -> Result<()> {
     // 初始化定时任务
     #[cfg(feature = "scheduler")]
     let mut scheduler_handle = init_scheduler(&c).await?;
+
     loop {
         // 每次轮询d
         after_login(&c.rq_client.clone()).await;
@@ -105,7 +106,6 @@ pub async fn run_client(c: Arc<Client>) -> Result<()> {
                 err.into()
             }
         };
-        handle = re_connection(c.clone()).await?;
         #[cfg(feature = "scheduler")]
         match loop_schedulers(scheduler_handle, &event_sender).await {
             Ok(_) => {
@@ -115,7 +115,7 @@ pub async fn run_client(c: Arc<Client>) -> Result<()> {
                 tracing::warn!("{:?}", err);
             }
         }
-        scheduler_handle = init_scheduler(&c).await?;
+        handle = re_connection(c.clone()).await?;
         tracing::info!("恢复连接");
         if token_login(c.as_ref()).await {
             tracing::info!("恢复会话");
@@ -137,13 +137,15 @@ pub async fn run_client(c: Arc<Client>) -> Result<()> {
             };
             login.await?;
         }
+        #[cfg(feature = "scheduler")]
+        {
+            scheduler_handle = init_scheduler(&c).await?;
+        }
     }
 }
 
 #[cfg(feature = "scheduler")]
-pub async fn init_scheduler(
-    c: &Arc<Client>,
-) -> Result<JoinHandle<tokio_cron_scheduler::JobScheduler>> {
+async fn init_scheduler(c: &Arc<Client>) -> Result<JoinHandle<tokio_cron_scheduler::JobScheduler>> {
     let mut handler = SchedulerHandler::new(c.rq_client.clone()).await?;
     handler.scheduler_job = c.schedulers.clone();
     let handle = handler.init().await?;
@@ -151,7 +153,7 @@ pub async fn init_scheduler(
 }
 
 #[cfg(feature = "scheduler")]
-pub async fn loop_schedulers(
+async fn loop_schedulers(
     handle: JoinHandle<tokio_cron_scheduler::JobScheduler>,
     event_sender: &EventSender,
 ) -> Result<()> {

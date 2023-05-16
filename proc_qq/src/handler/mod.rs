@@ -368,9 +368,9 @@ pub struct Module {
     pub handles: Vec<ModuleEventHandler>,
 }
 
-pub struct EventSender {
-    pub modules: Arc<Vec<Module>>,
-    pub result_handlers: Arc<Vec<EventResultHandler>>,
+pub(crate) struct EventSender {
+    pub(crate) modules: Arc<Vec<Module>>,
+    pub(crate) result_handlers: Arc<Vec<EventResultHandler>>,
 }
 
 impl EventSender {

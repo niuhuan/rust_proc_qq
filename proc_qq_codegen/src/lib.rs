@@ -6,7 +6,6 @@ use quote::{quote, ToTokens, TokenStreamExt};
 use syn::parse::{Parse, ParseStream};
 use syn::punctuated::Punctuated;
 use syn::spanned::Spanned;
-use syn::Meta::{List, NameValue};
 
 use syn::{parse_macro_input, Expr, FnArg, Meta, NestedMeta, PatType, Token};
 
@@ -559,9 +558,9 @@ pub fn scheduler_job(args: TokenStream, input: TokenStream) -> TokenStream {
     if let Some(nm) = attrs.get(0) {
         match nm.clone() {
             NestedMeta::Meta(meta) => match meta {
-                syn::Meta::Path(_) => abort!(&meta.span(), "不支持的参数名称"),
-                List(_) => abort!(&meta.span(), "不支持的嵌套"),
-                NameValue(nv) => {
+                Meta::Path(_) => abort!(&meta.span(), "不支持的参数名称"),
+                Meta::List(_) => abort!(&meta.span(), "不支持的嵌套"),
+                Meta::NameValue(nv) => {
                     if nv.path.segments.len() != 1 {
                         abort!(&nv.path.span(), "表达式有且只能有一个片段");
                     }
