@@ -51,7 +51,7 @@ pub struct Client {
     pub connection_handler: Arc<Option<Box<dyn ConnectionHandler + Sync + Send>>>,
     pub reconnect_duration: Duration,
     #[cfg(feature = "scheduler")]
-    pub(crate) jobs_scheduler: tokio::sync::Mutex<tokio_cron_scheduler::JobScheduler>,
+    pub schedulers: Arc<Vec<scheduler::Scheduler>>,
 }
 
 impl Client {
@@ -69,20 +69,22 @@ impl Client {
 
 pub async fn run_client(c: Arc<Client>) -> Result<()> {
     #[cfg(feature = "scheduler")]
-    {
-        let lock = c.jobs_scheduler.lock().await;
-        lock.start().await?;
-        drop(lock);
-    }
+    let mut jobs_scheduler = {
+        let mut jobs_scheduler = tokio_cron_scheduler::JobScheduler::new().await?;
+        scheduler::put_scheduler(
+            &mut jobs_scheduler,
+            c.schedulers.clone(),
+            c.rq_client.clone(),
+        )
+        .await?;
+        jobs_scheduler.start().await?;
+        jobs_scheduler
+    };
     match run_client_loop(c.clone()).await {
         Ok(o) => Ok(o),
         Err(e) => {
             #[cfg(feature = "scheduler")]
-            {
-                let mut lock = c.jobs_scheduler.lock().await;
-                lock.shutdown().await?;
-                drop(lock);
-            }
+            jobs_scheduler.shutdown().await?;
             return Err(e);
         }
     }
@@ -150,20 +152,22 @@ pub async fn run_client_loop(c: Arc<Client>) -> Result<()> {
 
 pub async fn run_client_once(c: Arc<Client>) -> Result<()> {
     #[cfg(feature = "scheduler")]
-    {
-        let lock = c.jobs_scheduler.lock().await;
-        lock.start().await?;
-        drop(lock);
-    }
+    let mut jobs_scheduler = {
+        let mut jobs_scheduler = tokio_cron_scheduler::JobScheduler::new().await?;
+        scheduler::put_scheduler(
+            &mut jobs_scheduler,
+            c.schedulers.clone(),
+            c.rq_client.clone(),
+        )
+        .await?;
+        jobs_scheduler.start().await?;
+        jobs_scheduler
+    };
     match run_client_once_inner(c.clone()).await {
         Ok(o) => Ok(o),
         Err(e) => {
             #[cfg(feature = "scheduler")]
-            {
-                let mut lock = c.jobs_scheduler.lock().await;
-                lock.shutdown().await?;
-                drop(lock);
-            }
+            jobs_scheduler.shutdown().await?;
             return Err(e);
         }
     }
@@ -665,42 +669,32 @@ impl ClientBuilder {
 
     /// 构造客户端
     pub async fn build(&self) -> Result<Client, anyhow::Error> {
-        let rq_client = Arc::new(ricq::Client::new(
-            match &self.device_source {
-                JsonFile(file_name) => {
-                    if Path::new(file_name).exists() {
-                        parse_device_json(
-                            &tokio::fs::read_to_string(file_name)
-                                .await
-                                .with_context(|| format!("读取文件失败 : {}", file_name))?,
-                        )?
-                    } else {
-                        let device = Device::random();
-                        tokio::fs::write(file_name, serde_json::to_string(&device).unwrap())
-                            .await
-                            .with_context(|| format!("写入文件失败 : {}", file_name))?;
-                        device
-                    }
-                }
-                JsonString(json_string) => parse_device_json(json_string)?,
-            },
-            self.version.clone(),
-            ClientHandler {
-                modules: self.modules_vec.clone(),
-                result_handlers: self.result_handlers_vec.clone(),
-            },
-        ));
-        #[cfg(feature = "scheduler")]
-        let mut jobs_scheduler = tokio_cron_scheduler::JobScheduler::new().await?;
-        #[cfg(feature = "scheduler")]
-        scheduler::put_scheduler(
-            &mut jobs_scheduler,
-            self.schedulers.clone(),
-            rq_client.clone(),
-        )
-        .await?;
         Ok(Client {
-            rq_client,
+            rq_client: Arc::new(ricq::Client::new(
+                match &self.device_source {
+                    JsonFile(file_name) => {
+                        if Path::new(file_name).exists() {
+                            parse_device_json(
+                                &tokio::fs::read_to_string(file_name)
+                                    .await
+                                    .with_context(|| format!("读取文件失败 : {}", file_name))?,
+                            )?
+                        } else {
+                            let device = Device::random();
+                            tokio::fs::write(file_name, serde_json::to_string(&device).unwrap())
+                                .await
+                                .with_context(|| format!("写入文件失败 : {}", file_name))?;
+                            device
+                        }
+                    }
+                    JsonString(json_string) => parse_device_json(json_string)?,
+                },
+                self.version.clone(),
+                ClientHandler {
+                    modules: self.modules_vec.clone(),
+                    result_handlers: self.result_handlers_vec.clone(),
+                },
+            )),
             authentication: self
                 .authentication
                 .clone()
@@ -732,7 +726,7 @@ impl ClientBuilder {
             connection_handler: self.connect_handler_arc.clone(),
             reconnect_duration: self.reconnect_duration,
             #[cfg(feature = "scheduler")]
-            jobs_scheduler: tokio::sync::Mutex::new(jobs_scheduler),
+            schedulers: self.schedulers.clone(),
         })
     }
 
