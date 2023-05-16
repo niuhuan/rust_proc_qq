@@ -617,6 +617,7 @@ pub fn scheduler_job(args: TokenStream, input: TokenStream) -> TokenStream {
         async fn #ident_raw(#bot_params_pat: #bot_params_ty) #block
     ).into()
 }
+
 #[cfg(feature = "scheduler")]
 #[proc_macro_error]
 #[proc_macro]

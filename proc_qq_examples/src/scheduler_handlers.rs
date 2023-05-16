@@ -1,7 +1,7 @@
 use proc_qq::re_exports::ricq::Client;
 use proc_qq::re_exports::ricq_core::msg::elem::Text;
 use proc_qq::re_exports::ricq_core::msg::MessageChain;
-use proc_qq::{scheduler, scheduler_job, MessageChainAppendTrait, SchedulerJob};
+use proc_qq::{scheduler, scheduler_job, MessageChainAppendTrait, Scheduler};
 use std::sync::Arc;
 
 /// 每1分钟发送一次 Hello std::time::Duration  秒
@@ -20,6 +20,6 @@ async fn handle_scheduler02(c: Arc<Client>) {
 }
 
 /// scheduler
-pub fn scheduler() -> SchedulerJob {
+pub fn scheduler() -> Scheduler {
     scheduler!("hello_jobs", handle_scheduler, handle_scheduler02,)
 }
