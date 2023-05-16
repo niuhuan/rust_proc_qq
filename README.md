@@ -309,33 +309,9 @@ let chain = chain.append(at).append(text).append(image);
 [Example](docs/EventResult.md)
 
 ## 定时任务
-使用 `ricq::Client` 发送消息
-```rust
-/// 使用cron表达式来指定任务在某个时间点或者周期性的执行
-/// 每1分钟发送一次 Hello
-#[scheduler_job(cron = "0 0/1 * * * ?")]
-async fn handle_scheduler(c:Arc<Client>) {
-  let chain = MessageChain::default()
-          .append(Text::new("Hello".to_owned()));
-  c.rq_client.send_friend_message(123123,chain).await.expect("sent message failed");
-}
 
-/// 每3分钟 获取一次网络状态 
-/// std::time::Duration::from_secs 
-#[scheduler_job(time = 180)]
-async fn handle_scheduler02(c: Arc<Client>) {
-  println!("{}", c.get_status());
-}
-/// 返回定时任务
-pub fn scheduler() -> SchedulerJob {
-  scheduler!(
-        "hello_jobs",
-        handle_scheduler,
-        handle_scheduler02
-    )
-}
-```
 [Example](docs/SchedulerJob.md)
+
 ### 其他
 `ricq::msg::elem::Other`在push_text的时候将会跳过
 
@@ -496,6 +472,12 @@ event.reply_text("你好").await?;
     - MPL 2.0
     - 如RICQ更换协议, 请以最新协议为准, 您可以提出ISSUE提醒我进行更新
 - 仓库持有人在变更仓库协议时无需经过其他代码贡献者的同意, 您在PR时就代表您同意此观点
+
+## 贡献代码
+
+- 我很乐意交流，您可以在Issues中提出您的想法进行交流，代码量较少时可直接提PR。如果内容合理，我会尽快CR以及Merge。
+- 如果可以，请使用过程宏对参数进行校验, 将Error在编译时抛出。
+- 使用emit!进行过程宏的代码提交，这有助于Debug。设置环境变量`PROC_QQ_CODEGEN_DEBUG=1`即可打印过程宏生成的代码。
 
 #### 鸣谢
 

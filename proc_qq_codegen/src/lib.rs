@@ -569,22 +569,26 @@ pub fn scheduler_job(args: TokenStream, input: TokenStream) -> TokenStream {
                     match ident_name.as_str() {
                         "cron" => match nv.lit {
                             syn::Lit::Str(value) => {
-                                let cron = value.value();
+                                let cron_value = value.value();
+                                let _ =
+                                    cron::Schedule::try_from(cron_value.as_str()).map_err(|e| {
+                                        abort!(&ident.span(), "cron表达式解析错误: {}", e)
+                                    });
                                 time_type.append_all(quote! {
-                                    ::proc_qq::TimeType::Cron(#cron.to_owned())
+                                    ::proc_qq::SchedulerJobPeriod::Cron(#cron_value.to_owned())
                                 });
                             }
                             _ => abort!(&ident.span(), "cron只支持字符串类型参数值"),
                         },
-                        "time" => match nv.lit {
+                        "repeat" => match nv.lit {
                             syn::Lit::Int(value) => {
                                 let time =
                                     value.to_string().parse::<u64>().expect("time必须是整数");
                                 time_type.append_all(quote! {
-                                    ::proc_qq::TimeType::Duration(#time.to_owned())
+                                    ::proc_qq::SchedulerJobPeriod::Repeat(#time.to_owned())
                                 });
                             }
-                            _ => abort!(&ident.span(), "time只支持字符串类型参数值"),
+                            _ => abort!(&ident.span(), "repeat只支持字符串类型参数值"),
                         },
                         _ => abort!(&ident.span(), "不支持的参数名称"),
                     }
@@ -593,30 +597,34 @@ pub fn scheduler_job(args: TokenStream, input: TokenStream) -> TokenStream {
             NestedMeta::Lit(ident) => abort!(&ident.span(), "不支持值类型的参数"),
         }
     } else {
-        abort!(&method.span(), "必须要有一个参数[ cron | time ] ")
+        abort!(&method.span(), "必须要有一个参数[ cron | repeat ] ")
     }
-    let ident_raw =
-        proc_macro2::Ident::new(&format!("{}_raw", &method.sig.ident), method.sig.span());
     let ident = method.sig.ident;
     let bot_params_pat = bot_params.pat.as_ref();
     let bot_params_ty = bot_params.ty.as_ref();
-    quote!(
+    let ident_str = format!("{}", ident);
+    let qu = quote!(
         #[allow(non_camel_case_types)]
         pub struct #ident;
 
-        impl ::proc_qq::ScheduledJobHandler for #ident{
-            fn time_type(&self) -> ::proc_qq::TimeType {
-                #time_type
-            }
-            fn call(&self, #bot_params_pat: #bot_params_ty) -> ::std::pin::Pin<Box<dyn ::std::future::Future<Output = ()> + Send + 'static>> {
-                Box::pin(async move{
-                    #ident_raw(#bot_params_pat).await;
-                } )
+        #[::proc_qq::re_exports::async_trait::async_trait]
+        impl ::proc_qq::SchedulerJobHandler for #ident{
+            async fn call(&self, #bot_params_pat: #bot_params_ty) -> ::proc_qq::re_exports::anyhow::Result<()> #block
+        }
+
+        impl Into<::proc_qq::SchedulerJob> for #ident {
+            fn into(self) -> ::proc_qq::SchedulerJob {
+                ::proc_qq::SchedulerJob {
+                    id: #ident_str.into(),
+                    period: #time_type,
+                    handler: std::sync::Arc::new(Box::new(self)),
+                }
             }
         }
-        async fn #ident_raw(#bot_params_pat: #bot_params_ty) #block
-    ).into()
+    );
+    emit!(qu)
 }
+
 #[cfg(feature = "scheduler")]
 #[proc_macro_error]
 #[proc_macro]
@@ -629,18 +637,15 @@ pub fn scheduler(input: TokenStream) -> TokenStream {
     let name = syn::parse_str::<Expr>(&params.expressions[0]).expect("name 解析错误");
     let mut handle_builder = String::new();
     for i in 1..params.expressions.len() {
-        handle_builder.push_str(&format!(
-            "::std::sync::Arc::new(Box::new({})),",
-            params.expressions[i]
-        ));
+        handle_builder.push_str(&format!("{}.into(),", params.expressions[i]));
     }
 
     let handle_invoker =
         syn::parse_str::<Expr>(&format!("vec![{handle_builder}]")).expect("handle invoker解析错误");
-    TokenStream::from(quote! {
-        ::proc_qq::SchedulerJob {
-            name: #name.to_owned(),
-            handles: #handle_invoker,
+    emit!(quote! {
+        ::proc_qq::Scheduler {
+            id: #name.to_owned(),
+            jobs: #handle_invoker,
         }
     })
 }
