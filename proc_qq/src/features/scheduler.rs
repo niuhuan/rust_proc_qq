@@ -17,7 +17,7 @@ pub struct SchedulerJob {
 
 pub enum SchedulerJobPeriod {
     Cron(String),
-    Duration(u64),
+    Repeat(u64),
 }
 
 #[async_trait::async_trait]
@@ -37,11 +37,13 @@ impl SchedulerJobProcess {
     pub fn do_process(&self) -> Pin<Box<dyn Future<Output = ()> + Send + 'static>> {
         let handler = Arc::clone(&self.handler);
         let client = Arc::clone(&self.client);
+        let scheduler_id = self.scheduler_id.clone();
+        let job_id = self.job_id.clone();
         Box::pin(async move {
             match handler.call(client).await {
                 Ok(_) => {}
-                Err(_) => {
-                    // todo log warn
+                Err(e) => {
+                    tracing::warn!("定时任务执行失败 : {scheduler_id} : {job_id} : {e}");
                 }
             };
         })
@@ -65,7 +67,7 @@ pub(crate) async fn put_scheduler(
                 SchedulerJobPeriod::Cron(cron) => {
                     Job::new_async(cron.as_str(), move |_, _| process.do_process())?
                 }
-                SchedulerJobPeriod::Duration(time) => Job::new_repeated_async(
+                SchedulerJobPeriod::Repeat(time) => Job::new_repeated_async(
                     std::time::Duration::from_secs(time.clone()),
                     move |_, _| process.do_process(),
                 )?,

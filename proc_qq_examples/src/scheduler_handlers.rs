@@ -6,7 +6,7 @@ use proc_qq::{scheduler, scheduler_job, MessageChainAppendTrait, Scheduler};
 use std::sync::Arc;
 
 /// 每1分钟发送一次 Hello std::time::Duration  秒
-#[scheduler_job(time = 60)]
+#[scheduler_job(repeat = 60)]
 async fn handle_scheduler(c: Arc<Client>) -> anyhow::Result<()> {
     let chain = MessageChain::default().append(Text::new("Hello".to_owned()));
     c.send_friend_message(123123, chain)

@@ -569,22 +569,26 @@ pub fn scheduler_job(args: TokenStream, input: TokenStream) -> TokenStream {
                     match ident_name.as_str() {
                         "cron" => match nv.lit {
                             syn::Lit::Str(value) => {
-                                let cron = value.value();
+                                let cron_value = value.value();
+                                let _ =
+                                    cron::Schedule::try_from(cron_value.as_str()).map_err(|e| {
+                                        abort!(&ident.span(), "cron表达式解析错误: {}", e)
+                                    });
                                 time_type.append_all(quote! {
-                                    ::proc_qq::SchedulerJobPeriod::Cron(#cron.to_owned())
+                                    ::proc_qq::SchedulerJobPeriod::Cron(#cron_value.to_owned())
                                 });
                             }
                             _ => abort!(&ident.span(), "cron只支持字符串类型参数值"),
                         },
-                        "time" => match nv.lit {
+                        "repeat" => match nv.lit {
                             syn::Lit::Int(value) => {
                                 let time =
                                     value.to_string().parse::<u64>().expect("time必须是整数");
                                 time_type.append_all(quote! {
-                                    ::proc_qq::SchedulerJobPeriod::Duration(#time.to_owned())
+                                    ::proc_qq::SchedulerJobPeriod::Repeat(#time.to_owned())
                                 });
                             }
-                            _ => abort!(&ident.span(), "time只支持字符串类型参数值"),
+                            _ => abort!(&ident.span(), "repeat只支持字符串类型参数值"),
                         },
                         _ => abort!(&ident.span(), "不支持的参数名称"),
                     }
@@ -593,7 +597,7 @@ pub fn scheduler_job(args: TokenStream, input: TokenStream) -> TokenStream {
             NestedMeta::Lit(ident) => abort!(&ident.span(), "不支持值类型的参数"),
         }
     } else {
-        abort!(&method.span(), "必须要有一个参数[ cron | time ] ")
+        abort!(&method.span(), "必须要有一个参数[ cron | repeat ] ")
     }
     let ident = method.sig.ident;
     let bot_params_pat = bot_params.pat.as_ref();
