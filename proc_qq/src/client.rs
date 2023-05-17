@@ -1,10 +1,13 @@
-use crate::handler::EventSender;
-use crate::DeviceSource::{JsonFile, JsonString};
-use crate::{
-    Authentication, ClientHandler, DeviceLockVerification, DeviceSource, EventResultHandler,
-    Module, SessionStore, ShowQR, ShowSlider,
-};
-use anyhow::{anyhow, Context, Result};
+use std::cmp::min;
+#[cfg(feature = "connect_handler")]
+use std::ops::Deref;
+use std::path::Path;
+#[cfg(feature = "connect_handler")]
+use std::pin::Pin;
+use std::sync::Arc;
+use std::time::Duration;
+
+use anyhow::{Context, Result};
 use bytes::{Buf, BufMut, Bytes, BytesMut};
 use futures::future::BoxFuture;
 use futures::FutureExt;
@@ -18,20 +21,20 @@ use ricq_core::command::wtlogin::{
 use ricq_core::protocol::device::Device;
 use ricq_core::protocol::version::{Version, ANDROID_PHONE};
 use ricq_core::{RQError, RQResult, Token};
-use std::cmp::min;
-use std::sync::Arc;
-use std::time::Duration;
 use tokio::net::TcpStream;
 use tokio::task::JoinHandle;
 use tokio::time::sleep;
 
 #[cfg(feature = "connect_handler")]
 use crate::features::connect_handler::ConnectionHandler;
-#[cfg(feature = "connect_handler")]
-use std::ops::Deref;
-use std::path::Path;
-#[cfg(feature = "connect_handler")]
-use std::pin::Pin;
+#[cfg(feature = "scheduler")]
+use crate::features::scheduler;
+use crate::handler::EventSender;
+use crate::DeviceSource::{JsonFile, JsonString};
+use crate::{
+    Authentication, ClientHandler, DeviceLockVerification, DeviceSource, EventResultHandler,
+    Module, SessionStore, ShowQR, ShowSlider,
+};
 
 /// 客户端
 pub struct Client {
@@ -47,6 +50,8 @@ pub struct Client {
     #[cfg(feature = "connect_handler")]
     pub connection_handler: Arc<Option<Box<dyn ConnectionHandler + Sync + Send>>>,
     pub reconnect_duration: Duration,
+    #[cfg(feature = "scheduler")]
+    pub schedulers: Arc<Vec<scheduler::Scheduler>>,
 }
 
 impl Client {
@@ -62,6 +67,29 @@ impl Client {
     }
 }
 
+pub async fn run_client(c: Arc<Client>) -> Result<()> {
+    #[cfg(feature = "scheduler")]
+    let mut jobs_scheduler = {
+        let mut jobs_scheduler = tokio_cron_scheduler::JobScheduler::new().await?;
+        scheduler::put_scheduler(
+            &mut jobs_scheduler,
+            c.schedulers.clone(),
+            c.rq_client.clone(),
+        )
+        .await?;
+        jobs_scheduler.start().await?;
+        jobs_scheduler
+    };
+    match run_client_loop(c.clone()).await {
+        Ok(o) => Ok(o),
+        Err(e) => {
+            #[cfg(feature = "scheduler")]
+            jobs_scheduler.shutdown().await?;
+            return Err(e);
+        }
+    }
+}
+
 /// 运行客户端，并尽可能的断线重连
 ///
 /// 1. 尝试使用token登录
@@ -70,7 +98,7 @@ impl Client {
 /// 4. 登录成功则保存token，并开始分发事件
 /// 5. 断开连接时停止分发事件, 并尝试使用token再次登录
 /// 6. 如果token失效则使用密码登录并转到4，未设置密码（例如扫码登录）则程序异常退出
-pub async fn run_client(c: Arc<Client>) -> Result<()> {
+pub async fn run_client_loop(c: Arc<Client>) -> Result<()> {
     // 连接到服务器
     let mut handle = connection(c.clone()).await?;
     // 优先使用token登录
@@ -122,7 +150,30 @@ pub async fn run_client(c: Arc<Client>) -> Result<()> {
     }
 }
 
-pub async fn run_client_once(client: Arc<Client>) -> Result<()> {
+pub async fn run_client_once(c: Arc<Client>) -> Result<()> {
+    #[cfg(feature = "scheduler")]
+    let mut jobs_scheduler = {
+        let mut jobs_scheduler = tokio_cron_scheduler::JobScheduler::new().await?;
+        scheduler::put_scheduler(
+            &mut jobs_scheduler,
+            c.schedulers.clone(),
+            c.rq_client.clone(),
+        )
+        .await?;
+        jobs_scheduler.start().await?;
+        jobs_scheduler
+    };
+    match run_client_once_inner(c.clone()).await {
+        Ok(o) => Ok(o),
+        Err(e) => {
+            #[cfg(feature = "scheduler")]
+            jobs_scheduler.shutdown().await?;
+            return Err(e);
+        }
+    }
+}
+
+pub async fn run_client_once_inner(client: Arc<Client>) -> Result<()> {
     // connect to server
     let handle = connection(client.clone()).await?;
     // token login if allow and file exists
@@ -322,7 +373,7 @@ async fn qr_login(client: &Client, show_qr: ShowQR) -> Result<()> {
                     #[cfg(feature = "console_qr")]
                     ShowQR::PrintToConsole => {
                         if let Err(err) = print_qr_to_console(image_data) {
-                            return Err(anyhow!("二维码打印到控制台时出现误 : {}", err));
+                            return Err(anyhow::anyhow!("二维码打印到控制台时出现误 : {}", err));
                         }
                         tracing::info!("请扫码");
                     }
@@ -535,6 +586,8 @@ pub struct ClientBuilder {
     session_store: Arc<Option<Box<dyn SessionStore + Sync + Send>>>,
     modules_vec: Arc<Vec<Module>>,
     result_handlers_vec: Arc<Vec<EventResultHandler>>,
+    #[cfg(feature = "scheduler")]
+    schedulers: Arc<Vec<scheduler::Scheduler>>,
     show_qr: Option<ShowQR>,
     show_slider: Option<ShowSlider>,
     device_lock_verification: Option<DeviceLockVerification>,
@@ -553,6 +606,8 @@ impl ClientBuilder {
             session_store: Arc::new(None),
             modules_vec: Arc::new(vec![]),
             result_handlers_vec: Arc::new(vec![]),
+            #[cfg(feature = "scheduler")]
+            schedulers: Arc::new(vec![]),
             show_qr: None,
             show_slider: None,
             device_lock_verification: None,
@@ -573,7 +628,12 @@ impl ClientBuilder {
         self.result_handlers_vec = e.into();
         self
     }
-
+    /// 设置定时任务
+    #[cfg(feature = "scheduler")]
+    pub fn schedulers<S: Into<Arc<Vec<scheduler::Scheduler>>>>(mut self, s: S) -> Self {
+        self.schedulers = s.into();
+        self
+    }
     /// 设置显示二维码的方式
     pub fn show_rq<E: Into<Option<ShowQR>>>(mut self, show_qr: E) -> Self {
         self.show_qr = show_qr.into();
@@ -665,6 +725,8 @@ impl ClientBuilder {
             #[cfg(feature = "connect_handler")]
             connection_handler: self.connect_handler_arc.clone(),
             reconnect_duration: self.reconnect_duration,
+            #[cfg(feature = "scheduler")]
+            schedulers: self.schedulers.clone(),
         })
     }
 

@@ -28,6 +28,7 @@ regex = "1"
 tokio-socks = { version = "0.5", optional = true }
 trust-dns-resolver = { version = "0.22", optional = true }
 url = { version = "2.3", optional = true }
+tokio-cron-scheduler = { version = "0.9" , optional = true }
 
 [target.'cfg(any(target_os = "windows",target_os = "linux",target_os = "macos"))'.dependencies]
 opener = "0.5"
@@ -45,3 +46,4 @@ console_qr = ["dep:rqrr", "dep:image"]
 connect_handler = []
 proxy = ["connect_handler", "dep:tokio-socks", "dep:trust-dns-resolver", "dep:url"]
 event_args = ["proc_qq_codegen/event_args"]
+scheduler = ["dep:tokio-cron-scheduler", "proc_qq_codegen/scheduler"]

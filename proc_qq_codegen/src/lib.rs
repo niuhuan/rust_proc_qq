@@ -6,6 +6,7 @@ use quote::{quote, ToTokens, TokenStreamExt};
 use syn::parse::{Parse, ParseStream};
 use syn::punctuated::Punctuated;
 use syn::spanned::Spanned;
+
 use syn::{parse_macro_input, Expr, FnArg, Meta, NestedMeta, PatType, Token};
 
 #[cfg(feature = "event_args")]
@@ -529,4 +530,122 @@ pub fn event_fn(args: TokenStream, input: TokenStream) -> TokenStream {
         });
     }
     emit!(result)
+}
+
+#[cfg(feature = "scheduler")]
+#[proc_macro_error]
+#[proc_macro_attribute]
+pub fn scheduler_job(args: TokenStream, input: TokenStream) -> TokenStream {
+    // 获取#[scheduler_job]的参数
+    let attrs = parse_macro_input!(args as syn::AttributeArgs);
+    // 获取方法
+    let method = parse_macro_input!(input as syn::ItemFn);
+    // 判断是否为async方法
+    if method.sig.asyncness.is_none() {
+        abort!(&method.sig.span(), "必须是async方法");
+    }
+    // 判断事件
+    let sig_params = &method.sig.inputs;
+    let bot_params = match sig_params.first() {
+        None => abort!(&sig_params.span(), "需要Arc<ricq::Client>作为参数"),
+        Some(bot) => match bot {
+            FnArg::Receiver(_) => abort!(&sig_params.span(), "第一个参数不能是self"),
+            FnArg::Typed(t) => t,
+        },
+    };
+    let block = &method.block;
+    let mut time_type = quote! {};
+    if let Some(nm) = attrs.get(0) {
+        match nm.clone() {
+            NestedMeta::Meta(meta) => match meta {
+                Meta::Path(_) => abort!(&meta.span(), "不支持的参数名称"),
+                Meta::List(_) => abort!(&meta.span(), "不支持的嵌套"),
+                Meta::NameValue(nv) => {
+                    if nv.path.segments.len() != 1 {
+                        abort!(&nv.path.span(), "表达式有且只能有一个片段");
+                    }
+                    let ident = &nv.path.segments.first().unwrap().ident;
+                    let ident_name = nv.path.segments.first().unwrap().ident.to_string();
+                    match ident_name.as_str() {
+                        "cron" => match nv.lit {
+                            syn::Lit::Str(value) => {
+                                let cron_value = value.value();
+                                let _ =
+                                    cron::Schedule::try_from(cron_value.as_str()).map_err(|e| {
+                                        abort!(&ident.span(), "cron表达式解析错误: {}", e)
+                                    });
+                                time_type.append_all(quote! {
+                                    ::proc_qq::SchedulerJobPeriod::Cron(#cron_value.to_owned())
+                                });
+                            }
+                            _ => abort!(&ident.span(), "cron只支持字符串类型参数值"),
+                        },
+                        "repeat" => match nv.lit {
+                            syn::Lit::Int(value) => {
+                                let time =
+                                    value.to_string().parse::<u64>().expect("time必须是整数");
+                                time_type.append_all(quote! {
+                                    ::proc_qq::SchedulerJobPeriod::Repeat(#time.to_owned())
+                                });
+                            }
+                            _ => abort!(&ident.span(), "repeat只支持字符串类型参数值"),
+                        },
+                        _ => abort!(&ident.span(), "不支持的参数名称"),
+                    }
+                }
+            },
+            NestedMeta::Lit(ident) => abort!(&ident.span(), "不支持值类型的参数"),
+        }
+    } else {
+        abort!(&method.span(), "必须要有一个参数[ cron | repeat ] ")
+    }
+    let ident = method.sig.ident;
+    let bot_params_pat = bot_params.pat.as_ref();
+    let bot_params_ty = bot_params.ty.as_ref();
+    let ident_str = format!("{}", ident);
+    let qu = quote!(
+        #[allow(non_camel_case_types)]
+        pub struct #ident;
+
+        #[::proc_qq::re_exports::async_trait::async_trait]
+        impl ::proc_qq::SchedulerJobHandler for #ident{
+            async fn call(&self, #bot_params_pat: #bot_params_ty) -> ::proc_qq::re_exports::anyhow::Result<()> #block
+        }
+
+        impl Into<::proc_qq::SchedulerJob> for #ident {
+            fn into(self) -> ::proc_qq::SchedulerJob {
+                ::proc_qq::SchedulerJob {
+                    id: #ident_str.into(),
+                    period: #time_type,
+                    handler: std::sync::Arc::new(Box::new(self)),
+                }
+            }
+        }
+    );
+    emit!(qu)
+}
+
+#[cfg(feature = "scheduler")]
+#[proc_macro_error]
+#[proc_macro]
+pub fn scheduler(input: TokenStream) -> TokenStream {
+    let params = parse_macro_input!(input as ModuleParams);
+    if params.expressions.len() < 1 {
+        abort!(params.span, "参数数量不足")
+    }
+
+    let name = syn::parse_str::<Expr>(&params.expressions[0]).expect("name 解析错误");
+    let mut handle_builder = String::new();
+    for i in 1..params.expressions.len() {
+        handle_builder.push_str(&format!("{}.into(),", params.expressions[i]));
+    }
+
+    let handle_invoker =
+        syn::parse_str::<Expr>(&format!("vec![{handle_builder}]")).expect("handle invoker解析错误");
+    emit!(quote! {
+        ::proc_qq::Scheduler {
+            id: #name.to_owned(),
+            jobs: #handle_invoker,
+        }
+    })
 }

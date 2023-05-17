@@ -13,6 +13,7 @@ proc-macro2 = "1.0"
 proc-macro-error = { version = "1.0", default-features = false }
 proc-macro2-diagnostics = "0.9"
 regex = "1"
+cron = { version = "0.12", optional = true }
 
 [lib]
 proc-macro = true
@@ -20,3 +21,4 @@ proc-macro = true
 [features]
 default = []
 event_args = []
+scheduler = ["dep:cron"]

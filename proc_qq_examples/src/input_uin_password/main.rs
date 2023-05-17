@@ -4,9 +4,9 @@ use std::sync::Arc;
 use proc_qq::re_exports::async_trait::async_trait;
 use proc_qq::re_exports::ricq::version::ANDROID_PHONE;
 use proc_qq::*;
-use proc_qq_examples::hello_module;
 use proc_qq_examples::init_tracing_subscriber;
 use proc_qq_examples::result_handlers;
+use proc_qq_examples::{hello_module, scheduler_handlers};
 
 #[tokio::main]
 async fn main() {
@@ -23,6 +23,7 @@ async fn main() {
         }))
         .modules(vec![hello_module::module()])
         .result_handlers(vec![result_handlers::on_result {}.into()])
+        .schedulers(vec![scheduler_handlers::scheduler()])
         .build()
         .await
         .unwrap();

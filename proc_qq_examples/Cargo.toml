@@ -16,7 +16,7 @@ name = "input-uin-password"
 path = "src/input_uin_password/main.rs"
 
 [dependencies]
-proc_qq = { path = "../proc_qq" }
+proc_qq = { path = "../proc_qq" ,features = ["event_args","scheduler"]}
 anyhow = "1.0"
 tokio = { version = "1", features = ["full"] }
 tracing = "0.1"
