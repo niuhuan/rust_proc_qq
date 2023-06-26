@@ -1,6 +1,6 @@
-use proc_macro2::Ident;
 use std::ops::Deref;
 
+use proc_macro2::Ident;
 use proc_macro_error::abort;
 use syn::{FnArg, ItemFn, Pat, Type};
 
@@ -30,6 +30,8 @@ pub enum BotParamsMatherTuple<'a> {
     Params(&'a Ident, &'a Type),
 }
 
+const command_notice: &str = r#"bot_command中的元素必须是由固定字符串和参数组合而成, 例如 "/删除 {idx}" "请{min}{time:|小时|分钟|秒钟}后提醒我{event}" "{option:|开启|关闭} 天气预报" "#;
+
 // 解析命令行
 pub(crate) fn parse_bot_command(
     method: &ItemFn,
@@ -37,8 +39,7 @@ pub(crate) fn parse_bot_command(
 ) -> Option<Vec<BotCommandRaw>> {
     // 由固定字符串和参数组合而成
     if let Some(bot_command) = bot_command {
-        let element_reg_str =
-            r#"([A-Za-z0-9_/\p{Han}\p{Hiragana}\p{Katakana}]+)|(\{([A-Za-z_]([A-Za-z0-9_]+)?)\})"#;
+        let element_reg_str = r#"([A-Za-z0-9_/\p{Han}\p{Hiragana}\p{Katakana}]+)|(\{([A-Za-z_]([A-Za-z0-9_]+)?)(:(|[A-Za-z0-9_/\p{Han}\p{Hiragana}\p{Katakana}]+)+)?\})"#;
         let elements_reg = regex::Regex::new(format!("^({})+$", element_reg_str).as_str())
             .expect("bot_command正则表达式编译失败");
         let element_reg =
@@ -48,14 +49,11 @@ pub(crate) fn parse_bot_command(
         // 根据空格切分并循环
         while let Some(item) = bot_command_item_strs.next() {
             if !elements_reg.is_match(item) {
-                abort!(
-                    &method.sig.ident.span(),
-                    r#"bot_command中的元素必须是由固定字符串和参数组合而成, 例如 "/删除 {idx}" "请{min}分钟后提醒我{event}" "#
-                );
+                abort!(&method.sig.ident.span(), command_notice);
             }
             let mut element_strs = element_reg.find_iter(item);
             let mut bot_command_elements = vec![];
-            // 多此匹配
+            // 多次匹配
             while let Some(element_str) = element_strs.next() {
                 let element_str = element_str.as_str();
                 if element_str.starts_with('{') {
@@ -67,11 +65,8 @@ pub(crate) fn parse_bot_command(
                 }
             }
             if bot_command_elements.is_empty() {
-                abort!(
-                    &method.sig.ident.span(),
-                    r#"bot_command中的元素必须是由固定字符串和参数组合而成, 例如 "/删除 {idx}" "请{min}分钟后提醒我{event}" "#,
-                    // PROC_QQ逻辑错误才会运行此分支
-                );
+                // PROC_QQ逻辑错误才会运行此分支
+                abort!(&method.sig.ident.span(), command_notice);
             }
             if bot_command_elements.len() == 1 {
                 bot_command_items.push(match bot_command_elements.first().unwrap() {
