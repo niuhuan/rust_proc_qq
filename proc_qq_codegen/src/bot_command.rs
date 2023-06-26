@@ -20,14 +20,14 @@ pub(crate) enum BotCommandRawTuple {
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum BotParamsMather<'a> {
     Command(String),
-    Params(&'a syn::Ident, &'a syn::Type),
+    Params(&'a Ident, &'a Type),
     Multiple(Vec<BotParamsMatherTuple<'a>>),
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum BotParamsMatherTuple<'a> {
     Command(String),
-    Params(&'a syn::Ident, &'a syn::Type),
+    Params(&'a Ident, &'a Type),
 }
 
 // 解析命令行
