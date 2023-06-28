@@ -234,7 +234,22 @@ async fn handle5(
 }
 ```
 
-TODO:枚举 : "请{time}{unit:时|分|秒|天}之后告诉我{text}"
+枚举
+
+请注意，枚举的匹配是通过 `|` 来分割的，第一个枚举值的前面也需要|。
+另外Uint可以时String，或者是数字类型。也可以是实现了`::proc_qq::TryFromStr`的自定义类型。
+
+```rust
+#[event(bot_command = "请{time}{unit:|时|分|秒|天}之后告诉我{text}")]
+async fn handle5(
+  _message: &MessageEvent,
+  time: i64,
+  unit: Unit,
+) -> anyhow::Result<bool> {
+  println!("text : {:?} , time : {:?} ", text, time);
+  Ok(true)
+}
+```
 
 #### 目前能匹配的类型
 ```
