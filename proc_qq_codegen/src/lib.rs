@@ -228,7 +228,7 @@ pub fn event(args: TokenStream, input: TokenStream) -> TokenStream {
                                         mmc.append_all(quote! {#x,});
                                     }
                                     gets.append_all(quote! {
-                                        let #pat: #ty = if let Some(value) = ::proc_qq::qtuple_matcher_get_enum::<#ty>(&mut ps, vec![#mmc]) {
+                                        let #pat: #ty = if let Some(value) = ::proc_qq::tuple_matcher_get_enum::<#ty>(&mut ps, vec![#mmc]) {
                                             value
                                         } else {
                                             return Ok(false);
