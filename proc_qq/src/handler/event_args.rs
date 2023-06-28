@@ -587,8 +587,6 @@ impl FromTupleMatcher for Vec<Option<String>> {
     }
 }
 
-//todo 浮点类型要分开处理了
-
 macro_rules! tuple_base_ty_supplier {
     ($ty:ty, $regexp:expr) => {
         impl FromTupleMatcher for $ty {
@@ -596,9 +594,10 @@ macro_rules! tuple_base_ty_supplier {
                 let regex = regex::Regex::new($regexp).expect("proc_qq 的正则错误");
                 if let Some(find) = regex.find(matcher.0.as_str()) {
                     if find.start() == 0 {
-                        matcher.0 = matcher.0.as_str()[find.start()..].to_string();
+                        let parse = matcher.0.as_str()[find.start()..find.end()].to_string();
+                        matcher.0 = matcher.0.as_str()[find.end()..].to_string();
+                        return parse.as_str().parse::<$ty>().ok();
                     }
-                    return matcher.0.parse::<$ty>().ok();
                 }
                 None
             }
