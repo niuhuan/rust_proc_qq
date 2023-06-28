@@ -1,10 +1,10 @@
+use ricq_core::msg::elem::RQElem;
+
 use crate::FriendMessageEvent;
 use crate::GroupMessageEvent;
 use crate::GroupTempMessageEvent;
 use crate::MessageEvent;
 use crate::{ImageElement, MessageContentTrait};
-use ricq_core::msg::elem::RQElem;
-use tracing::warn;
 
 #[derive(Clone, Debug)]
 pub enum EventArg {
@@ -174,56 +174,17 @@ impl CommandMatcher {
         !self.matching.is_empty() || self.idx < self.elements.len()
     }
 
-    pub fn tuple_matcher(&mut self, elements: Vec<TupleMatcherElement>) -> Option<Vec<String>> {
-        if self.matching.is_empty() {
-            None
-        } else {
-            warn!("{:?}", elements);
-            // matching 恒不为空，至少有1节
-            let mut saw = self.matching.split_ascii_whitespace();
-            let first = saw.next().unwrap();
-            let mut params_match: Vec<&str> = Vec::new();
-            let mut params_holding = false;
-            let mut sub_match = first;
-            for ele in elements {
-                match ele {
-                    TupleMatcherElement::Command(data) => {
-                        if params_holding {
-                            if let Some(find) = sub_match.find(data) {
-                                params_match.push(&sub_match[..find]);
-                                sub_match = &sub_match[find..];
-                                sub_match = &sub_match[data.len()..];
-                                params_holding = false;
-                            } else {
-                                return None;
-                            }
-                        } else {
-                            // 第一次匹配
-                            if sub_match.starts_with(data) {
-                                sub_match = &sub_match[data.len()..];
-                            } else {
-                                return None;
-                            }
-                        }
-                    }
-                    TupleMatcherElement::Param => {
-                        if params_holding {
-                            return None;
-                        } else {
-                            params_holding = true;
-                        }
-                    }
-                }
+    pub fn tuple_matcher(&mut self) -> Option<TupleMatcher> {
+        if !self.matching.is_empty() {
+            let sp_regexp = regex::Regex::new("\\s+").expect("proc_qq 正则错误");
+            let mut sp = sp_regexp.split(self.matching.as_str());
+            if let Some(first) = sp.next() {
+                let first = first.to_string();
+                self.matching = self.matching[first.len()..].trim().to_string();
+                return Some(TupleMatcher::new(first));
             }
-            // 最后一个参数
-            if params_holding {
-                params_match.push(&sub_match);
-            }
-            let result = params_match.iter().map(|s| s.to_string()).collect();
-            self.matching = self.matching[first.len()..].trim().to_string();
-            warn!("{:?}", result);
-            Some(result)
         }
+        None
     }
 }
 
@@ -278,6 +239,29 @@ impl FromCommandMatcher for Vec<String> {
         matcher.matching = String::default();
         Some(result)
     }
+}
+
+#[inline]
+pub fn matcher_get_enum<'a, F: Sized + TryFrom<String>>(
+    matcher: &mut CommandMatcher,
+    values: Vec<&str>,
+) -> Option<F> {
+    if matcher.matching.is_empty() {
+        return None;
+    }
+    let sp_regexp = regex::Regex::new("\\s+").expect("proc_qq 正则错误");
+    let mut sp = sp_regexp.split(matcher.matching.as_str());
+    if let Some(first) = sp.next() {
+        if values.contains(&first) {
+            let result = match F::try_from(first.to_string()) {
+                Ok(v) => Some(v),
+                Err(_) => return None,
+            };
+            matcher.matching = matcher.matching[first.len()..].trim().to_string();
+            return result;
+        }
+    }
+    None
 }
 
 macro_rules! command_base_ty_supplier {
@@ -545,6 +529,7 @@ impl FromCommandMatcher for Vec<ImageElement> {
 pub enum TupleMatcherElement {
     Command(&'static str),
     Param,
+    Enum(Vec<&'static str>),
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -556,98 +541,162 @@ impl TupleMatcher {
     }
 }
 
+impl TupleMatcher {
+    pub fn match_command(&mut self, command: &str) -> bool {
+        if let Some(idx) = self.0.find(command) {
+            if idx == 0 {
+                self.0 = self.0[command.len()..].to_string();
+                return true;
+            }
+        }
+        false
+    }
+}
+
 pub trait FromTupleMatcher: Sized {
-    fn get(matcher: TupleMatcher) -> Option<Self>;
+    fn get(matcher: &mut TupleMatcher) -> Option<Self>;
 }
 
 #[inline]
-pub fn tuple_matcher_get<F: Sized + FromTupleMatcher>(matcher: TupleMatcher) -> Option<F> {
+pub fn tuple_matcher_get<F: Sized + FromTupleMatcher>(matcher: &mut TupleMatcher) -> Option<F> {
     F::get(matcher)
 }
 
 impl FromTupleMatcher for String {
-    fn get(matcher: TupleMatcher) -> Option<Self> {
+    fn get(matcher: &mut TupleMatcher) -> Option<Self> {
         if matcher.0.is_empty() {
             None
         } else {
-            Some(matcher.0)
+            let result = Some(matcher.0.clone());
+            matcher.0 = "".to_string();
+            result
         }
     }
 }
 
 impl FromTupleMatcher for Option<String> {
-    fn get(matcher: TupleMatcher) -> Option<Self> {
+    fn get(matcher: &mut TupleMatcher) -> Option<Self> {
         if matcher.0.is_empty() {
             Some(None)
         } else {
-            Some(Some(matcher.0))
+            let result = Some(matcher.0.clone());
+            matcher.0 = "".to_string();
+            Some(result)
         }
     }
 }
 
 impl FromTupleMatcher for Vec<String> {
-    fn get(matcher: TupleMatcher) -> Option<Self> {
+    fn get(matcher: &mut TupleMatcher) -> Option<Self> {
         if matcher.0.is_empty() {
             Some(vec![])
         } else {
-            Some(vec![matcher.0])
+            let result = Some(vec![matcher.0.clone()]);
+            matcher.0 = "".to_string();
+            result
         }
     }
 }
 
 impl FromTupleMatcher for Vec<Option<String>> {
-    fn get(matcher: TupleMatcher) -> Option<Self> {
+    fn get(matcher: &mut TupleMatcher) -> Option<Self> {
         if matcher.0.is_empty() {
             Some(vec![])
         } else {
-            Some(vec![Some(matcher.0)])
+            let result = Some(vec![Some(matcher.0.clone())]);
+            matcher.0 = "".to_string();
+            result
         }
     }
 }
 
+//todo 浮点类型要分开处理了
+
 macro_rules! tuple_base_ty_supplier {
-    ($ty:ty) => {
+    ($ty:ty, $regexp:expr) => {
         impl FromTupleMatcher for $ty {
-            fn get(matcher: TupleMatcher) -> Option<Self> {
-                matcher.0.parse::<$ty>().ok()
+            fn get(matcher: &mut TupleMatcher) -> Option<Self> {
+                let regex = regex::Regex::new($regexp).expect("proc_qq 的正则错误");
+                if let Some(find) = regex.find(matcher.0.as_str()) {
+                    if find.start() == 0 {
+                        matcher.0 = matcher.0.as_str()[find.start()..].to_string();
+                    }
+                    return matcher.0.parse::<$ty>().ok();
+                }
+                None
             }
         }
 
         impl FromTupleMatcher for Option<$ty> {
-            fn get(matcher: TupleMatcher) -> Option<Self> {
-                if matcher.0.is_empty() {
-                    Some(None)
-                } else {
-                    matcher.0.parse::<$ty>().ok().map(|v| Some(v))
-                }
+            fn get(matcher: &mut TupleMatcher) -> Option<Self> {
+                Some(tuple_matcher_get::<$ty>(matcher))
             }
         }
 
         impl FromTupleMatcher for Vec<$ty> {
-            fn get(matcher: TupleMatcher) -> Option<Self> {
-                if matcher.0.is_empty() {
-                    Some(vec![])
-                } else {
-                    matcher.0.parse::<$ty>().ok().map(|v| vec![v])
-                }
+            fn get(matcher: &mut TupleMatcher) -> Option<Self> {
+                Some(match tuple_matcher_get::<$ty>(matcher) {
+                    None => vec![],
+                    Some(value) => vec![value],
+                })
             }
         }
     };
 }
 
-tuple_base_ty_supplier!(i8);
-tuple_base_ty_supplier!(u8);
-tuple_base_ty_supplier!(i16);
-tuple_base_ty_supplier!(u16);
-tuple_base_ty_supplier!(i32);
-tuple_base_ty_supplier!(u32);
-tuple_base_ty_supplier!(i64);
-tuple_base_ty_supplier!(u64);
-tuple_base_ty_supplier!(i128);
-tuple_base_ty_supplier!(u128);
-tuple_base_ty_supplier!(isize);
-tuple_base_ty_supplier!(usize);
-tuple_base_ty_supplier!(f32);
-tuple_base_ty_supplier!(f64);
-tuple_base_ty_supplier!(bool);
-tuple_base_ty_supplier!(char);
+macro_rules! tuple_base_ty_supplier_ix {
+    ($ty:ty) => {
+        tuple_base_ty_supplier!($ty, r#"-?\d+"#);
+    };
+}
+
+macro_rules! tuple_base_ty_supplier_ux {
+    ($ty:ty) => {
+        tuple_base_ty_supplier!($ty, r#"\d+"#);
+    };
+}
+
+macro_rules! tuple_base_ty_supplier_fx {
+    ($ty:ty) => {
+        tuple_base_ty_supplier!($ty, r#"-?\d+(\.\d+)"#);
+    };
+}
+
+tuple_base_ty_supplier_ix!(i8);
+tuple_base_ty_supplier_ix!(i16);
+tuple_base_ty_supplier_ix!(i32);
+tuple_base_ty_supplier_ix!(i64);
+tuple_base_ty_supplier_ix!(i128);
+tuple_base_ty_supplier_ix!(isize);
+tuple_base_ty_supplier_ix!(char);
+tuple_base_ty_supplier_ux!(u8);
+tuple_base_ty_supplier_ux!(u16);
+tuple_base_ty_supplier_ux!(u32);
+tuple_base_ty_supplier_ux!(u64);
+tuple_base_ty_supplier_ux!(u128);
+tuple_base_ty_supplier_ux!(usize);
+tuple_base_ty_supplier_fx!(f32);
+tuple_base_ty_supplier_fx!(f64);
+tuple_base_ty_supplier!(bool, "(true)|(false)");
+
+#[inline]
+pub fn tuple_matcher_get_enum<'a, F: Sized + TryFrom<String>>(
+    matcher: &mut TupleMatcher,
+    values: Vec<&str>,
+) -> Option<F> {
+    if matcher.0.is_empty() {
+        return None;
+    }
+    for x in values {
+        if matcher.0.starts_with(x) {
+            return match F::try_from(x.to_string()) {
+                Ok(value) => {
+                    matcher.0 = matcher.0[x.len()..].trim().to_string();
+                    Some(value)
+                }
+                Err(_) => None,
+            };
+        }
+    }
+    None
+}

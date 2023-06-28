@@ -6,7 +6,6 @@ use quote::{quote, ToTokens, TokenStreamExt};
 use syn::parse::{Parse, ParseStream};
 use syn::punctuated::Punctuated;
 use syn::spanned::Spanned;
-
 use syn::{parse_macro_input, Expr, FnArg, Meta, NestedMeta, PatType, Token};
 
 #[cfg(feature = "event_args")]
@@ -171,57 +170,80 @@ pub fn event(args: TokenStream, input: TokenStream) -> TokenStream {
                             };
                         });
                     }
-                    BotParamsMather::Multiple(multiple) => {
-                        let mut mme = quote! {};
-                        let mut pp = vec![];
-                        for x in &multiple {
-                            match x {
-                                BotParamsMatherTuple::Command(name) => {
-                                    mme.append_all(quote! {
-                                        ::proc_qq::TupleMatcherElement::Command(#name),
-                                    });
-                                }
-                                BotParamsMatherTuple::Params(p, t) => {
-                                    mme.append_all(quote! {
-                                        ::proc_qq::TupleMatcherElement::Param,
-                                    });
-                                    pp.push((*p, *t));
-                                }
-                            }
+                    BotParamsMather::Enum(pat, ty, values) => {
+                        p_pats.append_all(quote! {
+                           #pat,
+                        });
+                        command_params_in_raw.append_all(quote! {
+                           #pat: #ty,
+                        });
+                        let mut mmc = quote! {};
+                        for x in values {
+                            mmc.append_all(quote! {#x,});
                         }
                         gets.append_all(quote! {
-                            let mut ps = if let Some(ps) = matcher.tuple_matcher(vec![#mme]) {
+                            let #pat: #ty = match ::proc_qq::matcher_get_enum::<#ty>(&mut matcher, vec![#mmc]) {
+                                Some(value) => value,
+                                None => return Ok(false),
+                            };
+                        });
+                    }
+                    BotParamsMather::Multiple(multiple) => {
+                        //////////////////////////////////////////////
+                        gets.append_all(quote! {
+                            let mut ps = if let Some(ps) = matcher.tuple_matcher() {
                                 ps
                             } else {
                                 return Ok(false);
                             };
-                            ps.reverse();
                         });
-                        let len = pp.len();
-                        gets.append_all(quote! {
-                            if ps.len() != #len {
-                                return Ok(false);
-                            }
-                        });
-                        for (pat, ty) in pp {
-                            p_pats.append_all(quote! {
-                              #pat,
-                            });
-                            command_params_in_raw.append_all(quote! {
-                                #pat: #ty,
-                            });
-                            gets.append_all(quote! {
-                                    let #pat: #ty = if let Some(np) = ps.pop() {
-                                        let sub_matcher = ::proc_qq::TupleMatcher::new(np);
-                                        match ::proc_qq::tuple_matcher_get::<#ty>(sub_matcher) {
-                                            Some(value) => value,
-                                            None => return Ok(false),
+                        // let mut tp_elements = quote! {};
+                        for x in &multiple {
+                            match x {
+                                BotParamsMatherTuple::Command(name) => {
+                                    gets.append_all(quote! {
+                                        if !ps.match_command(#name) {
+                                            return Ok(false);
                                         }
-                                    } else {
-                                        return Ok(false);
-                                    };
-                            });
+                                    });
+                                }
+                                BotParamsMatherTuple::Params(pat, ty) => {
+                                    gets.append_all(quote! {
+                                        let #pat: #ty = if let Some(value) = ::proc_qq::tuple_matcher_get::<#ty>(&mut ps) {
+                                            value
+                                        } else {
+                                            return Ok(false);
+                                        };
+                                    });
+                                    p_pats.append_all(quote! {
+                                       #pat,
+                                    });
+                                    command_params_in_raw.append_all(quote! {
+                                       #pat: #ty,
+                                    });
+                                }
+                                BotParamsMatherTuple::Enum(pat, ty, values) => {
+                                    let mut mmc = quote! {};
+                                    for x in values {
+                                        mmc.append_all(quote! {#x,});
+                                    }
+                                    gets.append_all(quote! {
+                                        let #pat: #ty = if let Some(value) = ::proc_qq::qtuple_matcher_get_enum::<#ty>(&mut ps, vec![#mmc]) {
+                                            value
+                                        } else {
+                                            return Ok(false);
+                                        };
+                                    });
+                                    p_pats.append_all(quote! {
+                                       #pat,
+                                    });
+                                    command_params_in_raw.append_all(quote! {
+                                       #pat: #ty,
+                                    });
+                                }
+                            }
                         }
+                        ////////////////////////////////
                     }
                 }
             }
