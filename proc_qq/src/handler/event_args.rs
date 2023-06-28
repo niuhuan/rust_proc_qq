@@ -241,29 +241,6 @@ impl FromCommandMatcher for Vec<String> {
     }
 }
 
-#[inline]
-pub fn matcher_get_enum<'a, F: Sized + TryFrom<String>>(
-    matcher: &mut CommandMatcher,
-    values: Vec<&str>,
-) -> Option<F> {
-    if matcher.matching.is_empty() {
-        return None;
-    }
-    let sp_regexp = regex::Regex::new("\\s+").expect("proc_qq 正则错误");
-    let mut sp = sp_regexp.split(matcher.matching.as_str());
-    if let Some(first) = sp.next() {
-        if values.contains(&first) {
-            let result = match F::try_from(first.to_string()) {
-                Ok(v) => Some(v),
-                Err(_) => return None,
-            };
-            matcher.matching = matcher.matching[first.len()..].trim().to_string();
-            return result;
-        }
-    }
-    None
-}
-
 macro_rules! command_base_ty_supplier {
     ($ty:ty) => {
         impl FromCommandMatcher for $ty {
@@ -662,25 +639,81 @@ macro_rules! tuple_base_ty_supplier_fx {
     };
 }
 
-tuple_base_ty_supplier_ix!(i8);
-tuple_base_ty_supplier_ix!(i16);
-tuple_base_ty_supplier_ix!(i32);
-tuple_base_ty_supplier_ix!(i64);
-tuple_base_ty_supplier_ix!(i128);
-tuple_base_ty_supplier_ix!(isize);
-tuple_base_ty_supplier_ix!(char);
-tuple_base_ty_supplier_ux!(u8);
-tuple_base_ty_supplier_ux!(u16);
-tuple_base_ty_supplier_ux!(u32);
-tuple_base_ty_supplier_ux!(u64);
-tuple_base_ty_supplier_ux!(u128);
-tuple_base_ty_supplier_ux!(usize);
-tuple_base_ty_supplier_fx!(f32);
-tuple_base_ty_supplier_fx!(f64);
+macro_rules! tuple_base_ty_supplier_ix_types {
+    ($($ty:ty),*) => {
+        $(tuple_base_ty_supplier_ix!($ty);)*
+    };
+}
+
+macro_rules! tuple_base_ty_supplier_ux_types {
+    ($($ty:ty),*) => {
+        $(tuple_base_ty_supplier_ux!($ty);)*
+    };
+}
+
+macro_rules! tuple_base_ty_supplier_fx_types {
+    ($($ty:ty),*) => {
+        $(tuple_base_ty_supplier_fx!($ty);)*
+    };
+}
+
+tuple_base_ty_supplier_ix_types!(i8, i16, i32, i64, i128, isize, char);
+tuple_base_ty_supplier_ux_types!(u8, u16, u32, u64, u128, usize);
+tuple_base_ty_supplier_fx_types!(f32, f64);
 tuple_base_ty_supplier!(bool, "(true)|(false)");
 
+// enums
+
+pub trait TryFromStr: Sized {
+    fn try_from(value: &str) -> Result<Self, anyhow::Error>;
+}
+
+impl TryFromStr for String {
+    fn try_from(value: &str) -> Result<Self, anyhow::Error> {
+        Ok(value.to_string())
+    }
+}
+
+macro_rules! enum_try_from_str {
+    ($($ty:ty),*) => {
+        $(impl TryFromStr for $ty {
+            fn try_from(value: &str) -> Result<Self, anyhow::Error> {
+                Ok(value.parse::<$ty>()?)
+            }
+        })*
+    };
+}
+
+enum_try_from_str!(i8, i16, i32, i64, i128, isize, char);
+enum_try_from_str!(u8, u16, u32, u64, u128, usize);
+enum_try_from_str!(f32, f64);
+enum_try_from_str!(bool);
+
 #[inline]
-pub fn tuple_matcher_get_enum<'a, F: Sized + TryFrom<String>>(
+pub fn matcher_get_enum<'a, F: Sized + TryFromStr>(
+    matcher: &mut CommandMatcher,
+    values: Vec<&str>,
+) -> Option<F> {
+    if matcher.matching.is_empty() {
+        return None;
+    }
+    let sp_regexp = regex::Regex::new("\\s+").expect("proc_qq 正则错误");
+    let mut sp = sp_regexp.split(matcher.matching.as_str());
+    if let Some(first) = sp.next() {
+        if values.contains(&first) {
+            let result = match F::try_from(first) {
+                Ok(v) => Some(v),
+                Err(_) => return None,
+            };
+            matcher.matching = matcher.matching[first.len()..].trim().to_string();
+            return result;
+        }
+    }
+    None
+}
+
+#[inline]
+pub fn tuple_matcher_get_enum<'a, F: Sized + TryFromStr>(
     matcher: &mut TupleMatcher,
     values: Vec<&str>,
 ) -> Option<F> {
@@ -689,7 +722,7 @@ pub fn tuple_matcher_get_enum<'a, F: Sized + TryFrom<String>>(
     }
     for x in values {
         if matcher.0.starts_with(x) {
-            return match F::try_from(x.to_string()) {
+            return match F::try_from(x) {
                 Ok(value) => {
                     matcher.0 = matcher.0[x.len()..].trim().to_string();
                     Some(value)

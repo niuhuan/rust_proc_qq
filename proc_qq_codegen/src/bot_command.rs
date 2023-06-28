@@ -43,54 +43,64 @@ pub(crate) fn parse_bot_command(
 ) -> Option<Vec<BotCommandRaw>> {
     // 由固定字符串和参数组合而成
     if let Some(bot_command) = bot_command {
-        let element_reg_str = r#"([A-Za-z0-9_/\p{Han}\p{Hiragana}\p{Katakana}]+)|(\{([A-Za-z_]([A-Za-z0-9_]+)?)(:(|[A-Za-z0-9_/\p{Han}\p{Hiragana}\p{Katakana}]+)+)?\})"#;
-        let elements_reg = regex::Regex::new(format!("^({})+$", element_reg_str).as_str())
-            .expect("bot_command正则表达式编译失败");
-        let element_reg =
-            regex::Regex::new(element_reg_str).expect("bot_command正则表达式编译失败");
+        //
+        let command_reg = regex::Regex::new(r#"^[A-Za-z0-9_/\p{Han}\p{Hiragana}\p{Katakana}]+$"#)
+            .expect("proc_qq正则错误(command_reg)");
+        let params_reg = regex::Regex::new(r#"^\{[A-Za-z_]([A-Za-z0-9_]+)?(:(\|[A-Za-z0-9_/\p{Han}\p{Hiragana}\p{Katakana}]+)+)?\}$"#)
+            .expect("proc_qq正则错误(params_reg)");
+        let tuple_reg = regex::Regex::new(r#"^(([A-Za-z0-9_/\p{Han}\p{Hiragana}\p{Katakana}]+)|(\{[A-Za-z_]([A-Za-z0-9_]+)?(:(\|[A-Za-z0-9_/\p{Han}\p{Hiragana}\p{Katakana}]+)+)?\}))+$"#)
+            .expect("proc_qq正则错误(tuple_reg)");
+        //
         let mut bot_command_items = vec![];
         let mut bot_command_item_strs = bot_command.split_whitespace();
         // 根据空格切分并循环
         while let Some(item) = bot_command_item_strs.next() {
-            // 不符合正则表达式将会提示错误
-            if !elements_reg.is_match(item) {
-                abort!(&method.sig.ident.span(), COMMAND_NOTICE);
-            }
-            let mut element_strs = element_reg.find_iter(item);
-            let mut bot_command_elements = vec![];
-            // 多次匹配
-            while let Some(element_str) = element_strs.next() {
-                let element_str = element_str.as_str();
-                if element_str.starts_with('{') {
-                    let param = &element_str[1..element_str.len() - 1];
-                    if param.contains(":|") {
-                        let idx = param.find(":|").unwrap();
-                        let param_name = &param[..idx];
-                        let param_enum_str = &param[idx + 2..];
-                        let param_enums = param_enum_str.split('|');
-                        bot_command_elements.push(BotCommandRawTuple::Enum(
-                            param_name.to_string(),
-                            param_enums.map(|s| s.to_string()).collect(),
-                        ));
-                    } else {
-                        bot_command_elements.push(BotCommandRawTuple::Param(param.to_string()));
-                    }
+            if command_reg.is_match(item) {
+                bot_command_items.push(BotCommandRaw::Command(item.to_owned()));
+            } else if params_reg.is_match(item) {
+                let param = &item[1..item.len() - 1];
+                if param.contains(":|") {
+                    let idx = param.find(":|").unwrap();
+                    let param_name = &param[..idx];
+                    let param_enum_str = &param[idx + 2..];
+                    let param_enums = param_enum_str.split('|');
+                    bot_command_items.push(BotCommandRaw::Enum(
+                        param_name.to_string(),
+                        param_enums.map(|s| s.to_string()).collect(),
+                    ));
                 } else {
-                    bot_command_elements.push(BotCommandRawTuple::Command(element_str.to_string()));
+                    bot_command_items.push(BotCommandRaw::Param(param.to_string()));
                 }
-            }
-            if bot_command_elements.is_empty() {
-                // PROC_QQ逻辑错误才会运行此分支
-                abort!(&method.sig.ident.span(), COMMAND_NOTICE);
-            }
-            if bot_command_elements.len() == 1 {
-                bot_command_items.push(match bot_command_elements.first().unwrap() {
-                    BotCommandRawTuple::Command(tmp) => BotCommandRaw::Command(tmp.clone()),
-                    BotCommandRawTuple::Param(tmp) => BotCommandRaw::Param(tmp.clone()),
-                    BotCommandRawTuple::Enum(n, e) => BotCommandRaw::Enum(n.clone(), e.clone()),
-                });
-            } else {
+            } else if tuple_reg.is_match(item) {
+                let mut bot_command_elements = vec![];
+                let find_reg = regex::Regex::new(r#"(([A-Za-z0-9_/\p{Han}\p{Hiragana}\p{Katakana}]+)|(\{[A-Za-z_]([A-Za-z0-9_]+)?(:(\|[A-Za-z0-9_/\p{Han}\p{Hiragana}\p{Katakana}]+)+)?\}))"#).expect("proc_qq正则错误(find_reg)");
+                for x in find_reg.find_iter(item) {
+                    let element_str = &item[x.start()..x.end()];
+                    if element_str.starts_with("{") {
+                        let param = &element_str[1..element_str.len() - 1];
+                        if param.contains(":|") {
+                            let idx = param.find(":|").unwrap();
+                            let param_name = &param[..idx];
+                            let param_enum_str = &param[idx + 2..];
+                            let param_enums = param_enum_str.split('|');
+                            bot_command_elements.push(BotCommandRawTuple::Enum(
+                                param_name.to_string(),
+                                param_enums.map(|s| s.to_string()).collect(),
+                            ));
+                        } else {
+                            bot_command_elements.push(BotCommandRawTuple::Param(param.to_string()));
+                        }
+                    } else {
+                        bot_command_elements
+                            .push(BotCommandRawTuple::Command(element_str.to_string()));
+                    }
+                }
                 bot_command_items.push(BotCommandRaw::Multiple(bot_command_elements))
+            } else {
+                abort!(
+                    &method.sig.ident.span(),
+                    format!("{} => {}", COMMAND_NOTICE, item)
+                );
             }
         }
         Some(bot_command_items)
