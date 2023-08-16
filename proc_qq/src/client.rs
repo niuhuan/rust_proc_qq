@@ -32,8 +32,8 @@ use crate::features::scheduler;
 use crate::handler::EventSender;
 use crate::DeviceSource::{JsonFile, JsonString};
 use crate::{
-    Authentication, ClientHandler, DeviceLockVerification, DeviceSource, EventResultHandler,
-    Module, SessionStore, ShowQR, ShowSlider,
+    show_slider, Authentication, ClientHandler, DeviceLockVerification, DeviceSource,
+    EventResultHandler, Module, SessionStore, ShowQR, ShowSliderTrait,
 };
 
 /// 客户端
@@ -44,7 +44,7 @@ pub struct Client {
     pub(crate) modules: Arc<Vec<Module>>,
     pub(crate) result_handlers: Arc<Vec<EventResultHandler>>,
     pub show_qr: ShowQR,
-    pub show_slider: ShowSlider,
+    pub show_slider: Arc<Box<dyn ShowSliderTrait + Sync + Send>>,
     pub shutting: bool,
     pub device_lock_verification: DeviceLockVerification,
     #[cfg(feature = "connect_handler")]
@@ -473,45 +473,17 @@ async fn loop_login(client: &Client, first: RQResult<LoginResponse>) -> Result<(
                 // 图片应该没了
                 image_captcha: ref _image_captcha,
                 ..
-            }) => match client.show_slider {
-                ShowSlider::AndroidHelper => {
-                    tracing::info!("滑动条 (原URL) : {:?}", verify_url);
-                    let helper_url = verify_url
-                        .clone()
-                        .unwrap()
-                        .replace("ssl.captcha.qq.com", "txhelper.glitch.me");
-                    tracing::info!("滑动条 (改URL) : {:?}", helper_url);
-                    let mut txt = http_get(&helper_url)
-                        .await
-                        .with_context(|| "http请求失败")?;
-                    tracing::info!("您需要使用该仓库 提供的APP进行滑动 , 滑动后请等待, https://github.com/mzdluo123/TxCaptchaHelper : {}", txt);
-                    loop {
-                        sleep(Duration::from_secs(5)).await;
-                        let rsp = http_get(&helper_url)
-                            .await
-                            .with_context(|| "http请求失败")?;
-                        if !rsp.eq(&txt) {
-                            txt = rsp;
-                            break;
-                        }
-                    }
-                    tracing::info!("获取到ticket : {}", txt);
-                    resp = rq_client.submit_ticket(&txt).await.expect("发送ticket失败");
-                }
-                #[cfg(all(any(target_os = "windows"), feature = "pop_window_slider"))]
-                ShowSlider::PopWindow => {
-                    if let Some(ticket) =
-                        crate::captcha_window::ticket(verify_url.as_ref().unwrap())
-                    {
-                        resp = rq_client
-                            .submit_ticket(&ticket)
-                            .await
-                            .expect("failed to submit ticket");
-                    } else {
-                        panic!("not slide");
-                    }
-                }
-            },
+            }) => {
+                let ticket = client
+                    .show_slider
+                    .show_slider(verify_url.clone())
+                    .await
+                    .expect("未能获取ticket");
+                resp = rq_client
+                    .submit_ticket(&ticket)
+                    .await
+                    .expect("failed to submit ticket");
+            }
             LoginResponse::DeviceLockLogin { .. } => {
                 resp = rq_client
                     .device_lock_login()
@@ -537,14 +509,6 @@ async fn loop_login(client: &Client, first: RQResult<LoginResponse>) -> Result<(
             }
         }
     }
-}
-
-async fn http_get(url: &str) -> Result<String> {
-    Ok(reqwest::ClientBuilder::new().build().unwrap().get(url).header(
-        "user-agent", "Mozilla/5.0 (Linux; Android 6.0; Nexus 5 Build/MRA58N) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/98.0.4758.80 Mobile Safari/537.36",
-    ).send().await?
-        .text()
-        .await?)
 }
 
 pub fn token_to_bytes(t: &Token) -> Bytes {
@@ -589,7 +553,7 @@ pub struct ClientBuilder {
     #[cfg(feature = "scheduler")]
     schedulers: Arc<Vec<scheduler::Scheduler>>,
     show_qr: Option<ShowQR>,
-    show_slider: Option<ShowSlider>,
+    show_slider: Option<Arc<Box<dyn ShowSliderTrait + Sync + Send>>>,
     device_lock_verification: Option<DeviceLockVerification>,
     #[cfg(feature = "connect_handler")]
     connect_handler_arc: Arc<Option<Box<dyn ConnectionHandler + Sync + Send>>>,
@@ -641,7 +605,10 @@ impl ClientBuilder {
     }
 
     /// 设置显示滑动条的方式
-    pub fn show_slider<E: Into<Option<ShowSlider>>>(mut self, show_slider: E) -> Self {
+    pub fn show_slider<S: Into<Option<Arc<Box<dyn ShowSliderTrait + Sync + Send>>>>>(
+        mut self,
+        show_slider: S,
+    ) -> Self {
         self.show_slider = show_slider.into();
         self
     }
@@ -649,7 +616,7 @@ impl ClientBuilder {
     /// 设置显示滑动条的方式（如果是windows可以直接在桌面滑动）
     #[cfg(all(any(target_os = "windows"), feature = "pop_window_slider"))]
     pub fn show_slider_pop_menu_if_possible(self) -> Self {
-        self.show_slider(ShowSlider::PopWindow)
+        self.show_slider(show_slider::PopWindow::arc_boxed())
     }
 
     /// 设置显示滑动条的方式（如果是windows可以直接在桌面滑动）
@@ -714,7 +681,7 @@ impl ClientBuilder {
             show_slider: if self.show_slider.is_some() {
                 self.show_slider.clone().unwrap()
             } else {
-                ShowSlider::AndroidHelper
+                Arc::new(show_slider::AndroidHelper::boxed())
             },
             device_lock_verification: if self.device_lock_verification.is_some() {
                 self.device_lock_verification.clone().unwrap()

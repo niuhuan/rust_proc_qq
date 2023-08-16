@@ -1,13 +1,12 @@
+use anyhow::Result;
+use async_trait::async_trait;
+use bytes::Bytes;
 use core::future::Future;
+use ricq_core::msg::elem::{FlashImage, FriendImage, GroupImage};
 use std::fmt::{Debug, Formatter};
 use std::path::Path;
 use std::pin::Pin;
 use std::sync::Arc;
-
-use anyhow::Result;
-use async_trait::async_trait;
-use bytes::Bytes;
-use ricq_core::msg::elem::{FlashImage, FriendImage, GroupImage};
 
 use crate::DeviceSource::JsonFile;
 
@@ -77,12 +76,96 @@ pub enum ShowQR {
     SaveToFile,
 }
 
-#[derive(Clone, Debug)]
-pub enum ShowSlider {
-    AndroidHelper,
+#[async_trait]
+pub trait ShowSliderTrait {
+    async fn show_slider(&self, verify_url: Option<String>) -> Result<String>;
+}
+
+#[deprecated(since = "0.1.36", note = "please use `show_slider` instead")]
+#[allow(non_snake_case)]
+pub mod ShowSlider {
+    pub use super::show_slider::*;
+}
+
+pub mod show_slider {
+    use super::ShowSliderTrait;
+    use anyhow::{Context, Result};
+    use async_trait::async_trait;
+    use std::sync::Arc;
+    use std::time::Duration;
+    use tokio::time::sleep;
+
+    pub struct AndroidHelper;
+
+    impl AndroidHelper {
+        async fn http_get(&self, url: &str) -> Result<String> {
+            Ok(reqwest::ClientBuilder::new().build().unwrap().get(url).header(
+                "user-agent", "Mozilla/5.0 (Linux; Android 6.0; Nexus 5 Build/MRA58N) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/98.0.4758.80 Mobile Safari/537.36",
+            ).send().await?
+                .text()
+                .await?)
+        }
+
+        pub fn boxed() -> Box<dyn ShowSliderTrait + Sync + Send> {
+            Box::new(Self)
+        }
+
+        pub fn arc_boxed() -> Arc<Box<dyn ShowSliderTrait + Sync + Send>> {
+            Arc::new(Box::new(Self))
+        }
+    }
+
+    #[async_trait]
+    impl ShowSliderTrait for AndroidHelper {
+        async fn show_slider(&self, verify_url: Option<String>) -> Result<String> {
+            tracing::info!("滑动条 (原URL) : {:?}", verify_url);
+            let helper_url = verify_url
+                .clone()
+                .with_context(|| "滑动条URL不存在")?
+                .replace("ssl.captcha.qq.com", "txhelper.glitch.me");
+            tracing::info!("滑动条 (改URL) : {:?}", helper_url);
+            let mut txt = self
+                .http_get(&helper_url)
+                .await
+                .with_context(|| "http请求失败")?;
+            tracing::info!("您需要使用该仓库 提供的APP进行滑动 , 滑动后请等待, https://github.com/mzdluo123/TxCaptchaHelper : {}", txt);
+            loop {
+                sleep(Duration::from_secs(5)).await;
+                let rsp = self
+                    .http_get(&helper_url)
+                    .await
+                    .with_context(|| "http请求失败")?;
+                if !rsp.eq(&txt) {
+                    txt = rsp;
+                    break;
+                }
+            }
+            Ok(txt)
+        }
+    }
 
     #[cfg(all(any(target_os = "windows"), feature = "pop_window_slider"))]
-    PopWindow,
+    pub struct PopWindow;
+
+    #[cfg(all(any(target_os = "windows"), feature = "pop_window_slider"))]
+    impl PopWindow {
+        pub fn boxed() -> Box<dyn ShowSliderTrait + Sync + Send> {
+            Box::new(Self)
+        }
+
+        pub fn arc_boxed() -> Arc<Box<dyn ShowSliderTrait + Sync + Send>> {
+            Arc::new(Box::new(Self))
+        }
+    }
+
+    #[cfg(all(any(target_os = "windows"), feature = "pop_window_slider"))]
+    #[async_trait]
+    impl ShowSliderTrait for PopWindow {
+        async fn show_slider(&self, verify_url: Option<String>) -> Result<String> {
+            crate::captcha_window::ticket(verify_url.as_ref().with_context(|| "滑动条URL不存在")?)
+                .with_context(|| "ticket未获取到")
+        }
+    }
 }
 
 #[derive(Clone)]
