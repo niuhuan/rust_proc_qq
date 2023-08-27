@@ -13,6 +13,7 @@ use futures::future::BoxFuture;
 use futures::FutureExt;
 use rand::prelude::IteratorRandom;
 use ricq::ext::common::after_login;
+use ricq::qsign::QSignClient;
 use ricq_core::binary::{BinaryReader, BinaryWriter};
 use ricq_core::command::wtlogin::{
     LoginDeviceLocked, LoginNeedCaptcha, LoginResponse, LoginSuccess, LoginUnknownStatus,
@@ -657,6 +658,14 @@ impl ClientBuilder {
                     JsonString(json_string) => parse_device_json(json_string)?,
                 },
                 self.version.clone(),
+                Arc::new(
+                    QSignClient::new(
+                        String::from("http://localhost:8080"),
+                        String::from("114514"),
+                        Duration::from_secs(60),
+                    )
+                    .unwrap(),
+                ),
                 ClientHandler {
                     modules: self.modules_vec.clone(),
                     result_handlers: self.result_handlers_vec.clone(),
