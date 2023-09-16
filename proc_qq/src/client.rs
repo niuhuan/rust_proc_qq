@@ -13,6 +13,7 @@ use futures::future::BoxFuture;
 use futures::FutureExt;
 use rand::prelude::IteratorRandom;
 use ricq::ext::common::after_login;
+use ricq::qsign::QSignClient;
 use ricq_core::binary::{BinaryReader, BinaryWriter};
 use ricq_core::command::wtlogin::{
     LoginDeviceLocked, LoginNeedCaptcha, LoginResponse, LoginSuccess, LoginUnknownStatus,
@@ -544,6 +545,7 @@ pub fn bytes_to_token(token: Vec<u8>) -> Token {
 
 /// 用于构建客户端
 pub struct ClientBuilder {
+    qsign_client: Option<Arc<QSignClient>>,
     device_source: DeviceSource,
     version: &'static Version,
     authentication: Option<Authentication>,
@@ -564,6 +566,7 @@ impl ClientBuilder {
     // 构造
     pub fn new() -> Self {
         Self {
+            qsign_client: None,
             device_source: DeviceSource::default(),
             version: &ANDROID_PHONE,
             authentication: None,
@@ -579,6 +582,12 @@ impl ClientBuilder {
             connect_handler_arc: None.into(),
             reconnect_duration: Duration::from_millis(100),
         }
+    }
+
+    /// 设置签名服务器
+    pub fn qsign<S: Into<Option<Arc<QSignClient>>>>(mut self, h: S) -> Self {
+        self.qsign_client = h.into();
+        self
     }
 
     /// 设置模块
@@ -657,6 +666,9 @@ impl ClientBuilder {
                     JsonString(json_string) => parse_device_json(json_string)?,
                 },
                 self.version.clone(),
+                self.qsign_client
+                    .clone()
+                    .with_context(|| "您必须设置签名服务器")?,
                 ClientHandler {
                     modules: self.modules_vec.clone(),
                     result_handlers: self.result_handlers_vec.clone(),
