@@ -1,7 +1,9 @@
 use std::io::{stdin, stdout, Write};
 use std::sync::Arc;
+use std::time::Duration;
 
 use proc_qq::re_exports::async_trait::async_trait;
+use proc_qq::re_exports::ricq;
 use proc_qq::re_exports::ricq::version::ANDROID_PHONE;
 use proc_qq::*;
 use proc_qq_examples::init_tracing_subscriber;
@@ -11,6 +13,9 @@ use proc_qq_examples::{hello_module, scheduler_handlers};
 #[tokio::main]
 async fn main() {
     init_tracing_subscriber();
+    let qsign =
+        ricq::qsign::QSignClient::new("url".to_owned(), "key ".to_owned(), Duration::from_secs(60))
+            .expect("qsign client build err");
     let client = ClientBuilder::new()
         .authentication(Authentication::CustomUinPassword(Arc::new(Box::new(
             InputUinPassword {},
@@ -18,6 +23,7 @@ async fn main() {
         .show_slider_pop_menu_if_possible()
         .device(DeviceSource::JsonFile("device.json".to_owned()))
         .version(&ANDROID_PHONE)
+        .qsign(Some(Arc::new(qsign)))
         .session_store(Box::new(FileSessionStore {
             path: "session.token".to_string(),
         }))

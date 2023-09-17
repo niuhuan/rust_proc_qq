@@ -112,56 +112,65 @@ pub(crate) fn module() -> Module {
 main.rs
 
 ```rust
-use tracing::Level;
-use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
-
+use std::sync::Arc;
+use proc_qq::re_exports::ricq;
 use proc_qq::Authentication::{QRCode, UinPassword};
 use proc_qq::ClientBuilder;
+use tracing::Level;
+use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 
 mod hello_module;
 
 /// 启动并使用为二维码登录
 #[tokio::test]
 async fn test_qr_login() {
-    // 初始化日志打印
-    init_tracing_subscriber();
-    // 使用builder创建
-    let client = ClientBuilder::new()
-        // 使用session.token登录
-        //    .session_store(Box::new(FileSessionStore {
-        //      path: "session.token".to_string(),
-        //    }))
-        .authentication(QRCode)                    // 若不成功则使用二维码登录
-        // 注意，这里使用的设备必须支持二维码登录，例如安卓手表
-        // 如果您使用为不支持的协议协议，则会登录失败，例如安卓QQ 
-        // .authentication(UinPasswordMd5(config.account.uin, password)) // 账号密码登录
-        .device(JsonFile("device.json")) // 设备默认值 
-        .version(&ANDROID_WATCH)  // 安卓手表支持扫码登录
-        // .show_slider_pop_menu_if_possible() // 密码登录时, 如果是windows, 弹出一个窗口代替手机滑块 (需要启用feature=pop_window_slider)
-        .modules(vec![hello_module::module()])    // 您可以注册多个模块
-        .schedulers(vec![scheduler_handlers::scheduler()]) // 设置定时任务
-        .show_rq(Some(ShowQR::OpenBySystem))  // 自动打开二维码 在macos/linux/windows中, 不支持安卓
-        .build()
-        .await
-        .unwrap();
-    run_client(Arc::new(client)).await?;
+  // 初始化日志打印
+  init_tracing_subscriber();
+  // 设置签名服务器
+  let qsign =
+          ricq::qsign::QSignClient::new(
+            "url".to_owned(),
+            "key ".to_owned(),
+            Duration::from_secs(60),
+          ).expect("qsign client build err");
+  // 使用builder创建
+  let client = ClientBuilder::new()
+          // 使用session.token登录
+          //    .session_store(Box::new(FileSessionStore {
+          //      path: "session.token".to_string(),
+          //    }))
+          .authentication(QRCode) // 若不成功则使用二维码登录
+          // 注意，这里使用的设备必须支持二维码登录，例如安卓手表
+          // 如果您使用为不支持的协议协议，则会登录失败，例如安卓QQ
+          // .authentication(UinPasswordMd5(config.account.uin, password)) // 账号密码登录
+          .device(JsonFile("device.json".to_owned())) // 设备默认值
+          .version(&ANDROID_WATCH) // 安卓手表支持扫码登录
+          .qsign(Some(Arc::new(qsign))) // 签名服务器，目前的版本必须使用
+          // .show_slider_pop_menu_if_possible() // 密码登录时, 如果是windows, 弹出一个窗口代替手机滑块 (需要启用feature=pop_window_slider)
+          .modules(vec![hello_module::module()]) // 您可以注册多个模块
+          .schedulers(vec![scheduler_handlers::scheduler()]) // 设置定时任务
+          .show_rq(Some(ShowQR::OpenBySystem)) // 自动打开二维码 在macos/linux/windows中, 不支持安卓
+          .build()
+          .await
+          .unwrap();
+  run_client(Arc::new(client)).await?;
 }
 
 fn init_tracing_subscriber() {
-    tracing_subscriber::registry()
-        .with(
+  tracing_subscriber::registry()
+          .with(
             tracing_subscriber::fmt::layer()
-                .with_target(true)
-                .without_time(),
-        )
-        .with(
+                    .with_target(true)
+                    .without_time(),
+          )
+          .with(
             tracing_subscriber::filter::Targets::new()
-                .with_target("ricq", Level::DEBUG)
-                .with_target("proc_qq", Level::DEBUG)
-                // 这里改成自己的crate名称
-                .with_target("proc_qq_examples", Level::DEBUG),
-        )
-        .init();
+                    .with_target("ricq", Level::DEBUG)
+                    .with_target("proc_qq", Level::DEBUG)
+                    // 这里改成自己的crate名称
+                    .with_target("proc_qq_examples", Level::DEBUG),
+          )
+          .init();
 }
 
 ```
