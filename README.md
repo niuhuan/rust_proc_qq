@@ -12,10 +12,10 @@ QQ机器人框架 | [Telegram(电报)机器人框架](https://github.com/niuhuan
 ## 框架目的
 
 - 简单化 : 让程序员写更少的代码
-    - 自动管理客户端生命周期以及TCP重连
-    - 封装登录流程, 自动获取ticket, 验证滑动条
+  - 自动管理客户端生命周期以及TCP重连
+  - 封装登录流程, 自动获取ticket, 验证滑动条
 - 模块化 : 让调理更清晰
-    - 模块化, 实现插件之间的分离, 更好的启用禁用
+  - 模块化, 实现插件之间的分离, 更好的启用禁用
 
 # 设计思路
 
@@ -210,6 +210,13 @@ use proc_qq::{
 - DisconnectedAndOfflineEvent: 掉线并且断开连接 (proc-qq状态)
 
 支持更多种事件封装中...
+
+### 签名服务器
+> 从`8.9.63`开始，QQ使用了签名服务器，在不使用签名服务器的情况下将无法登录
+
+搭建方法可到 https://github.com/fuqiuluo/unidbg-fetch-qsign 查看
+或者使用 `docker` 直接运行 `docker run -d --restart=always --name qsign -p 8080:8080 xzhouqd/qsign:8.9.63`
+**请注意 sso 版本必须和协议版本一致**
 
 ## 字段匹配
 
@@ -493,8 +500,8 @@ event.reply_text("你好").await?;
 ##### 额外协议的说明
 
 - 暂定本仓库开源协议与RICQ保持一致.
-    - MPL 2.0
-    - 如RICQ更换协议, 请以最新协议为准, 您可以提出ISSUE提醒我进行更新
+  - MPL 2.0
+  - 如RICQ更换协议, 请以最新协议为准, 您可以提出ISSUE提醒我进行更新
 - 仓库持有人在变更仓库协议时无需经过其他代码贡献者的同意, 您在PR时就代表您同意此观点
 
 ## 贡献代码
