@@ -58,7 +58,7 @@ pub enum ResultProcess {
     LoginEvent(Box<dyn LoginResultHandler>),
     Message(Box<dyn MessageResultHandler>),
     ConnectedAndOnline(Box<dyn ConnectedAndOnlineResultHandler>),
-    DisconnectAndOffline(Box<dyn DisconnectedAndOfflineResultHandler>),
+    DisconnectedAndOffline(Box<dyn DisconnectedAndOfflineResultHandler>),
 
     GroupDisband(Box<dyn GroupDisbandResultHandler>),
     MemberPermissionChange(Box<dyn MemberPermissionChangeResultHandler>),
