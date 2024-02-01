@@ -377,8 +377,8 @@ impl EventSender {
         match map_handlers!(
             &self,
             &DisconnectedAndOfflineEvent {},
-            ModuleEventProcess::DisconnectAndOffline,
-            ResultProcess::DisconnectAndOffline,
+            ModuleEventProcess::DisconnectedAndOffline,
+            ResultProcess::DisconnectedAndOffline,
         ) {
             MapResult::Exception(_, _) => Err(anyhow::Error::msg("err")),
             _ => Ok(()),

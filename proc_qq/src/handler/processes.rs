@@ -38,7 +38,7 @@ pub enum ModuleEventProcess {
     LoginEvent(Box<dyn LoginEventProcess>),
     Message(Box<dyn MessageEventProcess>),
     ConnectedAndOnline(Box<dyn ConnectedAndOnlineEventProcess>),
-    DisconnectAndOffline(Box<dyn DisconnectedAndOfflineEventProcess>),
+    DisconnectedAndOffline(Box<dyn DisconnectedAndOfflineEventProcess>),
 
     GroupDisband(Box<dyn GroupDisbandEventProcess>),
     MemberPermissionChange(Box<dyn MemberPermissionChangeEventProcess>),
