@@ -40,7 +40,7 @@ where
         .unwrap()
         .get_async_connection()
         .await?
-        .set_ex(key, value, expire_seconds)
+        .set_ex(key, value, expire_seconds as u64)
         .await
 }
 
