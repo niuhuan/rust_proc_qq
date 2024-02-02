@@ -1,4 +1,5 @@
 [workspace]
+resolver = "2"
 members = [
     "proc_qq",
     "proc_qq_codegen",
