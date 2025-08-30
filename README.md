@@ -1,6 +1,8 @@
 RUST_PROC_QQ
 ============
 
+项目已经无法使用, 请使用更完善的机器人SDK https://github.com/niuhuan/runbot
+
 [![license](https://img.shields.io/github/license/niuhuan/rust_proc_qq)](https://raw.githubusercontent.com/niuhuan/rust_proc_qq/master/LICENSE)
 [![crates.io](https://img.shields.io/crates/v/proc_qq.svg)](https://crates.io/crates/proc_qq)
 
